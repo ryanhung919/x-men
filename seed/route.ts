@@ -173,8 +173,7 @@ async function seedProjects(nameToDeptId: Map<string, number>) {
 
   type ProjRow = { id: number; name: string; department_id: number };
   const inserted = await Promise.all(
-    projects.map(
-      (p) => {
+    projects.map((p) => {
       const depId = nameToDeptId.get(p.department_name)!;
       return sql<ProjRow[]>`
         INSERT INTO projects (name, department_id)
