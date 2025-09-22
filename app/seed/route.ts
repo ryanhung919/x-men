@@ -1,9 +1,9 @@
 import postgres from 'postgres';
-import bcrypt from 'bcrypt';
 import { createClient } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
 import {
   auth_users,
-  users,
+  user_settings,
   departments,
   user_departments,
   roles,
@@ -38,12 +38,27 @@ async function teardownSchema() {
   await sql`DROP TABLE IF EXISTS departments CASCADE`;
   await sql`DROP TABLE IF EXISTS user_settings CASCADE`;
 
-  console.log("✅ Schema torn down");
+  console.log("Schema torn down");
 }
 
 
 /* --------------------- AUTH USERS --------------------- */
 async function seedAuthUsers() {
+  console.log("Removing existing auth users via Admin API...");
+
+  const { data: usersResponse, error } = await supabase.auth.admin.listUsers();
+  if (error) throw error;
+
+  // Ensure TypeScript knows this is always an array
+  const existingUsers: User[] = 'users' in usersResponse ? usersResponse.users : [];
+
+  if (existingUsers.length) {
+    await Promise.all(
+      existingUsers.map((u: User) => supabase.auth.admin.deleteUser(u.id))
+    );
+    console.log(`Deleted ${existingUsers.length} existing users`);
+  }
+  
   const results = await Promise.all(
     auth_users.map(async (u) => {
       // Check if user already exists by email
@@ -83,14 +98,27 @@ async function seedAuthUsers() {
   return results;
 }
 
-/* --------------------- USER_SETTINGS (replaces old users) --------------------- */
+/* --------------------- USER_SETTINGS --------------------- */
 async function seedUserSettings() {
+  await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+    
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+      first_name VARCHAR(255) NOT NULL,
+      last_name  VARCHAR(255) NOT NULL,
+      mode       VARCHAR(10) NOT NULL DEFAULT 'light',
+      default_view VARCHAR(20) NOT NULL DEFAULT 'tasks'
+    );
+  `;
+  await sql`TRUNCATE TABLE user_settings CASCADE;`;
+
   await Promise.all(
-    users.map(
-      (u) =>
+    user_settings.map(
+      (us) =>
         sql`
         INSERT INTO user_settings (id, first_name, last_name, mode, default_view)
-        VALUES (${u.id}, ${u.first_name}, ${u.last_name}, ${u.mode}, ${u.default_view ?? 'tasks'})
+        VALUES (${us.id}, ${us.first_name}, ${us.last_name}, ${us.mode}, ${us.default_view ?? 'tasks'})
         ON CONFLICT (id) DO UPDATE
           SET first_name = EXCLUDED.first_name,
               last_name  = EXCLUDED.last_name,
@@ -272,45 +300,65 @@ async function seedTasks(deps: {
   `;
   await sql`TRUNCATE TABLE tasks RESTART IDENTITY CASCADE;`;
 
-  type TaskRet = { id: number; title: string };
   const titleToTaskId = new Map<string, number>();
+  const pendingTasks = [...tasks]; // clone original array
 
-  for (const t of tasks) {
-    const departmentId = deps.nameToDeptId.get(t.department_name);
-    if (!departmentId) throw new Error(`Unknown department: ${t.department_name}`);
+  while (pendingTasks.length) {
+    // Process all tasks whose parent (if any) exists
+    const readyTasks = pendingTasks.filter(
+      (t) =>
+        !t.parent_task_external_key || titleToTaskId.has(t.parent_task_external_key)
+    );
 
-    const projKey = `${t.project_name}::${departmentId}`;
-    const projectId = deps.projKeyToId.get(projKey);
-    if (!projectId)
-      throw new Error(`Unknown project: ${t.project_name} (dept ${t.department_name})`);
+    if (!readyTasks.length) {
+      throw new Error('Circular dependency detected among tasks!');
+    }
 
-    const parentId = t.parent_task_external_key
-      ? titleToTaskId.get(t.parent_task_external_key) ?? null
-      : null;
+    await Promise.all(
+      readyTasks.map(async (t) => {
+        const departmentId = deps.nameToDeptId.get(t.department_name);
+        if (!departmentId) throw new Error(`Unknown department: ${t.department_name}`);
 
-    const description = t.description ?? null;
-    const assigneeId = t.assignee_id ?? null;
-    const deadline = t.deadline ?? null;
-    const notes = t.notes ?? null;
-    const createdAt = t.created_at ?? new Date();
-    const updatedAt = t.updated_at ?? createdAt;
+        const projKey = `${t.project_name}::${departmentId}`;
+        const projectId = deps.projKeyToId.get(projKey);
+        if (!projectId)
+          throw new Error(`Unknown project: ${t.project_name} (dept ${t.department_name})`);
 
-    const [row] = await sql<TaskRet[]>`
-      INSERT INTO tasks (
-        title, description, priority, status, creator_id, assignee_id, department_id,
-        project_id, deadline, notes, parent_task_id, is_archived, created_at, updated_at
-      )
-      VALUES (
-        ${t.title}, ${description}, ${t.priority}, ${t.status}, ${t.creator_id}, ${assigneeId}, ${departmentId},
-        ${projectId}, ${deadline}, ${notes}, ${parentId}, ${t.is_archived}, ${createdAt}, ${updatedAt}
-      )
-      RETURNING id, title
-    `;
+        const parentId = t.parent_task_external_key
+          ? titleToTaskId.get(t.parent_task_external_key)!
+          : null;
 
-    if (!row) throw new Error('INSERT INTO tasks returned no row');
-    titleToTaskId.set(row.title, row.id);
+        const description = t.description ?? null;
+        const assigneeId = t.assignee_id ?? null;
+        const deadline = t.deadline ?? null;
+        const notes = t.notes ?? null;
+        const createdAt = t.created_at ?? new Date();
+        const updatedAt = t.updated_at ?? createdAt;
+
+        const [row] = await sql<{ id: number; title: string }[]>`
+          INSERT INTO tasks (
+            title, description, priority, status, creator_id, assignee_id, department_id,
+            project_id, deadline, notes, parent_task_id, is_archived, created_at, updated_at
+          )
+          VALUES (
+            ${t.title}, ${description}, ${t.priority}, ${t.status}, ${t.creator_id}, ${assigneeId}, ${departmentId},
+            ${projectId}, ${deadline}, ${notes}, ${parentId}, ${t.is_archived}, ${createdAt}, ${updatedAt}
+          )
+          RETURNING id, title
+        `;
+
+        titleToTaskId.set(row.title, row.id);
+      })
+    );
+
+    // Remove inserted tasks from pending
+    for (const t of readyTasks) {
+      const index = pendingTasks.indexOf(t);
+      if (index > -1) pendingTasks.splice(index, 1);
+    }
   }
 }
+
 
 /* --------------------- TASK_TAGS --------------------- */
 async function seedTaskTags() {
@@ -616,36 +664,38 @@ async function enableRLS() {
 export async function GET() {
   try {
     await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
-
-    // Clean start
     await teardownSchema();
 
-    // Create user_settings first
-    await sql`
-      CREATE TABLE IF NOT EXISTS user_settings (
-        id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-        first_name VARCHAR(255) NOT NULL,
-        last_name  VARCHAR(255) NOT NULL,
-        mode       VARCHAR(10) NOT NULL DEFAULT 'light',
-        default_view VARCHAR(20) NOT NULL DEFAULT 'tasks'
-      );
-    `;
-
-    // await seedAuthUsers();
+    await seedAuthUsers();
 
     await sql.begin(async () => {
-      await seedUserSettings();
-      const nameToDeptId = await seedDepartments();
-      await seedRoles();
-      await seedUserRoles(nameToDeptId);
-      await seedUserDepartments(nameToDeptId);
+      const [userSettingsPromise, rolesPromise, tagsPromise, departmentsPromise] = [
+        seedUserSettings(),
+        seedRoles(),
+        seedTags(),
+        seedDepartments()
+      ];
+
+      const nameToDeptId = await departmentsPromise;
+      await userSettingsPromise;
+      await rolesPromise;
+      await tagsPromise;
+
+      await Promise.all([
+        seedUserRoles(nameToDeptId),
+        seedUserDepartments(nameToDeptId),
+      ]);
+
       const { projKeyToId } = await seedProjects(nameToDeptId);
-      await seedTags();
+
       await seedTasks({ nameToDeptId, projKeyToId });
-      await seedTaskTags();
-      await seedTaskAssignments();   // <── new
-      await seedTaskComments();      // <── new
-      await seedNotifications();
+
+      await Promise.all([
+        seedTaskTags(),
+        seedTaskAssignments(),
+        seedTaskComments(),
+        seedNotifications(),
+      ]);
 
       await enableRLS();
     });
