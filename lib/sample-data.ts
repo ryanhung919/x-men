@@ -59,23 +59,19 @@ export const roles = [{ role: 'staff' }, { role: 'manager' }, { role: 'admin' }]
 export const user_roles = [
   {
     user_id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa',
-    role: 'staff',
-    department_name: 'Finance Manager',
+    role: 'staff'
   },
   {
     user_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a',
-    role: 'manager',
-    department_name: 'Finance Manager',
+    role: 'manager'
   },
   {
     user_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a',
-    role: 'admin',
-    department_name: 'Finance Executive',
+    role: 'admin'
   },
   {
     user_id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9',
-    role: 'admin',
-    department_name: 'Engineering',
+    role: 'admin'
   },
 ];
 

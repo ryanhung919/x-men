@@ -21,6 +21,27 @@ const supabase = createClient(
 );
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
+async function teardownSchema() {
+  console.log("⚠️ Dropping all app tables...");
+
+  // Order matters: drop dependent tables first
+  await sql`DROP TABLE IF EXISTS task_comments CASCADE`;
+  await sql`DROP TABLE IF EXISTS task_assignments CASCADE`;
+  await sql`DROP TABLE IF EXISTS task_tags CASCADE`;
+  await sql`DROP TABLE IF EXISTS tasks CASCADE`;
+  await sql`DROP TABLE IF EXISTS projects CASCADE`;
+  await sql`DROP TABLE IF EXISTS notifications CASCADE`;
+  await sql`DROP TABLE IF EXISTS tags CASCADE`;
+  await sql`DROP TABLE IF EXISTS user_roles CASCADE`;
+  await sql`DROP TABLE IF EXISTS roles CASCADE`;
+  await sql`DROP TABLE IF EXISTS user_departments CASCADE`;
+  await sql`DROP TABLE IF EXISTS departments CASCADE`;
+  await sql`DROP TABLE IF EXISTS user_settings CASCADE`;
+
+  console.log("✅ Schema torn down");
+}
+
+
 /* --------------------- AUTH USERS --------------------- */
 async function seedAuthUsers() {
   const results = await Promise.all(
@@ -158,19 +179,17 @@ async function seedUserRoles(nameToDeptId: Map<string, number>) {
     CREATE TABLE IF NOT EXISTS user_roles (
       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       role    VARCHAR(50) NOT NULL REFERENCES roles(role) ON DELETE CASCADE,
-      department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
-      PRIMARY KEY (user_id, role, department_id)
+      PRIMARY KEY (user_id, role)
     );
   `;
   await sql`TRUNCATE TABLE user_roles;`;
 
   await Promise.all(
     user_roles.map((ur) => {
-      const departmentId = ur.department_name ? nameToDeptId.get(ur.department_name) ?? null : null;
       return sql`
-          INSERT INTO user_roles (user_id, role, department_id)
-          VALUES (${ur.user_id}, ${ur.role}, ${departmentId})
-          ON CONFLICT (user_id, role, department_id) DO NOTHING
+          INSERT INTO user_roles (user_id, role)
+          VALUES (${ur.user_id}, ${ur.role})
+          ON CONFLICT (user_id, role) DO NOTHING
         `;
     })
   );
@@ -362,6 +381,57 @@ async function seedNotifications() {
   );
 }
 
+/* --------------------- TASK_ASSIGNMENTS --------------------- */
+async function seedTaskAssignments() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS task_assignments (
+      id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+      task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      assignee_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+      assignor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+  await sql`TRUNCATE TABLE task_assignments RESTART IDENTITY CASCADE;`;
+
+  // Example: assign Joel’s task to Mitch
+  await sql`
+    INSERT INTO task_assignments (task_id, assignee_id, assignor_id)
+    SELECT t.id, u1.id, u2.id
+    FROM tasks t
+    JOIN auth.users u1 ON u1.email = 'mitch.shona.2023@scis.smu.edu.sg'
+    JOIN auth.users u2 ON u2.email = 'joel.wang.2023@scis.smu.edu.sg'
+    WHERE t.title = 'Design dashboard layout'
+    ON CONFLICT DO NOTHING
+  `;
+}
+
+/* --------------------- TASK_COMMENTS --------------------- */
+async function seedTaskComments() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS task_comments (
+      id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+      task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+  await sql`TRUNCATE TABLE task_comments RESTART IDENTITY CASCADE;`;
+
+  // Example comment
+  await sql`
+    INSERT INTO task_comments (task_id, user_id, content)
+    SELECT t.id, u.id, 'Initial schema drafted. Please review.'
+    FROM tasks t
+    JOIN auth.users u ON u.email = 'ryan.hung.2023@scis.smu.edu.sg'
+    WHERE t.title = 'Design dashboard layout'
+    ON CONFLICT DO NOTHING
+  `;
+}
+
+
 /* --------------------- ENABLE ROW LEVEL SECURITY --------------------- */
 async function enableRLS() {
   // Enable RLS on all application tables
@@ -375,6 +445,9 @@ async function enableRLS() {
   await sql`ALTER TABLE tasks ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE task_tags ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE notifications ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE task_assignments ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE task_comments ENABLE ROW LEVEL SECURITY`;
+
 
   // Create basic RLS policies
 
@@ -438,34 +511,130 @@ async function enableRLS() {
     CREATE POLICY "Users can view tags" ON tags
     FOR SELECT USING (true)
   `;
+
+  // Task Assignments
+
+  // Users can view their own assignments, assignments they made, or any in their departments
+  await sql`
+    CREATE POLICY "Users can view task assignments they are involved in"
+    ON task_assignments
+    FOR SELECT
+    USING (
+      auth.uid() = assignee_id
+      OR auth.uid() = assignor_id
+      OR task_id IN (
+        SELECT t.id
+        FROM tasks t
+        JOIN user_departments ud ON t.department_id = ud.department_id
+        WHERE ud.user_id = auth.uid()
+      )
+    )
+  `;
+
+  // Only managers (or assignors re-adding) can assign tasks within their departments
+  await sql`
+    CREATE POLICY "Managers can assign tasks in their departments"
+    ON task_assignments
+    FOR INSERT
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM user_roles ur
+        JOIN user_departments ud ON ur.user_id = auth.uid() AND ud.user_id = auth.uid()
+        WHERE ur.role = 'manager'
+          AND ud.department_id IN (
+            SELECT department_id FROM tasks WHERE id = task_id
+          )
+      )
+      OR auth.uid() = assignor_id
+    )
+  `;
+
+  // Task Comments
+
+  // Users can view their own comments or comments on tasks in their departments
+  await sql`
+    CREATE POLICY "Users can view comments on tasks they are assigned to"
+    ON task_comments
+    FOR SELECT
+    USING (
+      auth.uid() = user_id
+      OR task_id IN (
+        SELECT t.id
+        FROM tasks t
+        JOIN user_departments ud ON t.department_id = ud.department_id
+        WHERE ud.user_id = auth.uid()
+      )
+    )
+  `;
+
+  // Staff can comment only if assigned, managers can comment on any task in their departments
+  await sql`
+    CREATE POLICY "Users can comment only on tasks they are assigned to or manage"
+    ON task_comments
+    FOR INSERT
+    WITH CHECK (
+      auth.uid() = user_id
+      AND (
+        task_id IN (
+          SELECT ta.task_id
+          FROM task_assignments ta
+          WHERE ta.assignee_id = auth.uid()
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM user_roles ur
+          JOIN user_departments ud ON ur.user_id = auth.uid() AND ud.user_id = auth.uid()
+          JOIN tasks t ON t.department_id = ud.department_id
+          WHERE ur.role = 'manager'
+            AND t.id = task_id
+        )
+      )
+    )
+  `;
+
+  // Users can only edit their own comments
+  await sql`
+    CREATE POLICY "Users can edit own comments"
+    ON task_comments
+    FOR UPDATE
+    USING (auth.uid() = user_id)
+  `;
+
+  // Only admins are allowed to delete comments
+  await sql`
+    CREATE POLICY "Admins can delete comments"
+    ON task_comments
+    FOR DELETE
+    USING (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
+  `;
+
 }
 
 /* --------------------- GET ROUTE --------------------- */
 export async function GET() {
   try {
-    // 1. Enable required extensions
     await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
-    // 2. Create user_settings table FIRST (before auth users due to trigger)
+    // Clean start
+    await teardownSchema();
+
+    // Create user_settings first
     await sql`
       CREATE TABLE IF NOT EXISTS user_settings (
-        id UUID PRIMARY KEY
-          REFERENCES auth.users(id) ON DELETE CASCADE,
+        id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
         first_name VARCHAR(255) NOT NULL,
         last_name  VARCHAR(255) NOT NULL,
         mode       VARCHAR(10) NOT NULL DEFAULT 'light',
-        default_view VARCHAR(20) NOT NULL DEFAULT 'tasks',
-        CONSTRAINT user_settings_mode_chk CHECK (mode IN ('light','dark')),
-        CONSTRAINT user_settings_view_chk CHECK (default_view IN ('tasks','calendar'))
+        default_view VARCHAR(20) NOT NULL DEFAULT 'tasks'
       );
     `;
 
-    // 3. Create auth users (trigger will work since user_settings exists)
-    await seedAuthUsers();
+    // await seedAuthUsers();
 
-    // 4. Seed all other tables
     await sql.begin(async () => {
-      await seedUserSettings(); // Update with custom data
+      await seedUserSettings();
       const nameToDeptId = await seedDepartments();
       await seedRoles();
       await seedUserRoles(nameToDeptId);
@@ -474,18 +643,16 @@ export async function GET() {
       await seedTags();
       await seedTasks({ nameToDeptId, projKeyToId });
       await seedTaskTags();
+      await seedTaskAssignments();   // <── new
+      await seedTaskComments();      // <── new
       await seedNotifications();
 
-      // Enable Row Level Security on all tables
       await enableRLS();
     });
 
-    return Response.json({
-      message: 'Database seeded successfully.',
-    });
+    return Response.json({ message: "Database seeded successfully." });
   } catch (error) {
-    console.error('Seeding error:', error);
-    console.error('Error details:', JSON.stringify(error, null, 2));
+    console.error("Seeding error:", error);
     return Response.json({ error: String(error) }, { status: 500 });
   }
 }
