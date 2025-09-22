@@ -10,7 +10,7 @@ import {
   projects,
   tasks,
   task_tags,
-} from '../lib/sample-data';
+} from '../lib/old-sample-data';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 

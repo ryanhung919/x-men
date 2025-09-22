@@ -1,47 +1,30 @@
-export const auth_users = [
-  {
-    id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa',
-    email: 'ryan.hung.2023@scis.smu.edu.sg',
-    password: 'password123',
-  },
-  {
-    id: '3958dc9e-712f-4377-85e9-fec4b6a6442a',
-    email: 'joel.wang.2023@scis.smu.edu.sg',
-    password: 'password123',
-  },
-  {
-    id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9',
-    email: 'mitch.shona.2023@scis.smu.edu.sg',
-    password: 'password123',
-  },
-  {
-    id: 'cc37c14a-0acf-4f4a-a6c9-d45682c144b9',
-    email: 'kester.yeo.2024@computing.smu.edu.sg',
-    password: 'password123',
-  },
-];
-
 export const users = [
   {
     id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa',
+    username: 'hungo',
+    password: 'hungo',
     first_name: 'Ryan',
     last_name: 'Hung',
+    email: 'ryan.hung.2023@scis.smu.edu.sg',
     mode: 'light',
-    default_view: 'tasks',
   },
   {
     id: '3958dc9e-712f-4377-85e9-fec4b6a6442a',
+    username: 'wangster',
+    password: 'wangster',
     first_name: 'Joel',
     last_name: 'Wang',
+    email: 'joel.wang.2023@scis.smu.edu.sg',
     mode: 'dark',
-    default_view: 'calendar',
   },
   {
     id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9',
+    username: 'mitchy',
+    password: 'mitchy',
     first_name: 'Mitch',
     last_name: 'Shona',
+    email: 'mitch.shona.2023@scis.smu.edu.sg',
     mode: 'light',
-    default_view: 'tasks',
   },
 ];
 
@@ -57,26 +40,10 @@ export const roles = [{ role: 'staff' }, { role: 'manager' }, { role: 'admin' }]
 // Joel: manager + admin (can manage Finance Manager dept and see its child)
 // Mitch: admin only (can see all depts)
 export const user_roles = [
-  {
-    user_id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa',
-    role: 'staff',
-    department_name: 'Finance Manager',
-  },
-  {
-    user_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a',
-    role: 'manager',
-    department_name: 'Finance Manager',
-  },
-  {
-    user_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a',
-    role: 'admin',
-    department_name: 'Finance Executive',
-  },
-  {
-    user_id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9',
-    role: 'admin',
-    department_name: 'Engineering',
-  },
+  { user_id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa', role: 'staff' },
+  { user_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a', role: 'manager' },
+  { user_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a', role: 'admin' },
+  { user_id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9', role: 'admin' },
 ];
 
 export const user_departments = [
@@ -135,16 +102,4 @@ export const tasks = [
 export const task_tags = [
   { task_title: 'Design dashboard layout', tag_name: 'Finance' },
   { task_title: 'Implement task board drag/drop', tag_name: 'Design' },
-];
-
-export const notifications = [
-  {
-    user_id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa', // Ryan's ID
-    title: 'Task assigned',
-    message: 'You have been assigned to Task A in Project X.',
-    type: 'task',
-    read: false,
-    created_at: new Date(),
-    updated_at: new Date(),
-  },
 ];
