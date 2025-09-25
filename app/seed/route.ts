@@ -499,6 +499,8 @@ async function enableRLS() {
 
   // Create basic RLS policies
 
+  /* ---------------- USER SETTINGS ---------------- */
+
   // User Settings: Users can only access their own settings
   await sql`
     CREATE POLICY "Users can view own settings" ON user_settings
@@ -509,6 +511,43 @@ async function enableRLS() {
     CREATE POLICY "Users can update own settings" ON user_settings
     FOR UPDATE USING (auth.uid() = id)
   `;
+
+  /* ---------------- USER DEPARTMENTS ---------------- */
+
+  // User Departments: Only admins can modify department memberships
+  await sql`
+    CREATE POLICY "Admins can manage department memberships" ON user_departments
+    FOR ALL
+    USING (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
+    WITH CHECK (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
+  `;
+
+  /* ---------------- USER ROLES ---------------- */
+
+  // User Roles: Users can view their own roles
+  await sql`
+    CREATE POLICY "Users can view their own roles" ON user_roles
+    FOR SELECT
+    USING (user_id = auth.uid())
+  `;
+
+  // User Roles: Only admins can assign or revoke roles
+  await sql`
+    CREATE POLICY "Admins can manage roles" ON user_roles
+    FOR ALL
+    USING (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
+    WITH CHECK (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
+  `;
+
+  /* ---------------- TASKS ---------------- */
 
   // Tasks: Users can see tasks in their departments
   await sql`
@@ -521,6 +560,23 @@ async function enableRLS() {
     )
   `;
 
+  // Tasks: Only admins can archive tasks
+  await sql`
+    CREATE POLICY "Admins can archive tasks" ON tasks
+    FOR UPDATE
+    USING (
+      EXISTS (
+        SELECT 1 FROM user_roles
+        WHERE user_id = auth.uid() AND role = 'admin'
+      )
+    )
+    WITH CHECK (
+      is_archived = true
+    )
+  `;
+
+  /* ---------------- PROJECTS ---------------- */
+
   // Projects: Users can see projects in their departments
   await sql`
     CREATE POLICY "Users can view projects in their departments" ON projects
@@ -532,11 +588,15 @@ async function enableRLS() {
     )
   `;
 
+  /* ---------------- NOTIFICATIONS ---------------- */
+
   // Notifications: Users can only see their own notifications
   await sql`
     CREATE POLICY "Users can view own notifications" ON notifications
     FOR SELECT USING (auth.uid() = user_id)
   `;
+
+  /* ---------------- DEPARTMENTS ---------------- */
 
   // Departments: Users can view departments they belong to
   await sql`
@@ -549,20 +609,25 @@ async function enableRLS() {
     )
   `;
 
-  // Read-only access for roles and tags (commonly referenced)
+  /* ---------------- ROLES ---------------- */
+
+  // Roles: Read-only access for roles (commonly referenced)
   await sql`
     CREATE POLICY "Users can view roles" ON roles
     FOR SELECT USING (true)
   `;
 
+  /* ---------------- TAGS ---------------- */
+
+  // Tags: Read-only access for tags (commonly referenced)
   await sql`
     CREATE POLICY "Users can view tags" ON tags
     FOR SELECT USING (true)
   `;
 
-  // Task Assignments
+  /* ---------------- TASK ASSIGNMENTS ---------------- */
 
-  // Users can view their own assignments, assignments they made, or any in their departments
+  // Task Assignments: Users can view their own assignments, assignments they made, or any in their departments
   await sql`
     CREATE POLICY "Users can view task assignments they are involved in"
     ON task_assignments
@@ -579,7 +644,7 @@ async function enableRLS() {
     )
   `;
 
-  // Only managers (or assignors re-adding) can assign tasks within their departments
+  // Task Assignments: Only managers (or assignors re-adding) can assign tasks within their departments
   await sql`
     CREATE POLICY "Managers can assign tasks in their departments"
     ON task_assignments
@@ -597,9 +662,9 @@ async function enableRLS() {
     )
   `;
 
-  // Task Comments
+  /* ---------------- TASK COMMENTS ---------------- */
 
-  // Users can view their own comments or comments on tasks in their departments
+  // Task Comments: Users can view their own comments or comments on tasks in their departments
   await sql`
     CREATE POLICY "Users can view comments on tasks they are assigned to"
     ON task_comments
@@ -615,7 +680,7 @@ async function enableRLS() {
     )
   `;
 
-  // Staff can comment only if assigned, managers can comment on any task in their departments
+  // Task Comments: Staff can comment only if assigned, managers can comment on any task in their departments
   await sql`
     CREATE POLICY "Users can comment only on tasks they are assigned to or manage"
     ON task_comments
@@ -640,7 +705,7 @@ async function enableRLS() {
     )
   `;
 
-  // Users can only edit their own comments
+  // Task Comments: Users can only edit their own comments
   await sql`
     CREATE POLICY "Users can edit own comments"
     ON task_comments
@@ -648,7 +713,7 @@ async function enableRLS() {
     USING (auth.uid() = user_id)
   `;
 
-  // Only admins are allowed to delete comments
+  // Task Comments: Only admins are allowed to delete comments
   await sql`
     CREATE POLICY "Admins can delete comments"
     ON task_comments
@@ -658,6 +723,52 @@ async function enableRLS() {
     )
   `;
 
+  /* ---------------- TASK TAGS ---------------- */
+
+  // Anyone can view task tags (as long as they can see the task)
+  await sql`
+    CREATE POLICY "Users can view tags of tasks in their departments"
+    ON task_tags
+    FOR SELECT
+    USING (
+      task_id IN (
+        SELECT t.id
+        FROM tasks t
+        JOIN user_departments ud ON t.department_id = ud.department_id
+        WHERE ud.user_id = auth.uid()
+      )
+    )
+  `;
+
+  // Anyone can add tags to tasks in their departments
+  await sql`
+    CREATE POLICY "Users can add tags to tasks in their departments"
+    ON task_tags
+    FOR INSERT
+    WITH CHECK (
+      task_id IN (
+        SELECT t.id
+        FROM tasks t
+        JOIN user_departments ud ON t.department_id = ud.department_id
+        WHERE ud.user_id = auth.uid()
+      )
+    )
+  `;
+
+  // Anyone can remove tags from tasks in their departments
+  await sql`
+    CREATE POLICY "Users can remove tags from tasks in their departments"
+    ON task_tags
+    FOR DELETE
+    USING (
+      task_id IN (
+        SELECT t.id
+        FROM tasks t
+        JOIN user_departments ud ON t.department_id = ud.department_id
+        WHERE ud.user_id = auth.uid()
+      )
+    )
+  `;
 }
 
 /* --------------------- GET ROUTE --------------------- */
