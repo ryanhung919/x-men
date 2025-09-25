@@ -13,6 +13,8 @@ import {
   tasks,
   task_tags,
   notifications,
+  task_assignments,
+  task_comments
 } from '../../lib/sample-data';
 
 const supabase = createClient(
@@ -442,16 +444,22 @@ async function seedTaskAssignments() {
   `;
   await sql`TRUNCATE TABLE task_assignments RESTART IDENTITY CASCADE;`;
 
-  // Example: assign Joel’s task to Mitch
-  await sql`
-    INSERT INTO task_assignments (task_id, assignee_id, assignor_id)
-    SELECT t.id, u1.id, u2.id
-    FROM tasks t
-    JOIN auth.users u1 ON u1.email = 'mitch.shona.2023@scis.smu.edu.sg'
-    JOIN auth.users u2 ON u2.email = 'joel.wang.2023@scis.smu.edu.sg'
-    WHERE t.title = 'Design dashboard layout'
-    ON CONFLICT DO NOTHING
-  `;
+  if (!task_assignments.length) return;
+
+  const taskRows = await sql`SELECT id, title FROM tasks`;
+  const titleToTaskId = new Map(taskRows.map((r: any) => [r.title as string, Number(r.id)]));
+
+  await Promise.all(
+    task_assignments.map((ta) => {
+      const taskId = titleToTaskId.get(ta.task_title);
+      if (!taskId) throw new Error(`Unknown task: ${ta.task_title}`);
+      return sql`
+        INSERT INTO task_assignments (task_id, assignee_id, assignor_id, created_at)
+        VALUES (${taskId}, ${ta.assignee_id}, ${ta.assignor_id}, ${ta.created_at})
+        ON CONFLICT DO NOTHING
+      `;
+    })
+  );
 }
 
 /* --------------------- TASK_COMMENTS --------------------- */
@@ -468,24 +476,22 @@ async function seedTaskComments() {
   `;
   await sql`TRUNCATE TABLE task_comments RESTART IDENTITY CASCADE;`;
 
-  // Example comment
-  await sql`
-    INSERT INTO task_comments (task_id, user_id, content)
-    SELECT t.id, u.id, 'Initial schema drafted. Please review.'
-    FROM tasks t
-    JOIN auth.users u ON u.email = 'ryan.hung.2023@scis.smu.edu.sg'
-    WHERE t.title = 'Design dashboard layout'
-    ON CONFLICT DO NOTHING
-  `;
+  if (!task_comments.length) return;
 
-  await sql`
-    INSERT INTO task_comments (task_id, user_id, content)
-    SELECT t.id, u.id, 'Added API endpoints section. Feedback welcome.'
-    FROM tasks t
-    JOIN auth.users u ON u.email = 'joel.wang.2023@scis.smu.edu.sg'
-    WHERE t.title = 'Design dashboard layout'
-    ON CONFLICT DO NOTHING
-  `;
+  const taskRows = await sql`SELECT id, title FROM tasks`;
+  const titleToTaskId = new Map(taskRows.map((r: any) => [r.title as string, Number(r.id)]));
+
+  await Promise.all(
+    task_comments.map((tc) => {
+      const taskId = titleToTaskId.get(tc.task_title);
+      if (!taskId) throw new Error(`Unknown task: ${tc.task_title}`);
+      return sql`
+        INSERT INTO task_comments (task_id, user_id, content, created_at, updated_at)
+        VALUES (${taskId}, ${tc.user_id}, ${tc.content}, ${tc.created_at}, ${tc.updated_at})
+        ON CONFLICT DO NOTHING
+      `;
+    })
+  );
 }
 
 

@@ -144,3 +144,44 @@ export const notifications = [
     updated_at: new Date(),
   },
 ];
+
+/* --------------------- TASK_ASSIGNMENTS --------------------- */
+export const task_assignments = [
+  {
+    task_title: 'Design dashboard layout',
+    assignee_id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9', // Mitch
+    assignor_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a', // Joel
+    created_at: new Date('2025-09-19T10:20:00Z'),
+  },
+  {
+    task_title: 'Implement task board drag/drop',
+    assignee_id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa', // Ryan
+    assignor_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a', // Joel
+    created_at: new Date('2025-09-19T10:22:00Z'),
+  },
+];
+
+/* --------------------- TASK_COMMENTS --------------------- */
+export const task_comments = [
+  {
+    task_title: 'Design dashboard layout',
+    user_id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa', // Ryan
+    content: 'Initial schema drafted. Please review.',
+    created_at: new Date('2025-09-19T10:21:00Z'),
+    updated_at: new Date('2025-09-19T10:21:00Z'),
+  },
+  {
+    task_title: 'Design dashboard layout',
+    user_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a', // Joel
+    content: 'Added API endpoints section. Feedback welcome.',
+    created_at: new Date('2025-09-19T10:23:00Z'),
+    updated_at: new Date('2025-09-19T10:23:00Z'),
+  },
+  {
+    task_title: 'Implement task board drag/drop',
+    user_id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9', // Mitch
+    content: 'Kanban columns initialized. Ready for review.',
+    created_at: new Date('2025-09-19T10:24:00Z'),
+    updated_at: new Date('2025-09-19T10:24:00Z'),
+  },
+];
