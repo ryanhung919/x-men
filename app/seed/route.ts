@@ -477,6 +477,15 @@ async function seedTaskComments() {
     WHERE t.title = 'Design dashboard layout'
     ON CONFLICT DO NOTHING
   `;
+
+  await sql`
+    INSERT INTO task_comments (task_id, user_id, content)
+    SELECT t.id, u.id, 'Added API endpoints section. Feedback welcome.'
+    FROM tasks t
+    JOIN auth.users u ON u.email = 'joel.wang.2023@scis.smu.edu.sg'
+    WHERE t.title = 'Design dashboard layout'
+    ON CONFLICT DO NOTHING
+  `;
 }
 
 
