@@ -89,15 +89,15 @@ export const tags = [
 ];
 
 export const projects = [
-  { name: 'Website Redesign', department_name: 'Engineering' },
-  { name: 'Annual Budget', department_name: 'Finance Manager' },
+  { name: 'Website Redesign', department_name: 'Engineering', is_archived: false },
+  { name: 'Annual Budget', department_name: 'Finance Manager', is_archived: false },
 ];
 
 export const tasks = [
   {
     title: 'Design dashboard layout',
     description: 'Create budget and expense overview designs with shadcn/ui.',
-    priority: 'High',
+    priority_bucket: '9',
     status: 'In Progress',
     creator_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a', // Joel created
     assignee_id: 'cc27c14a-0acf-4f4a-a6c9-d45682c144b9', // assigned to Mitch
@@ -113,7 +113,7 @@ export const tasks = [
   {
     title: 'Implement task board drag/drop',
     description: 'Kanban columns by status with optimistic updates and Supabase Realtime.',
-    priority: 'Medium',
+    priority_bucket: '5',
     status: 'To Do',
     creator_id: '3958dc9e-712f-4377-85e9-fec4b6a6442a', // Joel created
     assignee_id: 'd6e15727-9fe1-4961-8c5b-ea44a9bd81aa', // assigned to Ryan
