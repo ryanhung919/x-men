@@ -26,14 +26,14 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const result = await loginAction(undefined, formData);
-                if (result && result.message) {
-                  setMessage(result.message);
-                }
-              }}
+              // onSubmit={async (e) => {
+              //   e.preventDefault();
+              //   const formData = new FormData(e.currentTarget);
+              //   const result = await loginAction(undefined, formData);
+              //   if (result && result.message) {
+              //     setMessage(result.message);
+              //   }
+              // }}
               className="flex flex-col gap-6"
             >
               <div className="grid gap-2">
