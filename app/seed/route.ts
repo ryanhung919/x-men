@@ -3,27 +3,27 @@ import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
 import {
   auth_users,
-  user_settings,
-  departments,
-  user_departments,
+  user_info,
   roles,
   user_roles,
-  tags,
+  departments,
   projects,
+  project_departments,
   tasks,
+  tags,
   task_tags,
-  notifications,
   task_assignments,
+  task_attachments,
   task_comments,
+  notifications,
 } from '../../lib/sample-data';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
-async function teardownSchema() {
+async function teardownSchema(sql: postgres.Sql) {
   console.log('⚠️ Dropping all app tables...');
 
   // Order matters: drop dependent tables first
@@ -36,108 +36,55 @@ async function teardownSchema() {
   await sql`DROP TABLE IF EXISTS tags CASCADE`;
   await sql`DROP TABLE IF EXISTS user_roles CASCADE`;
   await sql`DROP TABLE IF EXISTS roles CASCADE`;
-  await sql`DROP TABLE IF EXISTS user_departments CASCADE`;
   await sql`DROP TABLE IF EXISTS departments CASCADE`;
-  await sql`DROP TABLE IF EXISTS user_settings CASCADE`;
+  await sql`DROP TABLE IF EXISTS user_info CASCADE`;
 
   console.log('Schema torn down');
 }
 
-/* --------------------- AUTH USERS --------------------- */
-async function seedAuthUsers() {
-  console.log('Removing existing auth users via Admin API...');
-
-  const { data: usersResponse, error } = await supabase.auth.admin.listUsers();
-  if (error) throw error;
-
-  // Ensure TypeScript knows this is always an array
-  const existingUsers: User[] = 'users' in usersResponse ? usersResponse.users : [];
-
-  if (existingUsers.length) {
-    await Promise.all(existingUsers.map((u: User) => supabase.auth.admin.deleteUser(u.id)));
-    console.log(`Deleted ${existingUsers.length} existing users`);
-  }
-
-  const results = await Promise.all(
-    auth_users.map(async (u) => {
-      // Check if user already exists by email
-      const existingUsers = await sql`
-        SELECT id, email FROM auth.users WHERE email = ${u.email}
-      `;
-
-      if (existingUsers.length > 0) {
-        return { success: true, email: u.email, skipped: true, user: existingUsers[0] };
-      }
-
-      // Create user if doesn't exist using raw SQL to maintain specific UUID
-      const result = await sql`
-        INSERT INTO auth.users (
-          id, email, encrypted_password, email_confirmed_at, created_at, updated_at,
-          raw_app_meta_data, raw_user_meta_data, aud, role
-        ) VALUES (
-          ${u.id}, ${u.email}, crypt(${u.password}, gen_salt('bf')), NOW(), NOW(), NOW(),
-          '{"provider": "email", "providers": ["email"]}', '{}', 'authenticated', 'authenticated'
-        )
-        RETURNING id, email
-      `;
-
-      if (result.length > 0) {
-        return { success: true, email: u.email, created: true, user: result[0] };
-      } else {
-        return { success: false, email: u.email, error: 'Failed to create user' };
-      }
-    })
-  );
-
-  const created = results.filter((r) => r.success && r.created).length;
-  const skipped = results.filter((r) => r.success && r.skipped).length;
-  const failed = results.filter((r) => !r.success).length;
-
-  console.log(`Auth users seeded: ${created} created, ${skipped} skipped, ${failed} failed`);
-  return results;
-}
-
-/* --------------------- USER_SETTINGS --------------------- */
-async function seedUserSettings() {
+/* --------------------- USER_INFO --------------------- */
+async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>) {
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS user_settings (
+    CREATE TABLE IF NOT EXISTS user_info (
       id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
       first_name VARCHAR(255) NOT NULL,
       last_name  VARCHAR(255) NOT NULL,
       mode       VARCHAR(10) NOT NULL DEFAULT 'light',
-      default_view VARCHAR(20) NOT NULL DEFAULT 'tasks'
+      default_view VARCHAR(20) NOT NULL DEFAULT 'tasks',
+      department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT
     );
   `;
-  await sql`TRUNCATE TABLE user_settings CASCADE;`;
+  await sql`TRUNCATE TABLE user_info CASCADE;`;
 
   await Promise.all(
-    user_settings.map(
-      (us) =>
-        sql`
-        INSERT INTO user_settings (id, first_name, last_name, mode, default_view)
-        VALUES (${us.id}, ${us.first_name}, ${us.last_name}, ${us.mode}, ${
-          us.default_view ?? 'tasks'
-        })
+    user_info.map((ui) => {
+      const depId = nameToDeptId.get(ui.department_name);
+      if (!depId) throw new Error(`Unknown department: ${ui.department_name}`);
+
+      return sql`
+        INSERT INTO user_info (id, first_name, last_name, mode, default_view, department_id)
+        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${ui.mode}, ${
+        ui.default_view ?? 'tasks'
+      }, ${depId})
         ON CONFLICT (id) DO UPDATE
           SET first_name = EXCLUDED.first_name,
               last_name  = EXCLUDED.last_name,
               mode       = EXCLUDED.mode,
-              default_view = EXCLUDED.default_view
-      `
-    )
+              default_view = EXCLUDED.default_view,
+              department_id = EXCLUDED.department_id
+      `;
+    })
   );
 }
 
 /* --------------------- DEPARTMENTS --------------------- */
-async function seedDepartments() {
+async function seedDepartments(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS departments (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-      name VARCHAR(255) NOT NULL UNIQUE,
-      parent_department_id BIGINT NULL REFERENCES departments(id) ON DELETE SET NULL,
-      CONSTRAINT chk_dept_not_self CHECK (parent_department_id IS NULL OR parent_department_id <> id)
+      name VARCHAR(255) NOT NULL UNIQUE
     );
   `;
   await sql`TRUNCATE TABLE departments RESTART IDENTITY CASCADE;`;
@@ -155,40 +102,45 @@ async function seedDepartments() {
   );
   const rows = inserted.flat();
   const nameToId = new Map<string, number>(rows.map((r) => [r.name, Number(r.id)]));
-
-  const fm = nameToId.get('Finance Manager');
-  const fe = nameToId.get('Finance Executive');
-  if (fm && fe) {
-    await sql`UPDATE departments SET parent_department_id = ${fm} WHERE id = ${fe}`;
-  }
   return nameToId;
 }
 
-/* --------------------- USER_DEPARTMENTS --------------------- */
-async function seedUserDepartments(nameToDeptId: Map<string, number>) {
+/* --------------------- PROJECT_DEPARTMENTS --------------------- */
+async function seedProjectDepartments(
+  sql: postgres.Sql,
+  nameToDeptId: Map<string, number>,
+  nameToProjId: Map<string, number>
+) {
   await sql`
-    CREATE TABLE IF NOT EXISTS user_departments (
-      user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-      department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
-      PRIMARY KEY (user_id, department_id)
+    CREATE TABLE IF NOT EXISTS project_departments (
+      project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+      PRIMARY KEY (project_id, department_id)
     );
   `;
-  await sql`TRUNCATE TABLE user_departments;`;
+  await sql`TRUNCATE TABLE project_departments;`;
+
+  if (!project_departments.length) return;
 
   await Promise.all(
-    user_departments.map((ud) => {
-      const depId = nameToDeptId.get(ud.department_name)!;
+    project_departments.map((pd) => {
+      const projId = nameToProjId.get(pd.project_name);
+      const deptId = nameToDeptId.get(pd.department_name);
+
+      if (!projId) throw new Error(`Unknown project: ${pd.project_name}`);
+      if (!deptId) throw new Error(`Unknown department: ${pd.department_name}`);
+
       return sql`
-        INSERT INTO user_departments (user_id, department_id)
-        VALUES (${ud.user_id}, ${depId})
-        ON CONFLICT (user_id, department_id) DO NOTHING
+        INSERT INTO project_departments (project_id, department_id)
+        VALUES (${projId}, ${deptId})
+        ON CONFLICT (project_id, department_id) DO NOTHING
       `;
     })
   );
 }
 
 /* --------------------- ROLES --------------------- */
-async function seedRoles() {
+async function seedRoles(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS roles (
       role VARCHAR(50) PRIMARY KEY,
@@ -203,7 +155,7 @@ async function seedRoles() {
 }
 
 /* --------------------- USER_ROLES --------------------- */
-async function seedUserRoles(nameToDeptId: Map<string, number>) {
+async function seedUserRoles(sql: postgres.Sql, nameToDeptId: Map<string, number>) {
   await sql`
     CREATE TABLE IF NOT EXISTS user_roles (
       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -225,7 +177,7 @@ async function seedUserRoles(nameToDeptId: Map<string, number>) {
 }
 
 /* --------------------- TAGS --------------------- */
-async function seedTags() {
+async function seedTags(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS tags (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -240,46 +192,38 @@ async function seedTags() {
 }
 
 /* --------------------- PROJECTS --------------------- */
-async function seedProjects(nameToDeptId: Map<string, number>) {
+async function seedProjects(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS projects (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-      name VARCHAR(255) NOT NULL,
-      department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+      name VARCHAR(255) NOT NULL UNIQUE,
       is_archived BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      CONSTRAINT uq_project UNIQUE (name, department_id)
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `;
   await sql`TRUNCATE TABLE projects RESTART IDENTITY CASCADE;`;
 
-  type ProjRow = { id: number; name: string; department_id: number };
+  type ProjRow = { id: number; name: string };
   const inserted = await Promise.all(
     projects.map((p) => {
-      const depId = nameToDeptId.get(p.department_name)!;
       return sql<ProjRow[]>`
-        INSERT INTO projects (name, department_id, is_archived)
-        VALUES (${p.name}, ${depId}, ${p.is_archived ?? false})
-        ON CONFLICT (name, department_id) DO NOTHING
-        RETURNING id, name, department_id
+        INSERT INTO projects (name, is_archived)
+        VALUES (${p.name}, ${p.is_archived ?? false})
+        ON CONFLICT (name) DO NOTHING
+        RETURNING id, name
       `;
     })
   );
   const rows = inserted.flat();
 
-  const projKeyToId = new Map<string, number>(
-    rows.map((r) => [`${r.name}::${r.department_id}`, Number(r.id)])
-  );
+  const projKeyToId = new Map<string, number>(rows.map((r) => [r.name, Number(r.id)]));
 
   return { projKeyToId };
 }
 
 /* --------------------- TASKS --------------------- */
-async function seedTasks(deps: {
-  nameToDeptId: Map<string, number>;
-  projKeyToId: Map<string, number>;
-}) {
+async function seedTasks(sql: postgres.Sql, deps: { projKeyToId: Map<string, number> }) {
   await sql`
     CREATE TABLE IF NOT EXISTS tasks (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -289,12 +233,13 @@ async function seedTasks(deps: {
       status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Done')),
       creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       assignee_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-      department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
-      project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL,
+      project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       deadline TIMESTAMPTZ,
       notes TEXT,
       parent_task_id BIGINT NULL REFERENCES tasks(id) ON DELETE RESTRICT,
-      recurrence_interval VARCHAR(50),
+      recurrence_interval INT NOT NULL DEFAULT 0,  -- recurrence in days/interval
+      recurrence_date TIMESTAMPTZ DEFAULT NULL, -- when recurrence starts
+      logged_time BIGINT NOT NULL DEFAULT 0, -- time in seconds
       is_archived BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -317,11 +262,8 @@ async function seedTasks(deps: {
 
     await Promise.all(
       readyTasks.map(async (t) => {
-        const departmentId = deps.nameToDeptId.get(t.department_name);
-        if (!departmentId) throw new Error(`Unknown department: ${t.department_name}`);
-
-        const projKey = t.project_name ? `${t.project_name}::${departmentId}` : null;
-        const projectId = projKey ? deps.projKeyToId.get(projKey) ?? null : null;
+        const projectId = deps.projKeyToId.get(t.project_name);
+        if (!projectId) throw new Error(`Unknown project: ${t.project_name}`);
 
         const parentId = t.parent_task_external_key
           ? titleToTaskId.get(t.parent_task_external_key)!
@@ -333,15 +275,22 @@ async function seedTasks(deps: {
         const notes = t.notes ?? null;
         const createdAt = t.created_at ?? new Date();
         const updatedAt = t.updated_at ?? createdAt;
+        const recurrenceInterval = t.recurrence_interval ?? 0;
+        const recurrenceAnchor = t.recurrence_date ?? null;
+        const loggedTime = t.logged_time ?? 0;
 
         const [row] = await sql<{ id: number; title: string }[]>`
           INSERT INTO tasks (
-            title, description, priority_bucket, status, creator_id, assignee_id, department_id,
-            project_id, deadline, notes, parent_task_id, is_archived, created_at, updated_at
+            title, description, priority_bucket, status, creator_id, assignee_id,
+            project_id, deadline, notes, parent_task_id,
+            recurrence_interval, recurrence_date, logged_time,
+            is_archived, created_at, updated_at
           )
           VALUES (
-            ${t.title}, ${description}, ${t.priority_bucket}, ${t.status}, ${t.creator_id}, ${assigneeId}, ${departmentId},
-            ${projectId}, ${deadline}, ${notes}, ${parentId}, ${t.is_archived}, ${createdAt}, ${updatedAt}
+            ${t.title}, ${description}, ${t.priority_bucket}, ${t.status}, ${t.creator_id}, ${assigneeId},
+            ${projectId}, ${deadline}, ${notes}, ${parentId},
+            ${recurrenceInterval}, ${recurrenceAnchor}, ${loggedTime},
+            ${t.is_archived}, ${createdAt}, ${updatedAt}
           )
           RETURNING id, title
         `;
@@ -358,7 +307,7 @@ async function seedTasks(deps: {
 }
 
 /* --------------------- TASK_TAGS --------------------- */
-async function seedTaskTags() {
+async function seedTaskTags(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS task_tags (
       task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -396,8 +345,55 @@ async function seedTaskTags() {
   );
 }
 
+/* --------------------- STORAGE BUCKET --------------------- */
+async function resetTaskAttachmentsBucket(sql: postgres.Sql) {
+  console.log('Resetting storage bucket: task-attachments');
+
+  // Drop bucket if exists
+  await sql`DELETE FROM storage.buckets WHERE id = 'task-attachments'`;
+
+  // Recreate bucket (private by default)
+  await sql`
+    INSERT INTO storage.buckets (id, name, public)
+    VALUES ('task-attachments', 'task-attachments', false)
+  `;
+}
+
+/* --------------------- TASK_ATTACHMENTS --------------------- */
+async function seedTaskAttachments(sql: postgres.Sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS task_attachments (
+      id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+      task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      storage_path TEXT NOT NULL,
+      uploaded_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT uq_task_file UNIQUE (task_id, storage_path)
+    );
+  `;
+  await sql`TRUNCATE TABLE task_attachments RESTART IDENTITY CASCADE;`;
+
+  if (!task_attachments.length) return;
+
+  const taskRows = await sql`SELECT id, title FROM tasks`;
+  const titleToTaskId = new Map(taskRows.map((r: any) => [r.title as string, Number(r.id)]));
+
+  await Promise.all(
+    task_attachments.map((ta) => {
+      const taskId = titleToTaskId.get(ta.task_title);
+      if (!taskId) throw new Error(`Unknown task: ${ta.task_title}`);
+
+      return sql`
+        INSERT INTO task_attachments (task_id, storage_path, uploaded_by, uploaded_at)
+        VALUES (${taskId}, ${ta.storage_path}, ${ta.uploaded_by}, ${ta.uploaded_at ?? new Date()})
+        ON CONFLICT (task_id, storage_path) DO NOTHING
+      `;
+    })
+  );
+}
+
 /* --------------------- NOTIFICATIONS --------------------- */
-async function seedNotifications() {
+async function seedNotifications(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS notifications (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -427,7 +423,7 @@ async function seedNotifications() {
 }
 
 /* --------------------- TASK_ASSIGNMENTS --------------------- */
-async function seedTaskAssignments() {
+async function seedTaskAssignments(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS task_assignments (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -458,7 +454,7 @@ async function seedTaskAssignments() {
 }
 
 /* --------------------- TASK_COMMENTS --------------------- */
-async function seedTaskComments() {
+async function seedTaskComments(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS task_comments (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -466,7 +462,8 @@ async function seedTaskComments() {
       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      is_archived BOOLEAN NOT NULL DEFAULT FALSE
     );
   `;
   await sql`TRUNCATE TABLE task_comments RESTART IDENTITY CASCADE;`;
@@ -490,48 +487,35 @@ async function seedTaskComments() {
 }
 
 /* --------------------- ENABLE ROW LEVEL SECURITY --------------------- */
-async function enableRLS() {
+async function enableRLS(sql: postgres.Sql) {
   // Enable RLS on all application tables
-  await sql`ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE user_info ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE departments ENABLE ROW LEVEL SECURITY`;
-  await sql`ALTER TABLE user_departments ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE roles ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE tags ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE projects ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE project_departments ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE tasks ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE task_tags ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE notifications ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE task_assignments ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE task_comments ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE task_attachments ENABLE ROW LEVEL SECURITY`;
 
   // Create basic RLS policies
 
-  /* ---------------- USER SETTINGS ---------------- */
+  /* ---------------- USER INFO ---------------- */
 
-  // User Settings: Users can only access their own settings
+  // User Info: Users can only access their own info
   await sql`
-    CREATE POLICY "Users can view own settings" ON user_settings
+    CREATE POLICY "Users can view own settings/info" ON user_info
     FOR SELECT USING (auth.uid() = id)
   `;
 
   await sql`
-    CREATE POLICY "Users can update own settings" ON user_settings
+    CREATE POLICY "Users can update own settings/info" ON user_info
     FOR UPDATE USING (auth.uid() = id)
-  `;
-
-  /* ---------------- USER DEPARTMENTS ---------------- */
-
-  // User Departments: Only admins can modify department memberships
-  await sql`
-    CREATE POLICY "Admins can manage department memberships" ON user_departments
-    FOR ALL
-    USING (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
-    WITH CHECK (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
   `;
 
   /* ---------------- USER ROLES ---------------- */
@@ -572,13 +556,15 @@ async function enableRLS() {
     WITH CHECK (auth.uid() = creator_id)
   `;
 
-  // Tasks: Users can see tasks in their departments
+  // Tasks: Users can see tasks in their department
   await sql`
-    CREATE POLICY "Users can view tasks in their departments" ON tasks
+    CREATE POLICY "Users can view tasks in their department" ON tasks
     FOR SELECT USING (
-      department_id IN (
-        SELECT department_id FROM user_departments
-        WHERE user_id = auth.uid()
+      EXISTS (
+        SELECT 1
+        FROM project_departments pd
+        WHERE pd.project_id = tasks.project_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
   `;
@@ -600,13 +586,15 @@ async function enableRLS() {
 
   /* ---------------- PROJECTS ---------------- */
 
-  // Projects: Users can see projects in their departments
+  // Projects: Users can see projects linked to their their department
   await sql`
-    CREATE POLICY "Users can view projects in their departments" ON projects
+    CREATE POLICY "Users can view projects in their department" ON projects
     FOR SELECT USING (
-      department_id IN (
-        SELECT department_id FROM user_departments
-        WHERE user_id = auth.uid()
+      EXISTS (
+        SELECT 1
+        FROM project_departments pd
+        WHERE pd.project_id = projects.id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
   `;
@@ -623,12 +611,20 @@ async function enableRLS() {
 
   // Departments: Users can view departments they belong to
   await sql`
-    CREATE POLICY "Users can view their departments" ON departments
+    CREATE POLICY "Users can view their department" ON departments
     FOR SELECT USING (
-      id IN (
-        SELECT department_id FROM user_departments
-        WHERE user_id = auth.uid()
-      )
+      id = (SELECT department_id FROM user_info WHERE id = auth.uid())
+    )
+  `;
+
+  /* ---------------- PROJECT_DEPARTMENTS ---------------- */
+  // Read-only: users can see the links for their department
+  await sql`
+    CREATE POLICY "Users can view project-department links for their department"
+    ON project_departments
+    FOR SELECT
+    USING (
+      department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
     )
   `;
 
@@ -652,77 +648,114 @@ async function enableRLS() {
 
   // Task Assignments: Users can view their own assignments, assignments they made, or any in their departments
   await sql`
-    CREATE POLICY "Users can view task assignments they are involved in"
+    CREATE POLICY "Users can view task assignments they are in"
     ON task_assignments
     FOR SELECT
     USING (
       auth.uid() = assignee_id
       OR auth.uid() = assignor_id
-      OR task_id IN (
-        SELECT t.id
+      OR EXISTS (
+        SELECT 1
         FROM tasks t
-        JOIN user_departments ud ON t.department_id = ud.department_id
-        WHERE ud.user_id = auth.uid()
+        JOIN project_departments pd ON pd.project_id = t.project_id
+        WHERE t.id = task_assignments.task_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
   `;
 
-  // Task Assignments: Only managers (or assignors re-adding) can assign tasks within their departments
+  // Task Assignments: Users can assign assignees to tasks
   await sql`
-    CREATE POLICY "Managers can assign tasks in their departments"
+    CREATE POLICY "Users can assign other users for tasks in their department"
     ON task_assignments
     FOR INSERT
     WITH CHECK (
-      EXISTS (
-        SELECT 1 FROM user_roles ur
-        JOIN user_departments ud ON ur.user_id = auth.uid() AND ud.user_id = auth.uid()
-        WHERE ur.role = 'manager'
-          AND ud.department_id IN (
-            SELECT department_id FROM tasks WHERE id = task_id
-          )
+      assignor_id = auth.uid()
+      AND EXISTS (
+        SELECT 1
+        FROM tasks t
+        JOIN project_departments pd ON pd.project_id = t.project_id
+        WHERE t.id = task_assignments.task_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
-      OR auth.uid() = assignor_id
+    )
+  `;
+
+  /* ---------------- TASK ATTACHMENTS ---------------- */
+  // Select: assignees of the task can view
+  await sql`
+    CREATE POLICY "Assignees can view task attachments"
+    ON task_attachments
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1
+        FROM task_assignments ta
+        WHERE ta.task_id = task_attachments.task_id
+          AND ta.assignee_id = auth.uid()
+      )
+    )
+  `;
+
+  // Insert: assignees of the task can add attachments (uploaded_by must be the actor)
+  await sql`
+    CREATE POLICY "Assignees can add task attachments"
+    ON task_attachments
+    FOR INSERT
+    WITH CHECK (
+      uploaded_by = auth.uid()
+      AND EXISTS (
+        SELECT 1
+        FROM task_assignments ta
+        WHERE ta.task_id = task_attachments.task_id
+          AND ta.assignee_id = auth.uid()
+      )
     )
   `;
 
   /* ---------------- TASK COMMENTS ---------------- */
 
-  // Task Comments: Users can view their own comments or comments on tasks in their departments
+  // Task Comments: Users can view their own comments or comments on tasks in their department
   await sql`
-    CREATE POLICY "Users can view comments on tasks they are assigned to"
+    CREATE POLICY "Users can view comments on tasks in their department"
     ON task_comments
     FOR SELECT
     USING (
-      auth.uid() = user_id
-      OR task_id IN (
-        SELECT t.id
+      user_id = auth.uid()
+      OR EXISTS (
+        SELECT 1
         FROM tasks t
-        JOIN user_departments ud ON t.department_id = ud.department_id
-        WHERE ud.user_id = auth.uid()
+        JOIN project_departments pd ON pd.project_id = t.project_id
+        WHERE t.id = task_comments.task_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
   `;
 
   // Task Comments: Staff can comment only if assigned, managers can comment on any task in their departments
   await sql`
-    CREATE POLICY "Users can comment only on tasks they are assigned to or manage"
+    CREATE POLICY "Users can comment on tasks they are assigned to or manage"
     ON task_comments
     FOR INSERT
     WITH CHECK (
-      auth.uid() = user_id
+      user_id = auth.uid()
       AND (
-        task_id IN (
-          SELECT ta.task_id
+        EXISTS (
+          SELECT 1
           FROM task_assignments ta
-          WHERE ta.assignee_id = auth.uid()
+          WHERE ta.task_id = task_comments.task_id
+            AND ta.assignee_id = auth.uid()
         )
-        OR EXISTS (
+        OR
+        EXISTS (
           SELECT 1
           FROM user_roles ur
-          JOIN user_departments ud ON ur.user_id = auth.uid() AND ud.user_id = auth.uid()
-          JOIN tasks t ON t.department_id = ud.department_id
+          JOIN user_info ui ON ur.user_id = ui.id
+          JOIN project_departments pd ON pd.department_id = ui.department_id
+          JOIN tasks t ON t.project_id = pd.project_id
           WHERE ur.role = 'manager'
-            AND t.id = task_id
+            AND ur.user_id = auth.uid()
+            AND t.id = task_comments.task_id
         )
       )
     )
@@ -732,8 +765,7 @@ async function enableRLS() {
   await sql`
     CREATE POLICY "Users can edit own comments"
     ON task_comments
-    FOR UPDATE
-    USING (auth.uid() = user_id)
+    FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid())
   `;
 
   // Task Comments: Only admins are allowed to delete comments
@@ -750,45 +782,48 @@ async function enableRLS() {
 
   // Anyone can view task tags (as long as they can see the task)
   await sql`
-    CREATE POLICY "Users can view tags of tasks in their departments"
+    CREATE POLICY "Users can view tags in their own department tasks"
     ON task_tags
     FOR SELECT
     USING (
-      task_id IN (
-        SELECT t.id
+      EXISTS (
+        SELECT 1
         FROM tasks t
-        JOIN user_departments ud ON t.department_id = ud.department_id
-        WHERE ud.user_id = auth.uid()
+        JOIN project_departments pd ON pd.project_id = t.project_id
+        WHERE t.id = task_tags.task_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
   `;
 
   // Anyone can add tags to tasks in their departments
   await sql`
-    CREATE POLICY "Users can add tags to tasks in their departments"
+    CREATE POLICY "Users can add tags in their own deparment tasks"
     ON task_tags
     FOR INSERT
     WITH CHECK (
-      task_id IN (
-        SELECT t.id
+      EXISTS (
+        SELECT 1
         FROM tasks t
-        JOIN user_departments ud ON t.department_id = ud.department_id
-        WHERE ud.user_id = auth.uid()
+        JOIN project_departments pd ON pd.project_id = t.project_id
+        WHERE t.id = task_tags.task_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
   `;
 
   // Anyone can remove tags from tasks in their departments
   await sql`
-    CREATE POLICY "Users can remove tags from tasks in their departments"
+    CREATE POLICY "Users can remove tags in their own department tasks"
     ON task_tags
     FOR DELETE
     USING (
-      task_id IN (
-        SELECT t.id
+      EXISTS (
+        SELECT 1
         FROM tasks t
-        JOIN user_departments ud ON t.department_id = ud.department_id
-        WHERE ud.user_id = auth.uid()
+        JOIN project_departments pd ON pd.project_id = t.project_id
+        WHERE t.id = task_tags.task_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
   `;
@@ -796,45 +831,60 @@ async function enableRLS() {
 
 /* --------------------- GET ROUTE --------------------- */
 export async function GET() {
+  const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+
   try {
     await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
-    await teardownSchema();
+    await teardownSchema(sql);
 
-    await seedAuthUsers();
-
-    await sql.begin(async () => {
-      const [userSettingsPromise, rolesPromise, tagsPromise, departmentsPromise] = [
-        seedUserSettings(),
-        seedRoles(),
-        seedTags(),
-        seedDepartments(),
+    await sql.begin(async (sql) => {
+      // Seed base tables
+      const [rolesPromise, tagsPromise, departmentsPromise, projectsPromise] = [
+        seedRoles(sql),
+        seedTags(sql),
+        seedDepartments(sql),
+        seedProjects(sql),
       ];
 
       const nameToDeptId = await departmentsPromise;
-      await userSettingsPromise;
+      const { projKeyToId } = await projectsPromise;
+
       await rolesPromise;
       await tagsPromise;
 
-      await Promise.all([seedUserRoles(nameToDeptId), seedUserDepartments(nameToDeptId)]);
+      // Seed user info (depends on departments)
+      await seedUserInfo(sql, nameToDeptId);
 
-      const { projKeyToId } = await seedProjects(nameToDeptId);
+      // Seed user roles
+      await seedUserRoles(sql, nameToDeptId);
 
-      await seedTasks({ nameToDeptId, projKeyToId });
+      // Seed project ↔ department links
+      await seedProjectDepartments(sql, nameToDeptId, projKeyToId);
 
+      // Seed tasks
+      await seedTasks(sql, { projKeyToId });
 
+      // Seed dependent tables
       await Promise.all([
-        seedTaskTags(),
-        seedTaskAssignments(),
-        seedTaskComments(),
-        seedNotifications(),
+        seedTaskTags(sql),
+        seedTaskAssignments(sql),
+        seedTaskComments(sql),
+        seedTaskAttachments(sql),
+        seedNotifications(sql),
       ]);
 
-      await enableRLS();
+      // Reset storage bucket for attachments
+      await resetTaskAttachmentsBucket(sql);
+
+      // Enable RLS after seeding
+      await enableRLS(sql);
     });
 
+    await sql.end();
     return Response.json({ message: 'Database seeded successfully.' });
   } catch (error) {
     console.error('Seeding error:', error);
+    await sql.end();
     return Response.json({ error: String(error) }, { status: 500 });
   }
 }
