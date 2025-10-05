@@ -45,15 +45,15 @@ jobs:
       #   run: pnpm test:integration
 
       # --- Coverage ---
-      - name: Generate coverage report
-        run: pnpm test:coverage
+      # - name: Generate coverage report
+      #   run: pnpm test:coverage
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage/coverage-final.json
-          flags: unittests
-          name: codecov-umbrella
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v3
+      #   with:
+      #     files: ./coverage/coverage-final.json
+      #     flags: unittests
+      #     name: codecov-umbrella
 
   # --- E2E tests (optional) ---
   # e2e:
