@@ -11,7 +11,7 @@ export default defineConfig({
   },
   test: {
     globals: true, // JSDOM for React components, node for backend utils
-    environment: "jsdom",
+    environment: "node",
     setupFiles: ["./__tests__/setup/vitest.setup.ts"],
     include: ["__tests__/unit/**/*.test.{ts,tsx}"],
     exclude: [
