@@ -2,6 +2,8 @@
   "name": "nextjs",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
+  
   "scripts": {
   "dev": "next dev -p 3000 --turbopack",
   "build": "next build --turbopack",
