@@ -7,7 +7,8 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 interface Props {
   departmentIds?: number[];
   projectIds?: number[];
-  timeRange?: "week" | "month" | "quarter";
+  startDate?: string;
+  endDate?: string;
 }
 
 interface TeamStatusData {
@@ -17,7 +18,7 @@ interface TeamStatusData {
   "Done": number;
 }
 
-export function TeamSummaryChart({ departmentIds = [], projectIds = [], timeRange = "month" }: Props) {
+export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDate, endDate }: Props) {
   const [data, setData] = useState<TeamStatusData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,11 +29,14 @@ export function TeamSummaryChart({ departmentIds = [], projectIds = [], timeRang
       setLoading(true);
       try {
         const params = new URLSearchParams({
-          action: "analytics",
-          departmentIds: departmentIds.join(","),
-          projectIds: projectIds.join(","),
-          timeRange,
+          action: 'report',
+          departmentIds: departmentIds.join(','),
+          projectIds: projectIds.join(','),
         });
+
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
         const res = await fetch(`/api/reports?${params}`);
         if (!res.ok) throw new Error("Failed to fetch analytics");
         const json = await res.json();
@@ -54,7 +58,7 @@ export function TeamSummaryChart({ departmentIds = [], projectIds = [], timeRang
     };
 
     fetchData();
-  }, [departmentIds, projectIds, timeRange]);
+  }, [departmentIds, projectIds, startDate, endDate]);
 
   if (loading) return (
     <Card>

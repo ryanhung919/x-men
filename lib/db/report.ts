@@ -1,60 +1,41 @@
 import { createClient } from "@/lib/supabase/server";
 
 interface GetTasksOpts {
-  departmentIds?: number[];
   projectIds?: number[];
-  timeRange?: "week" | "month" | "quarter";
+  startDate?: Date;
+  endDate?: Date;
 }
 
 export async function getTasks(opts: GetTasksOpts) {
-  const { departmentIds, projectIds, timeRange = "month" } = opts;
-
+  const { projectIds, startDate, endDate } = opts;
   const supabase = await createClient();
 
-  // Compute start date
-  const now = new Date();
-  const startDate = new Date();
-  switch (timeRange) {
-    case "week":
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case "month":
-      startDate.setMonth(now.getMonth() - 1);
-      break;
-    case "quarter":
-      startDate.setMonth(now.getMonth() - 3);
-      break;
-  }
-
-  // Step 1: Map departments → project IDs if departmentIds are provided
-  let filteredProjectIds = projectIds ?? [];
-  if (departmentIds && departmentIds.length > 0) {
-    const { data: mapping, error } = await supabase
-      .from("project_departments")
-      .select("project_id")
-      .in("department_id", departmentIds);
-    if (error) throw error;
-    filteredProjectIds = mapping.map((m: any) => m.project_id);
-  }
-
-  // Step 2: Query tasks
+  // Base query selecting all relevant task fields
   let query = supabase
     .from("tasks")
     .select(`
       id,
-      name,
+      title,
+      description,
+      priority_bucket,
       status,
-      project_id,
-      project:project_id(name),
-      assignee_id,
-      assignee:assignee_id(username),
       creator_id,
+      project_id,
+      deadline,
+      parent_task_id,
+      logged_time,
       created_at,
-      deadline
-    `)
-    .gte("created_at", startDate.toISOString());
+      updated_at
+    `);
 
-  if (filteredProjectIds.length > 0) query = query.in("project_id", filteredProjectIds);
+  // Filter by projectIds if provided
+  if (projectIds && projectIds.length > 0) {
+    query = query.in("project_id", projectIds);
+  }
+
+  // Filter by startDate / endDate if provided
+  if (startDate) query = query.gte("created_at", startDate.toISOString());
+  if (endDate) query = query.lte("created_at", endDate.toISOString());
 
   const { data: tasks, error } = await query;
   if (error) throw error;

@@ -3,17 +3,19 @@
 interface ExportProps {
   departmentIds?: number[];
   projectIds?: number[];
-  timeRange?: "week" | "month" | "quarter";
+  startDate?: string;
+  endDate?: string;
 }
 
-export function ExportButtons({ departmentIds = [], projectIds = [], timeRange = "month" }: ExportProps) {
+export function ExportButtons({ departmentIds = [], projectIds = [], startDate, endDate }: ExportProps) {
   const handleExport = async (format: "pdf" | "xlsx") => {
     try {
       const params = new URLSearchParams({
         action: "export",
         departmentIds: departmentIds.join(","),
         projectIds: projectIds.join(","),
-        timeRange,
+        startDate: startDate || "",
+        endDate: endDate || "",
         format,
       });
       const res = await fetch(`/api/reports?${params}`);

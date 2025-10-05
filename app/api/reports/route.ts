@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateReport } from "@/lib/services/report";
+import { generateReport, exportReport, ReportType } from "@/lib/services/report";
+import { filterDepartments, filterProjects } from "@/lib/services/filter";
+import { createClient } from "@/lib/supabase/server";
 
 // Helper to parse comma-separated query params
 function parseArrayParam(param?: string) {
@@ -11,67 +13,58 @@ export async function GET(req: NextRequest) {
   const action = searchParams.get("action");
 
   try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) return NextResponse.json([], { status: 200 });
+
     switch (action) {
-      // Fetch all departments
+      // --- Get departments for dropdown ---
       case "departments": {
-        const report = await generateReport({ type: "departments", timeRange: "month" });
-        return NextResponse.json(report.departments ?? []);
+        const projectIds = parseArrayParam(searchParams.get("projectIds") || "");
+        const departments = await filterDepartments(
+          user.id,
+          projectIds.length ? projectIds : undefined
+        );
+        return NextResponse.json(departments);
       }
 
-      // Fetch projects under selected departments
+      // --- Get projects for dropdown ---
       case "projects": {
-        const deptParam = searchParams.get("departmentIds") || "";
-        const departmentIds = parseArrayParam(deptParam);
-        if (!departmentIds.length) return NextResponse.json([]);
+        const departmentIds = parseArrayParam(searchParams.get("departmentIds") || "");
+        const projects = await filterProjects(
+          user.id,
+          departmentIds.length ? departmentIds : undefined
+        );
+        return NextResponse.json(projects);
+      }
 
-        const report = await generateReport({ departmentIds, type: "analytics", timeRange: "month" });
-        const tasks = report.tasks ?? [];
-        const projectMap = new Map<number, string>();
-        tasks.forEach((t: any) => {
-          if (t.project_id && !projectMap.has(t.project_id)) {
-            projectMap.set(t.project_id, t.project?.name ?? "");
+      // --- Generate report ---
+      case "report": 
+        case "time": {
+          const projectIds = parseArrayParam(searchParams.get("projectIds") || "");
+          const startDateStr = searchParams.get("startDate");
+          const endDateStr = searchParams.get("endDate");
+          const format = (searchParams.get("format") as "pdf" | "xlsx") || undefined;
+          const type = (searchParams.get("type") as ReportType) || "loggedTime";
+
+          const startDate = startDateStr ? new Date(startDateStr) : undefined;
+          const endDate = endDateStr ? new Date(endDateStr) : undefined;
+
+          const reportData = await generateReport({ projectIds, startDate, endDate, type });
+
+          if (format) {
+            const file = await exportReport(reportData, { projectIds, startDate, endDate, type, format });
+            return new Response(file.buffer, { headers: { "Content-Type": file.mime } });
           }
-        });
 
-        return NextResponse.json(Array.from(projectMap, ([id, name]) => ({ id, name })));
-      }
-
-      // Fetch metrics report
-      case "metrics": {
-        const deptIds = parseArrayParam(searchParams.get("departmentIds") || "");
-        const projIds = parseArrayParam(searchParams.get("projectIds") || "");
-        const timeRange = (searchParams.get("timeRange") as "week" | "month" | "quarter") || "month";
-
-        const report = await generateReport({ departmentIds: deptIds, projectIds: projIds, timeRange, type: "metrics" });
-        return NextResponse.json(report);
-      }
-
-      // Fetch analytics report
-      case "analytics": {
-        const deptIds = parseArrayParam(searchParams.get("departmentIds") || "");
-        const projIds = parseArrayParam(searchParams.get("projectIds") || "");
-        const timeRange = (searchParams.get("timeRange") as "week" | "month" | "quarter") || "month";
-
-        const report = await generateReport({ departmentIds: deptIds, projectIds: projIds, timeRange, type: "analytics" });
-        return NextResponse.json(report);
-      }
-
-      // Export report (PDF/XLSX)
-      case "export": {
-        const deptIds = parseArrayParam(searchParams.get("departmentIds") || "");
-        const projIds = parseArrayParam(searchParams.get("projectIds") || "");
-        const timeRange = (searchParams.get("timeRange") as "week" | "month" | "quarter") || "month";
-        const format = (searchParams.get("format") as "pdf" | "xlsx") || "pdf";
-
-        const report = await generateReport({ departmentIds: deptIds, projectIds: projIds, timeRange, type: "export", format });
-        return NextResponse.json(report); // frontend will handle buffer -> Blob
-      }
+          return NextResponse.json(reportData);
+        }
 
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Server error", details: String(err) }, { status: 500 });
   }
 }
