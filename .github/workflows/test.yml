@@ -1,0 +1,94 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        # Use --no-frozen-lockfile in CI if lockfile mismatch occurs
+        run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+
+      # --- Linting (optional) ---
+      # - name: Run linter
+      #   run: pnpm lint
+
+      # --- Unit tests ---
+      - name: Run unit tests
+        run: pnpm test:unit
+
+      # --- Integration tests (optional) ---
+      # - name: Run integration tests
+      #   run: pnpm test:integration
+
+      # --- Coverage ---
+      # - name: Generate coverage report
+      #   run: pnpm test:coverage
+
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v3
+      #   with:
+      #     files: ./coverage/coverage-final.json
+      #     flags: unittests
+      #     name: codecov-umbrella
+
+  # --- E2E tests (optional) ---
+  # e2e:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 60
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20.x
+  #         cache: 'pnpm'
+  #
+  #     - name: Setup pnpm
+  #       uses: pnpm/action-setup@v2
+  #       with:
+  #         version: 8
+  #
+  #     - name: Install dependencies
+  #       run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+  #
+  #     - name: Install Playwright browsers
+  #       run: pnpm exec playwright install --with-deps
+  #
+  #     - name: Run E2E tests
+  #       run: pnpm run test:e2e
+  #       env:
+  #         PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
+  #
+  #     - name: Upload Playwright report
+  #       uses: actions/upload-artifact@v3
+  #       if: always()
+  #       with:
+  #         name: playwright-report
+  #         path: playwright-report/
+  #         retention-days: 30

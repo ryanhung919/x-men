@@ -232,7 +232,6 @@ async function seedTasks(sql: postgres.Sql, deps: { projKeyToId: Map<string, num
       priority_bucket INT NOT NULL CHECK (priority_bucket BETWEEN 1 AND 10),
       status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Done')),
       creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-      assignee_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
       project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       deadline TIMESTAMPTZ,
       notes TEXT,
@@ -270,7 +269,6 @@ async function seedTasks(sql: postgres.Sql, deps: { projKeyToId: Map<string, num
           : null;
 
         const description = t.description ?? null;
-        const assigneeId = t.assignee_id ?? null;
         const deadline = t.deadline ?? null;
         const notes = t.notes ?? null;
         const createdAt = t.created_at ?? new Date();
@@ -281,13 +279,13 @@ async function seedTasks(sql: postgres.Sql, deps: { projKeyToId: Map<string, num
 
         const [row] = await sql<{ id: number; title: string }[]>`
           INSERT INTO tasks (
-            title, description, priority_bucket, status, creator_id, assignee_id,
+            title, description, priority_bucket, status, creator_id,
             project_id, deadline, notes, parent_task_id,
             recurrence_interval, recurrence_date, logged_time,
             is_archived, created_at, updated_at
           )
           VALUES (
-            ${t.title}, ${description}, ${t.priority_bucket}, ${t.status}, ${t.creator_id}, ${assigneeId},
+            ${t.title}, ${description}, ${t.priority_bucket}, ${t.status}, ${t.creator_id},
             ${projectId}, ${deadline}, ${notes}, ${parentId},
             ${recurrenceInterval}, ${recurrenceAnchor}, ${loggedTime},
             ${t.is_archived}, ${createdAt}, ${updatedAt}
@@ -518,6 +516,33 @@ async function enableRLS(sql: postgres.Sql) {
     FOR UPDATE USING (auth.uid() = id)
   `;
 
+  // Seucurity definer function that returns all colleagues in the same department:
+  await sql`
+    CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
+      RETURNS TABLE(id uuid, department_id int)
+      LANGUAGE sql
+      SECURITY DEFINER
+      AS $$
+        SELECT u.id, u.department_id
+        FROM user_info u
+        JOIN user_info me ON me.id = user_uuid
+        WHERE u.department_id = me.department_id;
+      $$;
+  `;
+
+  //User Info: Users can see colleagues in their department
+  await sql`
+    CREATE POLICY "Users can view colleagues in their department" ON user_info
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1
+        FROM get_department_colleagues(auth.uid()) AS g
+        WHERE g.id = user_info.id
+      )
+    );
+`;
+
   /* ---------------- USER ROLES ---------------- */
 
   // User Roles: Users can view their own roles
@@ -545,7 +570,7 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Users can create their own tasks" ON tasks
     FOR INSERT
-    WITH CHECK (auth.uid() = creator_id)
+    WITH CHECK (auth.uid() = creator_id);
   `;
 
   // Users can update their own tasks (details, status, priority_bucket, recurrence_interval)
@@ -558,15 +583,18 @@ async function enableRLS(sql: postgres.Sql) {
 
   // Tasks: Users can see tasks in their department
   await sql`
-    CREATE POLICY "Users can view tasks in their department" ON tasks
-    FOR SELECT USING (
-      EXISTS (
-        SELECT 1
-        FROM project_departments pd
-        WHERE pd.project_id = tasks.project_id
-          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-      )
-    )
+    CREATE POLICY "Users can view tasks assigned to their department" ON tasks
+    FOR SELECT
+    USING (
+        creator_id = auth.uid()
+        OR EXISTS (
+            SELECT 1
+            FROM task_assignments ta
+            JOIN user_info ui ON ui.id = ta.assignee_id
+            WHERE ta.task_id = tasks.id
+              AND ui.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
+        )
+    );
   `;
 
   // Tasks: Only admins can archive tasks
@@ -588,16 +616,19 @@ async function enableRLS(sql: postgres.Sql) {
 
   // Projects: Users can see projects linked to their their department
   await sql`
-    CREATE POLICY "Users can view projects in their department" ON projects
-    FOR SELECT USING (
-      EXISTS (
-        SELECT 1
-        FROM project_departments pd
-        WHERE pd.project_id = projects.id
-          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-      )
+  CREATE POLICY "Users can view projects linked to tasks in their department" ON projects
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM tasks t
+      JOIN task_assignments ta ON ta.task_id = t.id
+      JOIN user_info ui ON ui.id = ta.assignee_id
+      WHERE t.project_id = projects.id
+        AND ui.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
     )
-  `;
+  )
+`;
 
   /* ---------------- NOTIFICATIONS ---------------- */
 
@@ -609,23 +640,48 @@ async function enableRLS(sql: postgres.Sql) {
 
   /* ---------------- DEPARTMENTS ---------------- */
 
-  // Departments: Users can view departments they belong to
+  // Departments: Users can view departments linked to their department's projects
   await sql`
-    CREATE POLICY "Users can view their department" ON departments
-    FOR SELECT USING (
-      id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-    )
+    CREATE POLICY "Users can view departments linked to their department's projects"
+    ON departments
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1
+        FROM project_departments pd
+        JOIN projects p ON p.id = pd.project_id
+        JOIN tasks t ON t.project_id = p.id
+        JOIN task_assignments ta ON ta.task_id = t.id
+        JOIN user_info ui ON ui.id = ta.assignee_id
+        WHERE pd.department_id = departments.id
+          AND ui.department_id = (
+            SELECT department_id FROM user_info me
+            WHERE me.id = auth.uid()
+          )
+      )
+    );
   `;
 
   /* ---------------- PROJECT_DEPARTMENTS ---------------- */
-  // Read-only: users can see the links for their department
+
+  // Departments: Users can view project-department links for projects with their colleagues
   await sql`
-    CREATE POLICY "Users can view project-department links for their department"
+    CREATE POLICY "Users can view project-department links for projects with their colleagues"
     ON project_departments
     FOR SELECT
     USING (
-      department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-    )
+      EXISTS (
+        SELECT 1
+        FROM task_assignments ta
+        JOIN user_info u ON ta.assignee_id = u.id
+        WHERE u.department_id = (
+          SELECT department_id FROM user_info me WHERE me.id = auth.uid()
+        )
+        AND ta.task_id IN (
+          SELECT t.id FROM tasks t WHERE t.project_id = project_departments.project_id
+        )
+      )
+    );
   `;
 
   /* ---------------- ROLES ---------------- */
@@ -646,22 +702,20 @@ async function enableRLS(sql: postgres.Sql) {
 
   /* ---------------- TASK ASSIGNMENTS ---------------- */
 
-  // Task Assignments: Users can view their own assignments, assignments they made, or any in their departments
+  // Task Assignments: Users can view assignments where they are assignor/assignee or in their department
   await sql`
-    CREATE POLICY "Users can view task assignments they are in"
-    ON task_assignments
+    CREATE POLICY "Users can view task assignments relevant to their department" ON task_assignments
     FOR SELECT
     USING (
-      auth.uid() = assignee_id
-      OR auth.uid() = assignor_id
-      OR EXISTS (
-        SELECT 1
-        FROM tasks t
-        JOIN project_departments pd ON pd.project_id = t.project_id
-        WHERE t.id = task_assignments.task_id
-          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-      )
-    )
+        assignee_id = auth.uid()
+        OR assignor_id = auth.uid()
+        OR EXISTS (
+            SELECT 1
+            FROM user_info ui
+            WHERE ui.id = task_assignments.assignee_id
+              AND ui.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
+        )
+    );
   `;
 
   // Task Assignments: Users can assign assignees to tasks
@@ -828,6 +882,43 @@ async function enableRLS(sql: postgres.Sql) {
     )
   `;
 }
+/* --------------------- TRIGGERS --------------------- */
+
+async function createTriggers(sql: postgres.Sql) {
+  await sql`
+      -- Trigger function to update project_departments when a new task assignment is inserted
+    CREATE OR REPLACE FUNCTION update_project_departments()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+        assignee_dept_id int;
+    BEGIN
+        -- Get the department of the new assignee
+        SELECT department_id INTO assignee_dept_id
+        FROM user_info
+        WHERE id = NEW.assignee_id;
+
+        -- Insert a row into project_departments if it doesn't already exist
+        INSERT INTO project_departments (project_id, department_id)
+        SELECT t.project_id, assignee_dept_id
+        FROM tasks t
+        WHERE t.id = NEW.task_id
+        ON CONFLICT (project_id, department_id) DO NOTHING;
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_assignments table
+    CREATE TRIGGER trg_update_project_departments
+    AFTER INSERT ON task_assignments
+    FOR EACH ROW
+    EXECUTE FUNCTION update_project_departments();
+  `;
+}
 
 /* --------------------- GET ROUTE --------------------- */
 export async function GET() {
@@ -876,8 +967,8 @@ export async function GET() {
       // Reset storage bucket for attachments
       await resetTaskAttachmentsBucket(sql);
 
-      // Enable RLS after seeding
       await enableRLS(sql);
+      await createTriggers(sql);
     });
 
     await sql.end();
