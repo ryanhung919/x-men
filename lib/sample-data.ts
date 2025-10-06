@@ -48,7 +48,7 @@ export const auth_users = [
   },
   {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kesteryeo.2024@computing.smu.edu.sg',
+    email: 'kester.yeo.2024@computing.smu.edu.sg',
     password: 'password123',
   },
 ];
@@ -56,14 +56,13 @@ export const auth_users = [
 /* ======================== ORGANISATION CATALOG ======================== */
 /** Based on the briefing: core SG dev/ops team + finance. */
 export const departments = [
-  { name: 'Engineering' }, 
-  { name: 'Finance' }, 
+  { name: 'Engineering' },
+  { name: 'Finance' },
   { name: 'Operations' },
   { name: 'Technology' },
   { name: 'Marketing' },
   { name: 'Accounting' },
 ];
-
 
 export const roles = [{ role: 'staff' }, { role: 'manager' }, { role: 'admin' }];
 
@@ -158,7 +157,7 @@ export const user_info = [
 /* ======================== USER ROLES ======================== */
 /** Joel manages finance and is also admin; Mitch is admin; others staff. */
 export const user_roles = [
-  { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'admin' }, 
+  { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'admin' },
   { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'manager' }, // Joel (SMU)
   { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'staff' },
 
@@ -223,7 +222,6 @@ export const project_departments = [
   { project_name: 'Workflow Automation Pilot', department_name: 'Finance' },
   { project_name: 'FY25 Forecast Review', department_name: 'Finance' },
 ];
-
 
 /* ======================== TAGS ======================== */
 export const tags = [
@@ -634,7 +632,7 @@ export const task_assignments = [
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
     created_at: new Date('2025-09-22T10:05:00Z'),
-  },    
+  },
   {
     task_title: 'Develop finance KPIs for dashboard',
     assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)

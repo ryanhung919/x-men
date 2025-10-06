@@ -516,7 +516,7 @@ async function enableRLS(sql: postgres.Sql) {
     FOR UPDATE USING (auth.uid() = id)
   `;
 
-  // Seucurity definer function that returns all colleagues in the same department:
+  // Security definer function that returns all colleagues in the same department:
   await sql`
     CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
       RETURNS TABLE(id uuid, department_id int)
@@ -527,6 +527,57 @@ async function enableRLS(sql: postgres.Sql) {
         FROM user_info u
         JOIN user_info me ON me.id = user_uuid
         WHERE u.department_id = me.department_id;
+      $$;
+  `;
+
+  // Security definer function to check if user can view a task
+  // This bypasses RLS to avoid circular dependency with task_assignments
+  await sql`
+    CREATE OR REPLACE FUNCTION user_can_view_task(user_uuid uuid, task_id_param bigint)
+      RETURNS boolean
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      SET search_path = public
+      AS $$
+      DECLARE
+        task_creator_id uuid;
+        user_dept_id int;
+        task_project_id bigint;
+      BEGIN
+        -- Get task creator and project
+        SELECT creator_id, project_id INTO task_creator_id, task_project_id
+        FROM tasks
+        WHERE id = task_id_param;
+
+        -- User created the task
+        IF task_creator_id = user_uuid THEN
+          RETURN true;
+        END IF;
+
+        -- Get user's department
+        SELECT department_id INTO user_dept_id
+        FROM user_info
+        WHERE id = user_uuid;
+
+        -- Check if task has assignee from department that shares the same project
+        -- This includes:
+        -- 1. Assignees from user's own department
+        -- 2. Assignees from other departments linked to the same project
+        RETURN EXISTS (
+          SELECT 1
+          FROM task_assignments ta
+          JOIN user_info ui ON ui.id = ta.assignee_id
+          JOIN project_departments pd ON pd.department_id = ui.department_id
+          WHERE ta.task_id = task_id_param
+            AND pd.project_id = task_project_id
+            AND EXISTS (
+              SELECT 1
+              FROM project_departments pd2
+              WHERE pd2.project_id = task_project_id
+                AND pd2.department_id = user_dept_id
+            )
+        );
+      END;
       $$;
   `;
 
@@ -582,19 +633,11 @@ async function enableRLS(sql: postgres.Sql) {
   `;
 
   // Tasks: Users can see tasks in their department
+  // Uses SECURITY DEFINER function to avoid circular RLS dependency with task_assignments
   await sql`
     CREATE POLICY "Users can view tasks assigned to their department" ON tasks
     FOR SELECT
-    USING (
-        creator_id = auth.uid()
-        OR EXISTS (
-            SELECT 1
-            FROM task_assignments ta
-            JOIN user_info ui ON ui.id = ta.assignee_id
-            WHERE ta.task_id = tasks.id
-              AND ui.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-        )
-    );
+    USING (user_can_view_task(auth.uid(), id));
   `;
 
   // Tasks: Only admins can archive tasks
@@ -636,6 +679,30 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Users can view own notifications" ON notifications
     FOR SELECT USING (auth.uid() = user_id)
+  `;
+
+  // Notifications: Users can update (mark as read) their own notifications
+  await sql`
+    CREATE POLICY "Users can update own notifications" ON notifications
+    FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id)
+  `;
+
+  // Notifications: Users can delete their own notifications
+  await sql`
+    CREATE POLICY "Users can delete own notifications" ON notifications
+    FOR DELETE
+    USING (auth.uid() = user_id)
+  `;
+
+  // Notifications: INSERT policy - Allow system to create notifications for any user
+  // This policy allows notifications to be created by triggers or server-side code
+  // without requiring auth.uid() to match, since notifications are created FOR users, not BY users
+  await sql`
+    CREATE POLICY "System can create notifications" ON notifications
+    FOR INSERT
+    WITH CHECK (true)
   `;
 
   /* ---------------- DEPARTMENTS ---------------- */
@@ -917,6 +984,67 @@ async function createTriggers(sql: postgres.Sql) {
     AFTER INSERT ON task_assignments
     FOR EACH ROW
     EXECUTE FUNCTION update_project_departments();
+  `;
+
+  await sql`
+    -- Trigger function to create notification when a new task assignment is inserted
+    -- SECURITY DEFINER allows it to bypass RLS policies and avoid infinite recursion
+    CREATE OR REPLACE FUNCTION notify_task_assignment()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        assignor_first_name TEXT;
+        assignor_last_name TEXT;
+        assignor_full_name TEXT;
+    BEGIN
+        -- Skip notification if assignee is the same as assignor (self-assignment)
+        IF NEW.assignee_id = NEW.assignor_id THEN
+            RETURN NEW;
+        END IF;
+
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = NEW.task_id;
+
+        -- Get assignor name (bypass RLS)
+        IF NEW.assignor_id IS NOT NULL THEN
+            SELECT first_name, last_name INTO assignor_first_name, assignor_last_name
+            FROM user_info
+            WHERE id = NEW.assignor_id;
+
+            assignor_full_name := assignor_first_name || ' ' || assignor_last_name;
+        ELSE
+            assignor_full_name := 'Someone';
+        END IF;
+
+        -- Insert notification (bypass RLS)
+        INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+        VALUES (
+            NEW.assignee_id,
+            'New Task Assignment',
+            assignor_full_name || ' assigned you to task: "' || task_title_var || '"',
+            'task_assigned',
+            false,
+            NOW(),
+            NOW()
+        );
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_assignments table for notifications
+    CREATE TRIGGER trg_notify_task_assignment
+    AFTER INSERT ON task_assignments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_assignment();
   `;
 }
 
