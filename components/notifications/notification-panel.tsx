@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,83 +12,21 @@ import {
 } from '@/components/ui/sheet';
 import { NotificationItem, type Notification } from './notification-item';
 import { NotificationModal } from './notification-modal';
-import {
-  getNotifications,
-  getUnreadNotificationCount,
-  markNotificationRead,
-  markAllNotificationsRead,
-  deleteNotificationAction,
-} from '@/app/actions/notifs';
+import { useNotifications } from '@/hooks/use-notifications';
 
 export function NotificationPanel() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    handleMarkAsRead,
+    handleMarkAllAsRead,
+    handleDelete,
+  } = useNotifications();
+
   const [isOpen, setIsOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const fetchNotifications = async () => {
-    try {
-      setIsLoading(true);
-      const [notifs, count] = await Promise.all([
-        getNotifications(),
-        getUnreadNotificationCount(),
-      ]);
-      setNotifications(notifs);
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  // Refresh when panel opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
-  }, [isOpen]);
-
-  const handleMarkAsRead = async (id: number) => {
-    try {
-      await markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      await markAllNotificationsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      setUnreadCount(0);
-    } catch (error) {
-      console.error('Error marking all as read:', error);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    try {
-      await deleteNotificationAction(id);
-      const deletedNotification = notifications.find((n) => n.id === id);
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-      if (deletedNotification && !deletedNotification.read) {
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      }
-    } catch (error) {
-      console.error('Error deleting notification:', error);
-    }
-  };
 
   const handleNotificationClick = (notification: Notification) => {
     setSelectedNotification(notification);
