@@ -1,11 +1,13 @@
 'use client';
 
-import { Bell, LogOut, User2, Settings } from 'lucide-react';
+import { LogOut, User2, Settings } from 'lucide-react';
+import { NotificationPanel } from '@/components/notifications/notification-panel';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -123,16 +125,7 @@ export function Navbar() {
       </nav>
       <div className="flex-1" />
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          asChild
-          className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-110 hover:rotate-12"
-        >
-          <Link href="/notifications">
-            <Bell className="h-5 w-5" />
-          </Link>
-        </Button>
+        <NotificationPanel />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

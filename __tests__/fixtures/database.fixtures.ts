@@ -24,6 +24,31 @@ export const authUsersFixtures = {
 
 export const auth_users = Object.values(authUsersFixtures);
 
+/* --------------------- NOTIFICATIONS --------------------- */
+export const notificationsFixtures = {
+  aliceTaskAssigned: {
+    id: 1,
+    user_id: authUsersFixtures.alice.id,
+    title: 'New Task Assignment',
+    message: 'Bob Johnson assigned you to task: "Design Homepage"',
+    type: 'task_assigned',
+    read: false,
+    created_at: new Date('2025-10-06T10:00:00Z').toISOString(),
+    updated_at: new Date('2025-10-06T10:00:00Z').toISOString(),
+  },
+  bobTaskAssigned: {
+    id: 2,
+    user_id: authUsersFixtures.bob.id,
+    title: 'New Task Assignment',
+    message: 'Alice Smith assigned you to task: "Budget Report"',
+    type: 'task_assigned',
+    read: true,
+    created_at: new Date('2025-10-05T14:30:00Z').toISOString(),
+    updated_at: new Date('2025-10-05T15:00:00Z').toISOString(),
+  },
+};
+
+
 /* --------------------- DEPARTMENTS --------------------- */
 export const departmentsFixtures = {
   engineering: { id: 1, name: 'Engineering' },
@@ -358,35 +383,5 @@ export const task_comments = [
 ];
 
 /* --------------------- NOTIFICATIONS --------------------- */
-export const notifications = [
-  { 
-    id: 1, 
-    user_id: authUsersFixtures.alice.id, 
-    title: 'Task Assigned', 
-    message: 'You have been assigned Task 1', 
-    type: 'task', 
-    read: false, 
-    created_at: new Date('2024-01-10'), 
-    updated_at: new Date('2024-01-10') 
-  },
-  { 
-    id: 2, 
-    user_id: authUsersFixtures.carol.id, 
-    title: 'New Comment', 
-    message: 'Task 1 has a new comment', 
-    type: 'comment', 
-    read: false, 
-    created_at: new Date('2024-01-10'), 
-    updated_at: new Date('2024-01-10') 
-  },
-  { 
-    id: 3, 
-    user_id: authUsersFixtures.eve.id, 
-    title: 'Deadline Reminder', 
-    message: 'Task 5 deadline approaching', 
-    type: 'reminder', 
-    read: false, 
-    created_at: new Date('2024-01-14'), 
-    updated_at: new Date('2024-01-14') 
-  },
-];
+// Using notification fixtures defined earlier
+export const notifications = Object.values(notificationsFixtures);
