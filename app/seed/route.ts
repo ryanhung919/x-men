@@ -572,7 +572,23 @@ async function enableRLS(sql: postgres.Sql) {
     CREATE POLICY "Users can view relevant users" ON user_info
     FOR SELECT
     USING (can_view_user_info(id));
-`;
+  `;
+
+  await sql`
+    CREATE POLICY "Users can view task assignees" ON user_info
+    FOR SELECT
+    USING (
+      id IN (
+        SELECT ta.assignee_id
+        FROM task_assignments ta
+        WHERE ta.task_id IN (
+          SELECT t.id
+          FROM tasks t
+          WHERE is_task_visible_to_user(t.id, auth.uid())
+        )
+      )
+    );
+  `
 
   /* ---------------- USER ROLES ---------------- */
 

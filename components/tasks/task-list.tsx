@@ -403,7 +403,19 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
                     <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex -space-x-2">
+                    <div className="flex gap-1">
+                      <>
+                        {console.log(
+                          'Assignees for task:',
+                          task.id,
+                          task.assignees.map((a) => ({
+                            assignee_id: a.assignee_id,
+                            user_info: a.user_info
+                              ? `${a.user_info.first_name} ${a.user_info.last_name}`
+                              : 'MISSING',
+                          }))
+                        )}
+                      </>
                       {task.assignees.length > 0 ? (
                         task.assignees.slice(0, 3).map((assignee) => {
                           const { first_name, last_name } = assignee.user_info;
