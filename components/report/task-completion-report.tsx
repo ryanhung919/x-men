@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
+import { start } from "repl";
+import type { TaskCompletionReport as TaskCompletionReportType } from '@/components/report/export-buttons';
+
 
 interface Props {
   departmentIds?: number[];
@@ -11,15 +14,14 @@ interface Props {
   endDate?: string;
 }
 
-interface TeamStatusData {
-  staff: string;
-  "To Do": number;
-  "In Progress": number;
-  "Done": number;
+interface CompletionData {
+  assignee: string;
+  completed: number;
+  color: string;
 }
 
-export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDate, endDate }: Props) {
-  const [data, setData] = useState<TeamStatusData[]>([]);
+export function TaskCompletionsChart({ departmentIds = [], projectIds = [], startDate, endDate }: Props) {
+  const [data, setData] = useState<CompletionData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,14 +43,20 @@ export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDat
         if (!res.ok) throw new Error("Failed to fetch analytics");
         const json = await res.json();
         const tasks = json?.tasks ?? [];
-        const summaryMap: Record<string, TeamStatusData> = {};
+        const map: Record<string, number> = {};
         tasks.forEach((t: any) => {
-          const staffName = t.assignee?.username || "Unassigned";
-          if (!summaryMap[staffName]) summaryMap[staffName] = { staff: staffName, "To Do": 0, "In Progress": 0, "Done": 0 };
-          const status = t.status as "To Do" | "In Progress" | "Done";
-          if (status) summaryMap[staffName][status] += 1;
+          if (t.status === "Done") {
+            const assignee = t.assignee?.username || "Unassigned";
+            map[assignee] = (map[assignee] || 0) + 1;
+          }
         });
-        setData(Object.values(summaryMap));
+        setData(
+          Object.entries(map).map(([assignee, completed], idx) => ({
+            assignee,
+            completed,
+            color: `hsl(${(idx * 60) % 360}, 70%, 50%)`,
+          }))
+        );
       } catch (err) {
         console.error(err);
         setData([]);
@@ -60,33 +68,25 @@ export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDat
     fetchData();
   }, [departmentIds, projectIds, startDate, endDate]);
 
-  if (loading) return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Team Summary</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-64 bg-muted animate-pulse rounded" />
-      </CardContent>
-    </Card>
-  );
+  if (loading) return <div className="animate-pulse h-64 bg-muted rounded" />;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Team Summary</CardTitle>
+        <CardTitle>Task Completions</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data} stackOffset="expand">
+          <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="staff" />
+            <XAxis dataKey="assignee" />
             <YAxis />
             <Tooltip />
-            <Legend />
-            <Bar dataKey="To Do" stackId="a" fill="#94a3b8" />
-            <Bar dataKey="In Progress" stackId="a" fill="#3b82f6" />
-            <Bar dataKey="Done" stackId="a" fill="#10b981" />
+            <Bar dataKey="completed">
+              {data.map((entry, idx) => (
+                <Cell key={idx} fill={entry.color} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

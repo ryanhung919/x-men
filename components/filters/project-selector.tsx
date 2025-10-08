@@ -38,16 +38,30 @@ export function ProjectSelector({
   return (
     <div className="relative">
       <Select value="" onValueChange={() => {}}>
-        <SelectTrigger className="w-52">
+        <SelectTrigger
+          className={cn(
+            'w-52 border border-input bg-background text-foreground',
+            'hover:bg-accent hover:text-accent-foreground',
+            'focus:ring-2 focus:ring-ring focus:ring-offset-2'
+          )}
+        >
+          {' '}
           <SelectValue
             placeholder={
               selectedProjects.length
                 ? `${selectedProjects.length} project${selectedProjects.length > 1 ? 's' : ''}`
-                : 'Select projects'
+                : 'All projects'
             }
           />
         </SelectTrigger>
-        <SelectContent className="bg-white dark:bg-slate-950 border border-border shadow-md">
+        <SelectContent
+          className="bg-popover text-popover-foreground border border-border"
+          style={{
+            backgroundColor: 'hsl(var(--popover))',
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
+          }}
+        >
           <div className="max-h-[300px] overflow-y-auto">
             {projects.length === 0 ? (
               <div className="px-2 py-6 text-center text-sm text-muted-foreground">
@@ -77,7 +91,7 @@ export function ProjectSelector({
             )}
           </div>
           {loading && projects.length > 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-popover/80 backdrop-blur-sm pointer-events-none">
+            <div className="absolute inset-0 flex items-center justify-center bg-popover pointer-events-none">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
           )}

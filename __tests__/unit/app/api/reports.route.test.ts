@@ -15,8 +15,9 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 vi.mock("@/lib/services/report", () => ({
-  generateReport: vi.fn(),
-  exportReport: vi.fn(),
+  generateLoggedTimeReport: vi.fn(),
+  generateTeamSummaryReport: vi.fn(),
+  generateTaskCompletionReport: vi.fn(),
 }));
 
 vi.mock("@/lib/services/filter", () => ({
@@ -26,7 +27,11 @@ vi.mock("@/lib/services/filter", () => ({
 
 // Dynamic imports after mocks
 const { GET } = await import("@/app/api/reports/route");
-const { generateReport, exportReport } = await import("@/lib/services/report");
+const { 
+  generateLoggedTimeReport,
+  generateTeamSummaryReport,
+  generateTaskCompletionReport 
+} = await import("@/lib/services/report");
 const { filterDepartments, filterProjects } = await import("@/lib/services/filter");
 
 describe("app/api/reports/route", () => {
@@ -175,12 +180,19 @@ describe("app/api/reports/route", () => {
       });
     });
 
-    describe("action=report", () => {
-      it("should generate report with JSON response", async () => {
+    describe("action=time (loggedTime report)", () => {
+      it("should generate logged time report with JSON response", async () => {
         const mockReportData = {
+          kind: "loggedTime" as const,
           totalTime: 10,
           avgTime: 5,
           completedCount: 3,
+          overdueCount: 1,
+          timeByTask: new Map(),
+          wipTime: 2,
+          onTimeRate: 0.8,
+          totalLateness: 1.5,
+          overdueLoggedTime: 0.5,
         };
 
         mockSupabaseClient.auth = {
@@ -190,21 +202,23 @@ describe("app/api/reports/route", () => {
           }),
         } as any;
 
-        vi.mocked(generateReport).mockResolvedValue(mockReportData);
+        vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
-        const request = createMockRequest(
-          "/api/reports?action=report&type=loggedTime"
-        );
+        const request = createMockRequest("/api/reports?action=time");
         const response = await GET(request);
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data).toEqual(mockReportData);
-        expect(generateReport).toHaveBeenCalledWith({
+        expect(data).toMatchObject({
+          kind: "loggedTime",
+          totalTime: 10,
+          avgTime: 5,
+          completedCount: 3,
+        });
+        expect(generateLoggedTimeReport).toHaveBeenCalledWith({
           projectIds: [],
           startDate: undefined,
           endDate: undefined,
-          type: "loggedTime",
         });
       });
 
@@ -212,7 +226,18 @@ describe("app/api/reports/route", () => {
         const projectIds = [projectsFixtures.alpha.id];
         const startDate = "2024-01-01";
         const endDate = "2024-12-31";
-        const mockReportData = { totalTime: 10 };
+        const mockReportData = {
+          kind: "loggedTime" as const,
+          totalTime: 10,
+          avgTime: 5,
+          completedCount: 3,
+          overdueCount: 0,
+          timeByTask: new Map(),
+          wipTime: 0,
+          onTimeRate: 1,
+          totalLateness: 0,
+          overdueLoggedTime: 0,
+        };
 
         mockSupabaseClient.auth = {
           getUser: vi.fn().mockResolvedValue({
@@ -221,26 +246,38 @@ describe("app/api/reports/route", () => {
           }),
         } as any;
 
-        vi.mocked(generateReport).mockResolvedValue(mockReportData);
+        vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
         const request = createMockRequest(
-          `/api/reports?action=report&type=loggedTime&projectIds=${projectIds.join(",")}&startDate=${startDate}&endDate=${endDate}`
+          `/api/reports?action=time&projectIds=${projectIds.join(",")}&startDate=${startDate}&endDate=${endDate}`
         );
         const response = await GET(request);
         const data = await response.json();
 
-        expect(data).toEqual(mockReportData);
-        expect(generateReport).toHaveBeenCalledWith({
+        expect(data).toMatchObject({
+          kind: "loggedTime",
+          totalTime: 10,
+        });
+        expect(generateLoggedTimeReport).toHaveBeenCalledWith({
           projectIds,
           startDate: new Date(startDate),
           endDate: new Date(endDate),
-          type: "loggedTime",
         });
       });
 
-      it("should export report as PDF", async () => {
-        const mockReportData = { totalTime: 10 };
-        const mockPdfBuffer = Buffer.from("mock-pdf");
+      it("should default to time action when no action specified", async () => {
+        const mockReportData = {
+          kind: "loggedTime" as const,
+          totalTime: 0,
+          avgTime: 0,
+          completedCount: 0,
+          overdueCount: 0,
+          timeByTask: new Map(),
+          wipTime: 0,
+          onTimeRate: 0,
+          totalLateness: 0,
+          overdueLoggedTime: 0,
+        };
 
         mockSupabaseClient.auth = {
           getUser: vi.fn().mockResolvedValue({
@@ -249,78 +286,26 @@ describe("app/api/reports/route", () => {
           }),
         } as any;
 
-        vi.mocked(generateReport).mockResolvedValue(mockReportData);
-        vi.mocked(exportReport).mockResolvedValue({
-          buffer: mockPdfBuffer,
-          mime: "application/pdf",
-        });
+        vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
-        const request = createMockRequest(
-          "/api/reports?action=report&type=loggedTime&format=pdf"
-        );
+        const request = createMockRequest("/api/reports");
         const response = await GET(request);
 
         expect(response.status).toBe(200);
-        expect(response.headers.get("Content-Type")).toBe("application/pdf");
-        expect(exportReport).toHaveBeenCalledWith(mockReportData, {
-          projectIds: [],
-          startDate: undefined,
-          endDate: undefined,
-          type: "loggedTime",
-          format: "pdf",
-        });
-      });
-
-      it("should export report as XLSX", async () => {
-        const mockReportData = { totalTime: 10 };
-        const mockXlsxBuffer = Buffer.from("mock-xlsx");
-
-        mockSupabaseClient.auth = {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: authUsersFixtures.alice.id } },
-            error: null,
-          }),
-        } as any;
-
-        vi.mocked(generateReport).mockResolvedValue(mockReportData);
-        vi.mocked(exportReport).mockResolvedValue({
-          buffer: mockXlsxBuffer,
-          mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-
-        const request = createMockRequest(
-          "/api/reports?action=report&type=loggedTime&format=xlsx"
-        );
-        const response = await GET(request);
-
-        expect(response.status).toBe(200);
-        expect(response.headers.get("Content-Type")).toBe(
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
-      });
-
-      it("should default to loggedTime report type", async () => {
-        mockSupabaseClient.auth = {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: authUsersFixtures.alice.id } },
-            error: null,
-          }),
-        } as any;
-
-        vi.mocked(generateReport).mockResolvedValue({});
-
-        const request = createMockRequest("/api/reports?action=report");
-        await GET(request);
-
-        expect(generateReport).toHaveBeenCalledWith(
-          expect.objectContaining({ type: "loggedTime" })
-        );
+        expect(generateLoggedTimeReport).toHaveBeenCalled();
       });
     });
 
-    describe("action=time", () => {
-      it("should handle time action as alias for report", async () => {
-        const mockReportData = { totalTime: 10 };
+    describe("action=team (teamSummary report)", () => {
+      it("should generate team summary report", async () => {
+        const mockReportData = {
+          kind: "teamSummary" as const,
+          totalTasks: 5,
+          tasksByCreator: new Map([
+            ["user1", 3],
+            ["user2", 2],
+          ]),
+        };
 
         mockSupabaseClient.auth = {
           getUser: vi.fn().mockResolvedValue({
@@ -329,14 +314,118 @@ describe("app/api/reports/route", () => {
           }),
         } as any;
 
-        vi.mocked(generateReport).mockResolvedValue(mockReportData);
+        vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
-        const request = createMockRequest("/api/reports?action=time&type=loggedTime");
+        const request = createMockRequest("/api/reports?action=team");
         const response = await GET(request);
         const data = await response.json();
 
         expect(response.status).toBe(200);
-        expect(data).toEqual(mockReportData);
+        expect(data).toMatchObject({
+          kind: "teamSummary",
+          totalTasks: 5,
+        });
+        expect(generateTeamSummaryReport).toHaveBeenCalledWith({
+          projectIds: [],
+          startDate: undefined,
+          endDate: undefined,
+        });
+      });
+
+      it("should pass filters to team summary report", async () => {
+        const projectIds = [1, 2];
+        const mockReportData = {
+          kind: "teamSummary" as const,
+          totalTasks: 2,
+          tasksByCreator: new Map(),
+        };
+
+        mockSupabaseClient.auth = {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: authUsersFixtures.alice.id } },
+            error: null,
+          }),
+        } as any;
+
+        vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
+
+        const request = createMockRequest(
+          `/api/reports?action=team&projectIds=${projectIds.join(",")}`
+        );
+        await GET(request);
+
+        expect(generateTeamSummaryReport).toHaveBeenCalledWith({
+          projectIds,
+          startDate: undefined,
+          endDate: undefined,
+        });
+      });
+    });
+
+    describe("action=task (taskCompletion report)", () => {
+      it("should generate task completion report", async () => {
+        const mockReportData = {
+          kind: "taskCompletions" as const,
+          completionRate: 0.75,
+          completedByProject: new Map([
+            [1, 5],
+            [2, 3],
+          ]),
+        };
+
+        mockSupabaseClient.auth = {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: authUsersFixtures.alice.id } },
+            error: null,
+          }),
+        } as any;
+
+        vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
+
+        const request = createMockRequest("/api/reports?action=task");
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data).toMatchObject({
+          kind: "taskCompletions",
+          completionRate: 0.75,
+        });
+        expect(generateTaskCompletionReport).toHaveBeenCalledWith({
+          projectIds: [],
+          startDate: undefined,
+          endDate: undefined,
+        });
+      });
+
+      it("should pass filters to task completion report", async () => {
+        const projectIds = [1];
+        const startDate = "2024-01-01";
+        const mockReportData = {
+          kind: "taskCompletions" as const,
+          completionRate: 0.5,
+          completedByProject: new Map(),
+        };
+
+        mockSupabaseClient.auth = {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: authUsersFixtures.alice.id } },
+            error: null,
+          }),
+        } as any;
+
+        vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
+
+        const request = createMockRequest(
+          `/api/reports?action=task&projectIds=${projectIds.join(",")}&startDate=${startDate}`
+        );
+        await GET(request);
+
+        expect(generateTaskCompletionReport).toHaveBeenCalledWith({
+          projectIds,
+          startDate: new Date(startDate),
+          endDate: undefined,
+        });
       });
     });
 
@@ -376,22 +465,6 @@ describe("app/api/reports/route", () => {
         expect(response.status).toBe(500);
         expect(data).toHaveProperty("error", "Server error");
         expect(data).toHaveProperty("details");
-      });
-
-      it("should handle missing action parameter", async () => {
-        mockSupabaseClient.auth = {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: authUsersFixtures.alice.id } },
-            error: null,
-          }),
-        } as any;
-
-        const request = createMockRequest("/api/reports");
-        const response = await GET(request);
-        const data = await response.json();
-
-        expect(response.status).toBe(400);
-        expect(data).toHaveProperty("error");
       });
     });
 
@@ -455,9 +528,9 @@ describe("app/api/reports/route", () => {
 
         // Empty string results in undefined after parseArrayParam
         const calls = vi.mocked(filterDepartments).mock.calls[0];
-          expect(calls[0]).toBe(authUsersFixtures.alice.id);
-          expect(calls[1]).toBeUndefined();
-      })
+        expect(calls[0]).toBe(authUsersFixtures.alice.id);
+        expect(calls[1]).toBeUndefined();
+      });
 
       it("should parse date strings correctly", async () => {
         mockSupabaseClient.auth = {
@@ -467,19 +540,63 @@ describe("app/api/reports/route", () => {
           }),
         } as any;
 
-        vi.mocked(generateReport).mockResolvedValue({});
+        vi.mocked(generateLoggedTimeReport).mockResolvedValue({
+          kind: "loggedTime" as const,
+          totalTime: 0,
+          avgTime: 0,
+          completedCount: 0,
+          overdueCount: 0,
+          timeByTask: new Map(),
+          wipTime: 0,
+          onTimeRate: 0,
+          totalLateness: 0,
+          overdueLoggedTime: 0,
+        });
 
         const request = createMockRequest(
-          "/api/reports?action=report&startDate=2024-01-01T00:00:00Z&endDate=2024-12-31T23:59:59Z"
+          "/api/reports?action=time&startDate=2024-01-01T00:00:00Z&endDate=2024-12-31T23:59:59Z"
         );
         await GET(request);
 
-        expect(generateReport).toHaveBeenCalledWith(
+        expect(generateLoggedTimeReport).toHaveBeenCalledWith(
           expect.objectContaining({
             startDate: new Date("2024-01-01T00:00:00Z"),
             endDate: new Date("2024-12-31T23:59:59Z"),
           })
         );
+      });
+
+      it("should handle invalid date strings", async () => {
+        mockSupabaseClient.auth = {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: authUsersFixtures.alice.id } },
+            error: null,
+          }),
+        } as any;
+
+        vi.mocked(generateLoggedTimeReport).mockResolvedValue({
+          kind: "loggedTime",
+          totalTime: 0,
+          avgTime: 0,
+          completedCount: 0,
+          overdueCount: 0,
+          timeByTask: new Map(),
+          wipTime: 0,
+          onTimeRate: 0,
+          totalLateness: 0,
+          overdueLoggedTime: 0,
+        });
+
+        const request = createMockRequest(
+          "/api/reports?action=time&startDate=invalid-date"
+        );
+        await GET(request);
+
+        expect(generateLoggedTimeReport).toHaveBeenCalledWith({
+          projectIds: [],
+          startDate: undefined, // Invalid date becomes undefined
+          endDate: undefined,
+        });
       });
     });
   });

@@ -7,7 +7,8 @@ on:
     branches: [main, develop]
 
 jobs:
-  tests:
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -29,7 +30,6 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        # Use --no-frozen-lockfile in CI if lockfile mismatch occurs
         run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 
       # --- Linting (optional) ---
@@ -40,55 +40,150 @@ jobs:
       - name: Run unit tests
         run: pnpm test:unit
 
-      # --- Integration tests (optional) ---
-      # - name: Run integration tests
-      #   run: pnpm test:integration
-
-      # --- Coverage ---
-      # - name: Generate coverage report
-      #   run: pnpm test:coverage
-
-      # - name: Upload coverage to Codecov
-      #   uses: codecov/codecov-action@v3
-      #   with:
-      #     files: ./coverage/coverage-final.json
-      #     flags: unittests
-      #     name: codecov-umbrella
-
-  # --- E2E tests (optional) ---
-  # e2e:
+  # integration-tests:
+  #   name: Integration Tests
   #   runs-on: ubuntu-latest
-  #   timeout-minutes: 60
+  #   needs: unit-tests
+    
+  #   # Only run integration tests on main/develop or PRs to those branches
+    # if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.base_ref == 'main' || github.base_ref == 'develop'
+
   #   steps:
   #     - name: Checkout code
   #       uses: actions/checkout@v4
-  #
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 20.x
-  #         cache: 'pnpm'
-  #
+
   #     - name: Setup pnpm
   #       uses: pnpm/action-setup@v2
   #       with:
   #         version: 8
-  #
+      
+  #     - name: Setup Node.js 20.x
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20.x
+  #         cache: 'pnpm'
+
   #     - name: Install dependencies
   #       run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
-  #
-  #     - name: Install Playwright browsers
-  #       run: pnpm exec playwright install --with-deps
-  #
-  #     - name: Run E2E tests
-  #       run: pnpm run test:e2e
+
+  #     - name: Run integration tests
   #       env:
-  #         PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
-  #
-  #     - name: Upload Playwright report
-  #       uses: actions/upload-artifact@v3
+  #         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  #         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  #         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  #         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+  #       run: pnpm test:integration
+
+  #     - name: Upload integration test results
   #       if: always()
+  #       uses: actions/upload-artifact@v3
   #       with:
-  #         name: playwright-report
-  #         path: playwright-report/
-  #         retention-days: 30
+  #         name: integration-test-results
+  #         path: |
+  #           coverage/
+  #           test-results/
+  #         retention-days: 7
+          
+# Optional: Linting
+# lint:
+#   name: Lint
+#   runs-on: ubuntu-latest
+#   steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v4
+#
+#     - name: Setup pnpm
+#       uses: pnpm/action-setup@v2
+#       with:
+#         version: 8
+#
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: 20.x
+#         cache: 'pnpm'
+#
+#     - name: Install dependencies
+#       run: pnpm install --frozen-lockfile
+#
+#     - name: Run linter
+#       run: pnpm lint
+
+# Optional: Coverage reporting
+# coverage:
+#   name: Coverage Report
+#   runs-on: ubuntu-latest
+#   needs: [unit-tests, integration-tests]
+#   if: github.ref == 'refs/heads/main'
+#   
+#   steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v4
+#
+#     - name: Setup pnpm
+#       uses: pnpm/action-setup@v2
+#       with:
+#         version: 8
+#
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: 20.x
+#         cache: 'pnpm'
+#
+#     - name: Install dependencies
+#       run: pnpm install --frozen-lockfile
+#
+#     - name: Generate coverage
+#       env:
+#         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+#         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+#         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+#         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+#       run: pnpm test:coverage
+#
+#     - name: Upload coverage to Codecov
+#       uses: codecov/codecov-action@v3
+#       with:
+#         files: ./coverage/coverage-final.json
+#         flags: unittests,integration
+#         name: codecov-umbrella
+
+
+# e2e-tests:
+#   name: End-to-End Tests
+#   runs-on: ubuntu-latest
+#   timeout-minutes: 60
+#   steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v4
+#
+#     - name: Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: 20.x
+#         cache: 'pnpm'
+#
+#     - name: Setup pnpm
+#       uses: pnpm/action-setup@v2
+#       with:
+#         version: 8
+#
+#     - name: Install dependencies
+#       run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+#
+#     - name: Install Playwright browsers
+#       run: pnpm exec playwright install --with-deps
+#
+#     - name: Run E2E tests
+#       run: pnpm run test:e2e
+#       env:
+#         PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
+#
+#     - name: Upload Playwright report
+#       uses: actions/upload-artifact@v3
+#       if: always()
+#       with:
+#         name: playwright-report
+#         path: playwright-report/
+#         retention-days: 30

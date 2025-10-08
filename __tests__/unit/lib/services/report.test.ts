@@ -1,30 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { tasks } from "@/__tests__/fixtures/database.fixtures";
 
-
 // Mock dependencies
 vi.mock("@/lib/db/report", () => ({
   getTasks: vi.fn(),
 }));
 
-vi.mock("jspdf", () => ({
-  jsPDF: vi.fn().mockImplementation(() => ({
-    text: vi.fn(),
-    output: vi.fn().mockReturnValue(Buffer.from("mock-pdf")),
-  })),
-}));
-
-vi.mock("xlsx", () => ({
-  utils: {
-    json_to_sheet: vi.fn().mockReturnValue({}),
-    book_new: vi.fn().mockReturnValue({}),
-    book_append_sheet: vi.fn(),
-  },
-  write: vi.fn().mockReturnValue(Buffer.from("mock-xlsx")),
-}));
-
 // Dynamic import after mocks
-const { generateReport, exportReport } = await import("@/lib/services/report");
+const { 
+  generateLoggedTimeReport,
+  generateTeamSummaryReport,
+  generateTaskCompletionReport,
+} = await import("@/lib/services/report");
 const { getTasks } = await import("@/lib/db/report");
 
 describe("lib/services/report", () => {
@@ -32,184 +19,169 @@ describe("lib/services/report", () => {
     vi.clearAllMocks();
   });
 
-  describe("generateReport", () => {
-    describe("loggedTime report type", () => {
-      it("should generate logged time report with correct metrics", async () => {
-        const mockTasks = [
-          {
-            ...tasks[0],
-            status: "Done",
-            logged_time: 3600, // 1 hour
-            deadline: "2024-01-15T00:00:00Z",
-            updated_at: "2024-01-14T00:00:00Z", // On time
-          },
-          {
-            ...tasks[1],
-            status: "Done",
-            logged_time: 7200, // 2 hours
-            deadline: "2024-01-20T00:00:00Z",
-            updated_at: "2024-01-22T00:00:00Z", // Late by 2 days
-          },
-          {
-            ...tasks[2],
-            status: "In Progress",
-            logged_time: 1800, // 0.5 hours
-            deadline: "2024-01-01T00:00:00Z", // Overdue
-          },
-        ];
+  describe("generateLoggedTimeReport", () => {
+    it("should generate logged time report with correct metrics", async () => {
+      const mockTasks = [
+        {
+          ...tasks[0],
+          status: "Done",
+          logged_time: 3600, // 1 hour
+          deadline: "2024-01-15T00:00:00Z",
+          updated_at: "2024-01-14T00:00:00Z", // On time
+        },
+        {
+          ...tasks[1],
+          status: "Done",
+          logged_time: 7200, // 2 hours
+          deadline: "2024-01-20T00:00:00Z",
+          updated_at: "2024-01-22T00:00:00Z", // Late by 2 days
+        },
+        {
+          ...tasks[2],
+          status: "In Progress",
+          logged_time: 1800, // 0.5 hours
+          deadline: "2024-01-01T00:00:00Z", // Overdue
+        },
+      ];
 
-        vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-        const result = await generateReport({
-          projectIds: [1],
-          type: "loggedTime",
-        });
-
-        expect(result).toHaveProperty("totalTime");
-        expect(result).toHaveProperty("avgTime");
-        expect(result).toHaveProperty("completedCount", 2);
-        expect(result).toHaveProperty("overdueCount", 1);
-        expect(result).toHaveProperty("onTimeRate");
-        expect(result).toHaveProperty("totalLateness");
-        expect(result).toHaveProperty("wipTime");
-        expect(result).toHaveProperty("overdueLoggedTime");
-
-        // Verify calculations
-        expect(result.completedCount).toBe(2);
-        expect(result.overdueCount).toBe(1);
-        expect(result.onTimeRate).toBe(0.5); // 1 out of 2 on time
+      const result = await generateLoggedTimeReport({
+        projectIds: [1],
       });
 
-      it("should calculate total time correctly", async () => {
-        const mockTasks = [
-          { ...tasks[0], logged_time: 3600, status: "Done" },
-          { ...tasks[1], logged_time: 7200, status: "Done" },
-        ];
+      expect(result).toHaveProperty("kind", "loggedTime");
+      expect(result).toHaveProperty("totalTime");
+      expect(result).toHaveProperty("avgTime");
+      expect(result).toHaveProperty("completedCount", 2);
+      expect(result).toHaveProperty("overdueCount", 1);
+      expect(result).toHaveProperty("onTimeRate");
+      expect(result).toHaveProperty("totalLateness");
+      expect(result).toHaveProperty("wipTime");
+      expect(result).toHaveProperty("overdueLoggedTime");
 
-        vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+      // Verify calculations
+      expect(result.completedCount).toBe(2);
+      expect(result.overdueCount).toBe(1);
+      expect(result.onTimeRate).toBe(0.5); // 1 out of 2 on time
+    });
 
-        const result = await generateReport({
-          type: "loggedTime",
-        });
+    it("should calculate total time correctly", async () => {
+      const mockTasks = [
+        { ...tasks[0], logged_time: 3600, status: "Done" },
+        { ...tasks[1], logged_time: 7200, status: "Done" },
+      ];
 
-        // Total: (3600 + 7200) / 3600 = 3 hours
-        expect(result.totalTime).toBe(3);
-      });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-      it("should calculate average time correctly", async () => {
-        const mockTasks = [
-          { ...tasks[0], logged_time: 3600, status: "Done" },
-          { ...tasks[1], logged_time: 7200, status: "Done" },
-          { ...tasks[2], logged_time: 1800, status: "In Progress" },
-        ];
+      const result = await generateLoggedTimeReport({});
 
-        vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+      // Total: (3600 + 7200) / 3600 = 3 hours
+      expect(result.totalTime).toBe(3);
+      expect(result.kind).toBe("loggedTime");
+    });
 
-        const result = await generateReport({
-          type: "loggedTime",
-        });
+    it("should calculate average time correctly", async () => {
+      const mockTasks = [
+        { ...tasks[0], logged_time: 3600, status: "Done" },
+        { ...tasks[1], logged_time: 7200, status: "Done" },
+        { ...tasks[2], logged_time: 1800, status: "In Progress" },
+      ];
 
-        // Avg for completed: (3600 + 7200) / 2 / 3600 = 1.5 hours
-        expect(result.avgTime).toBe(1.5);
-      });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-      it("should handle tasks with no deadline", async () => {
-        const mockTasks = [
-          { ...tasks[0], status: "Done", logged_time: 3600, deadline: null },
-        ];
+      const result = await generateLoggedTimeReport({});
 
-        vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+      // Avg for completed: (3600 + 7200) / 2 / 3600 = 1.5 hours
+      expect(result.avgTime).toBe(1.5);
+    });
 
-        const result = await generateReport({
-          type: "loggedTime",
-        });
+    it("should handle tasks with no deadline", async () => {
+      const mockTasks = [
+        { ...tasks[0], status: "Done", logged_time: 3600, deadline: null },
+      ];
 
-        expect(result.onTimeRate).toBe(0); // No deadlines to compare
-      });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-      it("should handle empty task list", async () => {
-        vi.mocked(getTasks).mockResolvedValue([]);
+      const result = await generateLoggedTimeReport({});
 
-        const result = await generateReport({
-          type: "loggedTime",
-        });
+      expect(result.onTimeRate).toBe(0); // No deadlines to compare
+    });
 
-        expect(result.totalTime).toBe(0);
-        expect(result.avgTime).toBe(0);
-        expect(result.completedCount).toBe(0);
-        expect(result.overdueCount).toBe(0);
-      });
+    it("should handle empty task list", async () => {
+      vi.mocked(getTasks).mockResolvedValue([]);
 
-      it("should rollup logged time for subtasks to parent", async () => {
-        const mockTasks = [
-          { 
-            ...tasks[0], 
-            id: 1, 
-            logged_time: 3600, 
-            parent_task_id: null,
-            status: "Done" 
-          },
-          { 
-            ...tasks[1], 
-            id: 2, 
-            logged_time: 1800, 
-            parent_task_id: 1,
-            status: "Done" 
-          },
-        ];
+      const result = await generateLoggedTimeReport({});
 
-        vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+      expect(result.totalTime).toBe(0);
+      expect(result.avgTime).toBe(0);
+      expect(result.completedCount).toBe(0);
+      expect(result.overdueCount).toBe(0);
+    });
 
-        const result = await generateReport({
-          type: "loggedTime",
-        });
+    it("should rollup logged time for subtasks to parent", async () => {
+      const mockTasks = [
+        { 
+          ...tasks[0], 
+          id: 1, 
+          logged_time: 3600, 
+          parent_task_id: null,
+          status: "Done" 
+        },
+        { 
+          ...tasks[1], 
+          id: 2, 
+          logged_time: 1800, 
+          parent_task_id: 1,
+          status: "Done" 
+        },
+      ];
 
-        // Parent should have its own time + subtask time
-        expect(result.timeByTask.get(1)).toBe(3600 + 1800);
-        expect(result.timeByTask.get(2)).toBe(1800);
-      });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-      it("should calculate overdue logged time correctly", async () => {
-        const now = new Date();
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const result = await generateLoggedTimeReport({});
 
-        const mockTasks = [
-          {
-            ...tasks[0],
-            status: "In Progress",
-            logged_time: 7200, // 2 hours
-            deadline: yesterday.toISOString(),
-          },
-        ];
+      // Parent should have its own time + subtask time
+      expect(result.timeByTask.get(1)).toBe(3600 + 1800);
+      expect(result.timeByTask.get(2)).toBe(1800);
+    });
 
-        vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+    it("should calculate overdue logged time correctly", async () => {
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        const result = await generateReport({
-          type: "loggedTime",
-        });
+      const mockTasks = [
+        {
+          ...tasks[0],
+          status: "In Progress",
+          logged_time: 7200, // 2 hours
+          deadline: yesterday.toISOString(),
+        },
+      ];
 
-        expect(result.overdueLoggedTime).toBe(2);
-      });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-      it("should calculate lateness in hours", async () => {
-        const mockTasks = [
-          {
-            ...tasks[0],
-            status: "Done",
-            logged_time: 3600,
-            deadline: "2024-01-15T00:00:00Z",
-            updated_at: "2024-01-15T12:00:00Z", // 12 hours late
-          },
-        ];
+      const result = await generateLoggedTimeReport({});
 
-        vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+      expect(result.overdueLoggedTime).toBe(2);
+    });
 
-        const result = await generateReport({
-          type: "loggedTime",
-        });
+    it("should calculate lateness in hours", async () => {
+      const mockTasks = [
+        {
+          ...tasks[0],
+          status: "Done",
+          logged_time: 3600,
+          deadline: "2024-01-15T00:00:00Z",
+          updated_at: "2024-01-15T12:00:00Z", // 12 hours late
+        },
+      ];
 
-        expect(result.totalLateness).toBeGreaterThan(0);
-      });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateLoggedTimeReport({});
+
+      expect(result.totalLateness).toBeGreaterThan(0);
     });
 
     it("should pass filters to getTasks", async () => {
@@ -219,11 +191,10 @@ describe("lib/services/report", () => {
 
       vi.mocked(getTasks).mockResolvedValue([]);
 
-      await generateReport({
+      await generateLoggedTimeReport({
         projectIds,
         startDate,
         endDate,
-        type: "loggedTime",
       });
 
       expect(getTasks).toHaveBeenCalledWith({
@@ -232,88 +203,161 @@ describe("lib/services/report", () => {
         endDate,
       });
     });
+  });
 
-    it("should return empty object for unknown report type", async () => {
+  describe("generateTeamSummaryReport", () => {
+    it("should generate team summary report with correct data", async () => {
+      const mockTasks = [
+        { ...tasks[0], status: "Done", creator_id: "user1" },
+        { ...tasks[1], status: "In Progress", creator_id: "user1" },
+        { ...tasks[2], status: "Done", creator_id: "user2" },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateTeamSummaryReport({});
+
+      expect(result).toHaveProperty("kind", "teamSummary");
+      expect(result).toHaveProperty("totalTasks", 3);
+      expect(result).toHaveProperty("tasksByCreator");
+      
+      // Verify tasks by creator
+      expect(result.tasksByCreator.get("user1")).toBe(2);
+      expect(result.tasksByCreator.get("user2")).toBe(1);
+    });
+
+    it("should handle tasks with no creator_id", async () => {
+      const mockTasks = [
+        { ...tasks[0], creator_id: undefined },
+        { ...tasks[1], creator_id: "user1" },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateTeamSummaryReport({});
+
+      expect(result.tasksByCreator.get("unknown")).toBe(1);
+      expect(result.tasksByCreator.get("user1")).toBe(1);
+    });
+
+    it("should handle empty task list", async () => {
       vi.mocked(getTasks).mockResolvedValue([]);
 
-      const result = await generateReport({
-        type: "unknownType" as any,
-      });
+      const result = await generateTeamSummaryReport({});
 
-      expect(result).toEqual({});
+      expect(result.totalTasks).toBe(0);
+      expect(result.tasksByCreator.size).toBe(0);
+    });
+
+    it("should pass filters to getTasks", async () => {
+      const projectIds = [1, 2];
+      vi.mocked(getTasks).mockResolvedValue([]);
+
+      await generateTeamSummaryReport({ projectIds });
+
+      expect(getTasks).toHaveBeenCalledWith({
+        projectIds,
+        startDate: undefined,
+        endDate: undefined,
+      });
     });
   });
 
-  // describe("exportReport", () => {
-  //   it("should export report as PDF", async () => {
-  //     const reportData = { totalTime: 10, avgTime: 5 };
+  describe("generateTaskCompletionReport", () => {
+    it("should generate task completion report with correct data", async () => {
+      const mockTasks = [
+        { ...tasks[0], status: "Done", project_id: 1 },
+        { ...tasks[1], status: "Done", project_id: 1 },
+        { ...tasks[2], status: "In Progress", project_id: 2 },
+        { ...tasks[3], status: "To Do", project_id: 2 },
+      ];
 
-  //     const result = await exportReport(reportData, {
-  //       type: "loggedTime",
-  //       format: "pdf",
-  //     });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-  //     expect(result).toHaveProperty("buffer");
-  //     expect(result).toHaveProperty("mime", "application/pdf");
-  //     expect(result.buffer).toBeInstanceOf(ArrayBuffer);
-  //   });
+      const result = await generateTaskCompletionReport({});
 
-  //   it("should export report as XLSX", async () => {
-  //     const reportData = [{ task: "Task 1", time: 10 }];
+      expect(result).toHaveProperty("kind", "taskCompletions");
+      expect(result).toHaveProperty("completionRate");
+      expect(result).toHaveProperty("completedByProject");
 
-  //     const result = await exportReport(reportData, {
-  //       type: "loggedTime",
-  //       format: "xlsx",
-  //     });
+      // 2 completed out of 4 total = 0.5
+      expect(result.completionRate).toBe(0.5);
+      
+      // Project 1 has 2 completed
+      expect(result.completedByProject.get(1)).toBe(2);
+      
+      // Project 2 has 0 completed
+      expect(result.completedByProject.get(2)).toBeUndefined();
+    });
 
-  //     expect(result).toHaveProperty("buffer");
-  //     expect(result).toHaveProperty(
-  //       "mime",
-  //       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-  //     );
-  //   });
+    it("should handle all completed tasks", async () => {
+      const mockTasks = [
+        { ...tasks[0], status: "Done", project_id: 1 },
+        { ...tasks[1], status: "Done", project_id: 1 },
+      ];
 
-  //   it("should handle object data for XLSX export", async () => {
-  //     const reportData = { 
-  //       totalTime: 10, 
-  //       avgTime: 5,
-  //       completedCount: 3 
-  //     };
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-  //     const result = await exportReport(reportData, {
-  //       type: "loggedTime",
-  //       format: "xlsx",
-  //     });
+      const result = await generateTaskCompletionReport({});
 
-  //     expect(result.buffer).toBeDefined();
-  //   });
+      expect(result.completionRate).toBe(1); // 100% completion
+      expect(result.completedByProject.get(1)).toBe(2);
+    });
 
-  //   it("should throw error for unsupported format", async () => {
-  //     const reportData = { totalTime: 10 };
+    it("should handle no completed tasks", async () => {
+      const mockTasks = [
+        { ...tasks[0], status: "To Do", project_id: 1 },
+        { ...tasks[1], status: "In Progress", project_id: 1 },
+      ];
 
-  //     await expect(
-  //       exportReport(reportData, {
-  //         type: "loggedTime",
-  //         format: "csv" as any,
-  //       })
-  //     ).rejects.toThrow("Unsupported export format");
-  //   });
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
 
-  //   it("should include report type in PDF", async () => {
-  //     const { jsPDF } = await import("jspdf");
-  //     const reportData = { totalTime: 10 };
+      const result = await generateTaskCompletionReport({});
 
-  //     await exportReport(reportData, {
-  //       type: "loggedTime",
-  //       format: "pdf",
-  //     });
+      expect(result.completionRate).toBe(0);
+      expect(result.completedByProject.size).toBe(0);
+    });
 
-  //     const mockInstance = vi.mocked(jsPDF).mock.results[0]?.value;
-  //     expect(mockInstance.text).toHaveBeenCalledWith(
-  //       "loggedTime Report",
-  //       10,
-  //       10
-  //     );
-  //   });
-  // });
+    it("should handle empty task list", async () => {
+      vi.mocked(getTasks).mockResolvedValue([]);
+
+      const result = await generateTaskCompletionReport({});
+
+      // Empty list: 0 / 1 = 0 (due to `|| 1` in denominator)
+      expect(result.completionRate).toBe(0);
+      expect(result.completedByProject.size).toBe(0);
+    });
+
+    it("should aggregate completions per project correctly", async () => {
+      const mockTasks = [
+        { ...tasks[0], status: "Done", project_id: 1 },
+        { ...tasks[1], status: "Done", project_id: 2 },
+        { ...tasks[2], status: "Done", project_id: 2 },
+        { ...tasks[3], status: "In Progress", project_id: 3 },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateTaskCompletionReport({});
+
+      expect(result.completedByProject.get(1)).toBe(1);
+      expect(result.completedByProject.get(2)).toBe(2);
+      expect(result.completedByProject.get(3)).toBeUndefined();
+    });
+
+    it("should pass filters to getTasks", async () => {
+      const projectIds = [1];
+      const startDate = new Date("2024-01-01");
+
+      vi.mocked(getTasks).mockResolvedValue([]);
+
+      await generateTaskCompletionReport({ projectIds, startDate });
+
+      expect(getTasks).toHaveBeenCalledWith({
+        projectIds,
+        startDate,
+        endDate: undefined,
+      });
+    });
+  });
 });
