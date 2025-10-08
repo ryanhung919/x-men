@@ -501,6 +501,57 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`ALTER TABLE task_comments ENABLE ROW LEVEL SECURITY`;
   await sql`ALTER TABLE task_attachments ENABLE ROW LEVEL SECURITY`;
 
+  // Create security define function to check admin status (bypasses RLS recursion)
+  await sql`
+    CREATE OR REPLACE FUNCTION is_admin()
+    RETURNS boolean
+    LANGUAGE sql
+    SECURITY DEFINER
+    AS $$
+      SELECT EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin');
+    $$;
+  `;
+
+  // Create security definer function for task visibility (bypasses RLS recursion)
+  await sql`
+    CREATE OR REPLACE FUNCTION is_task_visible_to_user(task_id_arg bigint, user_id_arg uuid)
+    RETURNS boolean
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    AS $$
+    BEGIN
+      IF user_id_arg != auth.uid() THEN
+        RETURN FALSE;
+      END IF;
+      RETURN
+        EXISTS (
+          SELECT 1 FROM tasks t WHERE t.id = task_id_arg AND t.creator_id = user_id_arg
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM task_assignments ta
+          JOIN user_info ui ON ta.assignee_id = ui.id
+          WHERE ta.task_id = task_id_arg
+            AND ui.department_id = (SELECT department_id FROM user_info WHERE id = user_id_arg)
+        );
+    END;
+    $$;
+  `;
+
+  // Create security definer function that returns all colleagues in the same department
+  await sql`
+    CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
+      RETURNS TABLE(id uuid, department_id int)
+      LANGUAGE sql
+      SECURITY DEFINER
+      AS $$
+        SELECT u.id, u.department_id
+        FROM user_info u
+        JOIN user_info me ON me.id = user_uuid
+        WHERE u.department_id = me.department_id;
+      $$;
+  `;
+
   // Create basic RLS policies
 
   /* ---------------- USER INFO ---------------- */
@@ -516,31 +567,11 @@ async function enableRLS(sql: postgres.Sql) {
     FOR UPDATE USING (auth.uid() = id)
   `;
 
-  // Seucurity definer function that returns all colleagues in the same department:
-  await sql`
-    CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
-      RETURNS TABLE(id uuid, department_id int)
-      LANGUAGE sql
-      SECURITY DEFINER
-      AS $$
-        SELECT u.id, u.department_id
-        FROM user_info u
-        JOIN user_info me ON me.id = user_uuid
-        WHERE u.department_id = me.department_id;
-      $$;
-  `;
-
   //User Info: Users can see colleagues in their department
   await sql`
-    CREATE POLICY "Users can view colleagues in their department" ON user_info
+    CREATE POLICY "Users can view relevant users" ON user_info
     FOR SELECT
-    USING (
-      EXISTS (
-        SELECT 1
-        FROM get_department_colleagues(auth.uid()) AS g
-        WHERE g.id = user_info.id
-      )
-    );
+    USING (can_view_user_info(id));
 `;
 
   /* ---------------- USER ROLES ---------------- */
@@ -552,16 +583,12 @@ async function enableRLS(sql: postgres.Sql) {
     USING (user_id = auth.uid())
   `;
 
-  // User Roles: Only admins can assign or revoke roles
+  // User Roles: Only admins can assign or revoke roles (updated to use is_admin() to avoid recursion)
   await sql`
     CREATE POLICY "Admins can manage roles" ON user_roles
     FOR ALL
-    USING (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
-    WITH CHECK (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
+    USING (is_admin())
+    WITH CHECK (is_admin())
   `;
 
   /* ---------------- TASKS ---------------- */
@@ -585,16 +612,7 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Users can view tasks assigned to their department" ON tasks
     FOR SELECT
-    USING (
-        creator_id = auth.uid()
-        OR EXISTS (
-            SELECT 1
-            FROM task_assignments ta
-            JOIN user_info ui ON ui.id = ta.assignee_id
-            WHERE ta.task_id = tasks.id
-              AND ui.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-        )
-    );
+    USING (is_task_visible_to_user(id, auth.uid()));
   `;
 
   // Tasks: Only admins can archive tasks
@@ -704,17 +722,11 @@ async function enableRLS(sql: postgres.Sql) {
 
   // Task Assignments: Users can view assignments where they are assignor/assignee or in their department
   await sql`
-    CREATE POLICY "Users can view task assignments relevant to their department" ON task_assignments
+    CREATE POLICY "Users can view assignments for visible tasks" ON task_assignments
     FOR SELECT
     USING (
-        assignee_id = auth.uid()
-        OR assignor_id = auth.uid()
-        OR EXISTS (
-            SELECT 1
-            FROM user_info ui
-            WHERE ui.id = task_assignments.assignee_id
-              AND ui.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-        )
+      is_task_visible_to_user(task_id, auth.uid())
+      OR assignee_id = auth.uid()
     );
   `;
 
