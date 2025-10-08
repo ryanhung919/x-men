@@ -5,7 +5,7 @@ import { DepartmentSelector, Department } from '@/components/filters/department-
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
 import { DateRangeFilter, DateRangeType } from '@/components/filters/date-range-selector';
 import { startOfDay, endOfDay, format } from 'date-fns';
-import cn from 'classnames';
+import { cn } from '@/lib/utils'
 
 import { LoggedTimeReport } from '@/components/report/logged-time-report';
 import { TaskCompletionsChart } from '@/components/report/task-completion-report';
