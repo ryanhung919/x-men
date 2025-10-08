@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle'
 
 import {
   DropdownMenu,
@@ -122,6 +123,14 @@ export function Navbar() {
         >
           <Link href="/schedule">Schedule</Link>
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          asChild
+          className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
+        >
+          <Link href="/report">Report</Link>
+        </Button>
       </nav>
       <div className="flex-1" />
       <div className="flex items-center gap-2">
@@ -172,6 +181,9 @@ export function Navbar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
       </div>
     </header>
   );

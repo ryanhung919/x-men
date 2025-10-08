@@ -11,8 +11,8 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "node", // Use node environment for integration tests
-    setupFiles: ["./__tests__/setup/vitest.setup.ts"],
+    environment: "node",
+    setupFiles: ["./__tests__/setup/integration.setup.ts"],
     include: ["__tests__/integration/**/*.test.{ts,tsx}"],
     exclude: [
       "**/node_modules/**",
@@ -31,6 +31,14 @@ export default defineConfig({
         ".next/",
       ],
     },
-    testTimeout: 15000,
+    testTimeout: 30000, // Increased timeout for real DB operations
+    hookTimeout: 60000, // Increased timeout for setup/teardown
+    // Run tests sequentially to avoid DB conflicts
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
   },
 });

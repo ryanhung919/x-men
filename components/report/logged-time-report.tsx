@@ -3,12 +3,16 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import type { LoggedTimeReport as LoggedTimeReportType, } from '@/components/report/export-buttons';
+
 
 interface LoggedTimeProps {
   departmentIds?: number[];
   projectIds?: number[];
   startDate?: string;
   endDate?: string;
+  onDataLoaded?: (data: LoggedTimeReportType) => void; // NEW: callback to lift data
+
 }
 
 interface Metrics {
@@ -28,6 +32,7 @@ export function LoggedTimeReport({
   projectIds = [],
   startDate,
   endDate,
+  onDataLoaded
 }: LoggedTimeProps) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,7 +41,11 @@ export function LoggedTimeReport({
   const prevMetricsRef = useRef<Metrics | null>(null);
 
   useEffect(() => {
-    if (!departmentIds.length) return;
+    if (!departmentIds.length) {
+    setMetrics(null);
+    prevMetricsRef.current = null;
+    return;
+  }
 
     const fetchMetrics = async () => {
       setLoading(true);
@@ -52,8 +61,8 @@ export function LoggedTimeReport({
 
         const res = await fetch(`/api/reports?${params}`);
         if (!res.ok) throw new Error('Failed to fetch logged time metrics');
+        
         const json = await res.json();
-
         if (json) {
           const newMetrics: Metrics = {
             totalCompleted: json.completedCount,
@@ -69,6 +78,24 @@ export function LoggedTimeReport({
 
           prevMetricsRef.current = newMetrics; // save for skeleton fallback
           setMetrics(newMetrics);
+
+          if (onDataLoaded) {
+            const exportData: LoggedTimeReportType = {
+              kind: 'loggedTime',
+              totalTime: newMetrics.totalLoggedHours,
+              avgTime: newMetrics.avgLoggedHours,
+              completedCount: newMetrics.totalCompleted,
+              overdueCount: newMetrics.totalOverdue,
+              onTimeRate: newMetrics.onTimeRate,
+              totalLateness: newMetrics.totalLateness,
+              wipTime: newMetrics.wipHours,
+              overdueLoggedTime: newMetrics.overdueLoggedTime,
+              timeByTask: new Map(
+                Object.entries(newMetrics.timeByTask).map(([k, v]) => [Number(k), v])
+              ),
+            };
+            onDataLoaded(exportData);
+          }
         }
       } catch (err) {
         console.error(err);

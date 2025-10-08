@@ -1,68 +1,32 @@
-import { getTasks } from '@/lib/db/report';
-import { jsPDF } from 'jspdf';
-import * as XLSX from 'xlsx';
+import { getTasks } from "@/lib/db/report";
 
-export type ReportType = 'loggedTime' | 'teamSummary' | 'taskCompletions';
-
-interface ReportOptions {
+// Shared types
+export type ReportFormat = "pdf" | "xlsx";
+export interface ReportFilters {
   projectIds?: number[];
-  startDate?: Date; // optional, fallback handled in getTasks
-  endDate?: Date; // optional
-  type: ReportType;
+  startDate?: Date;
+  endDate?: Date;
 }
 
-interface ExportOptions extends ReportOptions {
-  format: 'pdf' | 'xlsx';
-}
-
+// Task shape (as used by your DB layer)
 interface Task {
   id: number;
   title: string;
-  status: 'To Do' | 'In Progress' | 'Done' | string;
+  status: "To Do" | "In Progress" | "Done" | string;
   project_id: number;
   parent_task_id?: number | null;
   logged_time: number; // seconds
-  deadline?: string;
+  deadline?: string | null;
   creator_id?: string;
   created_at: string;
-  updated_at?: string;
+  updated_at?: string | null;
 }
 
-export interface LoggedTimeReport {
-  totalTime: number;
-  avgTime: number;
-  completedCount: number;
-  overdueCount: number;
-  timeByTask: Map<number, number>;
-  wipTime: number;
-  onTimeRate: number;
-  totalLateness: number;
-  overdueLoggedTime: number;
-}
-
-export interface TeamSummaryReport {
-  // Add fields returned by teamSummary logic, e.g.:
-  // totalTasks: number;
-  // tasksByCreator: Map<string, number>;
-  // ... other fields
-}
-
-export interface TaskCompletionReport {
-  // Add fields returned by taskCompletion logic, e.g.:
-  // completionRate: number;
-  // completedByProject: Map<number, number>;
-  // ... other fields
-}
-
-export type GeneratedReport = LoggedTimeReport | TeamSummaryReport | TaskCompletionReport;
-
-
-// --- Rollup subtasks to parent tasks ---
+// Utility: roll up child to parent
 function rollupLoggedTime(tasks: Task[]): Map<number, number> {
   const taskMap = new Map<number, Task>();
   const timeMap = new Map<number, number>();
   tasks.forEach((t) => taskMap.set(t.id, t));
-
   tasks.forEach((t) => {
     const total = t.logged_time;
     if (t.parent_task_id && taskMap.has(t.parent_task_id)) {
@@ -71,144 +35,122 @@ function rollupLoggedTime(tasks: Task[]): Map<number, number> {
     }
     timeMap.set(t.id, total);
   });
-
   return timeMap;
 }
 
-export async function generateReport(
-  opts: ReportOptions & { type: 'loggedTime' }
-): Promise<LoggedTimeReport>;
-
-export async function generateReport(
-  opts: ReportOptions & { type: 'teamSummary' }
-): Promise<TeamSummaryReport>;
-
-export async function generateReport(
-  opts: ReportOptions & { type: 'taskCompletions' }
-): Promise<TaskCompletionReport>;
-export async function generateReport(
-  opts: ReportOptions
-): Promise<LoggedTimeReport | TeamSummaryReport | TaskCompletionReport>;
-
-
-// --- Generate report data ---
-export async function generateReport(opts: ReportOptions): Promise<LoggedTimeReport | TeamSummaryReport | TaskCompletionReport> {
-  const { projectIds, startDate, endDate, type } = opts;
-
-  const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
-
-  if (type === 'loggedTime') {
-    const taskTimeMap = rollupLoggedTime(tasks);
-
-    const completedTasks = tasks.filter((t) => t.status === 'Done');
-    const wipTasks = tasks.filter((t) => t.status !== 'Done');
-
-    const now = new Date();
-
-    // On-time completion rate
-    const onTimeTasks = completedTasks.filter((t) => {
-      if (!t.updated_at || !t.deadline) return false;
-      return new Date(t.updated_at) <= new Date(t.deadline);
-    });
-    const onTimeRate = completedTasks.length ? onTimeTasks.length / completedTasks.length : 0;
-
-    // Lateness in hours
-    const totalLateness = completedTasks.reduce((sum, t) => {
-      if (!t.updated_at || !t.deadline) return sum;
-      const late = Math.max(
-        0,
-        (new Date(t.updated_at).getTime() - new Date(t.deadline).getTime()) / 1000 / 3600
-      );
-      return sum + late;
-    }, 0);
-
-    // Overdue logged time
-    const overdueLoggedTime =
-      wipTasks
-        .filter((t) => t.deadline && new Date(t.deadline) < now)
-        .reduce((sum, t) => sum + t.logged_time, 0) / 3600;
-
-    const totalLoggedSeconds = tasks.reduce((sum, t) => sum + t.logged_time, 0);
-    const avgLogged = completedTasks.length
-      ? completedTasks.reduce((sum, t) => sum + t.logged_time, 0) / completedTasks.length
-      : 0;
-
-    const overdueTasks = wipTasks.filter((t) => t.deadline && new Date(t.deadline) < now);
-
-    return {
-      totalTime: totalLoggedSeconds / 3600,
-      avgTime: avgLogged / 3600,
-      completedCount: completedTasks.length,
-      overdueCount: overdueTasks.length,
-      timeByTask: taskTimeMap,
-      wipTime: wipTasks.reduce((sum, t) => sum + t.logged_time, 0) / 3600,
-      onTimeRate,
-      totalLateness,
-      overdueLoggedTime,
-    };
-  }
-
-  // if (type === "teamSummary") {
-  //   const statusCounts = ["To Do", "In Progress", "Done"].map((status: string) => ({
-  //     status,
-  //     count: tasks.filter((t: Task) => t.status === status).length,
-  //   }));
-
-  //   const topPerformers = tasks
-  //     .filter((t: Task) => t.status === "Done")
-  //     .reduce((acc: Record<string, number>, t: Task) => {
-  //       if (!t.assignee_id) return acc;
-  //       acc[t.assignee_id] = (acc[t.assignee_id] ?? 0) + 1;
-  //       return acc;
-  //     }, {});
-
-  //   const overdueCount = tasks.filter(
-  //     (t: Task) => t.deadline && new Date(t.deadline) < new Date() && t.status !== "Done"
-  //   ).length;
-
-  //   return { statusCounts, topPerformers, overdueCount, totalTasks: tasks.length };
-  // }
-
-  // if (type === "taskCompletions") {
-  //   const completionsPerProject: Record<number, number> = {};
-  //   const completionsPerUser: Record<string, number> = {};
-
-  //   tasks.forEach((t: Task) => {
-  //     if (t.status === "Done") {
-  //       completionsPerProject[t.project_id] = (completionsPerProject[t.project_id] ?? 0) + 1;
-  //       if (t.creator_id) completionsPerUser[t.creator_id] = (completionsPerUser[t.creator_id] ?? 0) + 1;
-  //     }
-  //   });
-
-  //   return { completionsPerProject, completionsPerUser };
-  // }
-
-  return {};
+// Logged Time Report
+export interface LoggedTimeReport {
+  kind: "loggedTime";
+  totalTime: number;           // hours
+  avgTime: number;             // hours
+  completedCount: number;
+  overdueCount: number;
+  timeByTask: Map<number, number>; // seconds per task id (pre-division), or keep hours if preferred
+  wipTime: number;             // hours
+  onTimeRate: number;          // 0..1
+  totalLateness: number;       // hours
+  overdueLoggedTime: number;   // hours
 }
 
-// --- Export functions ---
-export async function exportReport(reportData: any, opts: ExportOptions) {
-  const { type, format } = opts;
+export async function generateLoggedTimeReport(filters: ReportFilters): Promise<LoggedTimeReport> {
+  const { projectIds, startDate, endDate } = filters;
+  const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
 
-  if (format === 'pdf') {
-    const doc = new jsPDF();
-    doc.text(`${type} Report`, 10, 10);
-    doc.text(JSON.stringify(reportData, null, 2), 10, 20);
-    return { buffer: doc.output('arraybuffer'), mime: 'application/pdf' };
-  }
+  const taskTimeMap = rollupLoggedTime(tasks);
+  const completedTasks = tasks.filter((t) => t.status === "Done");
+  const wipTasks = tasks.filter((t) => t.status !== "Done");
+  const now = new Date();
 
-  if (format === 'xlsx') {
-    const ws = XLSX.utils.json_to_sheet(
-      Array.isArray(reportData) ? reportData : Object.values(reportData)
+  const onTimeTasks = completedTasks.filter((t) => {
+    if (!t.updated_at || !t.deadline) return false;
+    return new Date(t.updated_at) <= new Date(t.deadline);
+  });
+  const onTimeRate = completedTasks.length ? onTimeTasks.length / completedTasks.length : 0;
+
+  const totalLateness = completedTasks.reduce((sum, t) => {
+    if (!t.updated_at || !t.deadline) return sum;
+    const hoursLate = Math.max(
+      0,
+      (new Date(t.updated_at).getTime() - new Date(t.deadline).getTime()) / 1000 / 3600
     );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    return {
-      buffer: buf,
-      mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    };
+    return sum + hoursLate;
+  }, 0);
+
+  const overdueLoggedTime =
+    wipTasks.filter((t) => t.deadline && new Date(t.deadline) < now)
+            .reduce((sum, t) => sum + t.logged_time, 0) / 3600;
+
+  const totalLoggedSeconds = tasks.reduce((sum, t) => sum + t.logged_time, 0);
+  const avgLoggedSeconds = completedTasks.length
+    ? completedTasks.reduce((sum, t) => sum + t.logged_time, 0) / completedTasks.length
+    : 0;
+
+  const overdueTasks = wipTasks.filter((t) => t.deadline && new Date(t.deadline) < now);
+
+  return {
+    kind: "loggedTime",
+    totalTime: totalLoggedSeconds / 3600,
+    avgTime: avgLoggedSeconds / 3600,
+    completedCount: completedTasks.length,
+    overdueCount: overdueTasks.length,
+    timeByTask: taskTimeMap, // map of seconds; if you prefer hours, convert when consuming
+    wipTime: wipTasks.reduce((sum, t) => sum + t.logged_time, 0) / 3600,
+    onTimeRate,
+    totalLateness,
+    overdueLoggedTime,
+  };
+}
+
+// Team Summary Report (example shape — tailor to your needs)
+export interface TeamSummaryReport {
+  kind: "teamSummary";
+  totalTasks: number;
+  tasksByCreator: Map<string, number>;
+}
+
+
+export async function generateTeamSummaryReport(filters: ReportFilters): Promise<TeamSummaryReport> {
+  const { projectIds, startDate, endDate } = filters;
+  const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
+
+  const tasksByCreator = new Map<string, number>();
+  for (const t of tasks) {
+    const key = t.creator_id ?? "unknown";
+    tasksByCreator.set(key, (tasksByCreator.get(key) ?? 0) + 1);
   }
 
-  throw new Error('Unsupported export format');
+  return {
+    kind: "teamSummary",
+    totalTasks: tasks.length,
+    tasksByCreator,
+  };
+}
+
+// Task Completions Report (example shape — tailor to your needs)
+export interface TaskCompletionReport {
+  kind: "taskCompletions";
+  completionRate: number; // completed / total
+  completedByProject: Map<number, number>;
+}
+
+export async function generateTaskCompletionReport(filters: ReportFilters): Promise<TaskCompletionReport> {
+  const { projectIds, startDate, endDate } = filters;
+  const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
+
+  const total = tasks.length || 1;
+  const completed = tasks.filter((t) => t.status === "Done").length;
+  const completionRate = completed / total;
+
+  const completedByProject = new Map<number, number>();
+  for (const t of tasks) {
+    if (t.status === "Done") {
+      completedByProject.set(t.project_id, (completedByProject.get(t.project_id) ?? 0) + 1);
+    }
+  }
+
+  return {
+    kind: "taskCompletions",
+    completionRate,
+    completedByProject,
+  };
 }

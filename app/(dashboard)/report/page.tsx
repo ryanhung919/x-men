@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { DepartmentSelector, Department } from '@/components/filters/department-selector';
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
 import { DateRangeFilter, DateRangeType } from '@/components/filters/date-range-selector';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, format } from 'date-fns';
+import cn from 'classnames';
 
 import { LoggedTimeReport } from '@/components/report/logged-time-report';
-import { TaskCompletionsChart } from '@/components/report/task-completions-chart';
-import { TeamSummaryChart } from '@/components/report/team-summary-chart';
-import { ExportButtons } from '@/components/report/export-buttons';
+import { TaskCompletionsChart } from '@/components/report/task-completion-report';
+import { TeamSummaryChart } from '@/components/report/team-summary-report';
+import { ExportButtons, type AnyReport } from '@/components/report/export-buttons';
 import {
   Select,
   SelectTrigger,
@@ -17,6 +18,8 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
+
+import { XIcon } from 'lucide-react';
 
 async function fetchDepartments(projectIds?: number[]): Promise<Department[]> {
   const query = projectIds?.length ? `&projectIds=${projectIds.join(',')}` : '';
@@ -31,6 +34,12 @@ async function fetchProjects(departmentIds?: number[]): Promise<Project[]> {
   if (!res.ok) throw new Error('Failed to fetch projects');
   return res.json();
 }
+
+const REPORT_OPTIONS = [
+  { value: 'loggedTime', label: 'Logged Time' },
+  { value: 'taskCompletions', label: 'Task Completions' },
+  { value: 'teamSummary', label: 'Team Summary' },
+];
 
 export default function ReportsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -47,9 +56,22 @@ export default function ReportsPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
 
   const [dateRange, setDateRange] = useState<DateRangeType>({
-    startDate: startOfDay(new Date()),
-    endDate: endOfDay(new Date()),
+    startDate: undefined,
+    endDate: undefined,
   });
+
+  const [reportData, setReportData] = useState<AnyReport | null>(null);
+
+  const hasActiveFilters =
+    selectedDepartments.length > 0 ||
+    selectedProjects.length > 0 ||
+    (dateRange.startDate && dateRange.endDate);
+
+  const clearAllFilters = () => {
+    setSelectedDepartments([]);
+    setSelectedProjects([]);
+    setDateRange({ startDate: undefined, endDate: undefined });
+  };
 
   // --- Step 1 & Initial load: fetch all departments and projects ---
   useEffect(() => {
@@ -80,9 +102,14 @@ export default function ReportsPage() {
   }, [selectedDepartments]);
 
   // --- Step 2 & 3: determine which project IDs to send to report ---
-  const reportProjectIds = selectedProjects.length
-    ? selectedProjects // Step 3: only selected projects
-    : projects.map((p) => p.id); // Step 2: all visible projects
+  const reportProjectIds = useMemo(() => {
+    return selectedProjects.length ? selectedProjects : projects.map((p) => p.id);
+  }, [selectedProjects, projects]);
+
+  // Callback to lift report data from child components
+  const handleReportDataLoaded = useCallback((data: AnyReport) => {
+    setReportData(data);
+  }, []);
 
   return (
     <div className="space-y-6 p-4">
@@ -102,43 +129,94 @@ export default function ReportsPage() {
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
         <Select value={selectedReport} onValueChange={(v) => setSelectedReport(v as any)}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger
+            className={cn(
+              'w-52 border border-input bg-background text-foreground',
+              'hover:bg-accent hover:text-accent-foreground',
+              'focus:ring-2 focus:ring-ring focus:ring-offset-2'
+            )}
+          >
             <SelectValue placeholder="Select report" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="loggedTime">Logged Time</SelectItem>
-            <SelectItem value="taskCompletions">Task Completions</SelectItem>
-            <SelectItem value="teamSummary">Team Summary</SelectItem>
+
+          <SelectContent
+            className="bg-popover text-popover-foreground border border-border shadow-md"
+            style={{
+              backgroundColor: 'hsl(var(--popover))',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
+            }}
+          >
+            <div className="max-h-[300px] overflow-y-auto">
+              <SelectItem
+                value="loggedTime"
+                className="cursor-pointer rounded-sm px-2 py-2 text-sm transition-colors duration-100 hover:bg-accent/50 focus:bg-accent"
+              >
+                Logged Time
+              </SelectItem>
+              <SelectItem
+                value="taskCompletions"
+                className="cursor-pointer rounded-sm px-2 py-2 text-sm transition-colors duration-100 hover:bg-accent/50 focus:bg-accent"
+              >
+                Task Completions
+              </SelectItem>
+              <SelectItem
+                value="teamSummary"
+                className="cursor-pointer rounded-sm px-2 py-2 text-sm transition-colors duration-100 hover:bg-accent/50 focus:bg-accent"
+              >
+                Team Summary
+              </SelectItem>
+            </div>
           </SelectContent>
         </Select>
 
-        <ExportButtons
-          departmentIds={selectedDepartments}
-          projectIds={reportProjectIds}
-          startDate={dateRange.startDate?.toISOString()}
-          endDate={dateRange.endDate?.toISOString()}
-        />
+        {reportData && (
+          <ExportButtons
+            reportData={reportData}
+            reportTitle={REPORT_OPTIONS.find((o) => o.value === selectedReport)?.label}
+          />
+        )}
       </div>
 
-      {dateRange.startDate && dateRange.endDate && (
-        <div className="flex items-center gap-2 mt-2">
-          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
-            Created: {dateRange.startDate.toLocaleDateString()} –{' '}
-            {dateRange.endDate.toLocaleDateString()}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 mt-3">
+          <span className="flex items-center gap-2 rounded-full bg-accent/10 text-accent-foreground px-3 py-1.5 text-sm border border-accent/30 shadow-sm">
+            {selectedDepartments.length > 0 && (
+              <span>
+                {selectedDepartments.length} department{selectedDepartments.length > 1 ? 's' : ''}
+              </span>
+            )}
+            {selectedDepartments.length > 0 && selectedProjects.length > 0 && <span>•</span>}
+            {selectedProjects.length > 0 && (
+              <span>
+                {selectedProjects.length} project{selectedProjects.length > 1 ? 's' : ''}
+              </span>
+            )}
+            {(selectedDepartments.length > 0 || selectedProjects.length > 0) &&
+              dateRange.startDate &&
+              dateRange.endDate && <span>•</span>}
+            {dateRange.startDate && dateRange.endDate && (
+              <span>
+                {format(dateRange.startDate, 'dd/MM/yyyy')} –{' '}
+                {format(dateRange.endDate, 'dd/MM/yyyy')}
+              </span>
+            )}
           </span>
           <button
-            className="text-sm text-red-600 underline"
-            onClick={() => setDateRange({ startDate: undefined, endDate: undefined })}
+            onClick={clearAllFilters}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-accent-foreground transition-colors"
           >
-            Clear
+            <XIcon className="h-3.5 w-3.5" />
+            Clear Filters
           </button>
         </div>
       )}
 
+      {/* Report Display */}
       <div className="mt-4">
         {!selectedDepartments.length && !selectedProjects.length ? (
           <div className="text-muted-foreground">
-            Please select department(s) and/or project(s)
+            Please select department(s) and/or project(s).{' '}
           </div>
         ) : selectedReport === 'loggedTime' ? (
           <LoggedTimeReport
@@ -146,6 +224,7 @@ export default function ReportsPage() {
             projectIds={reportProjectIds}
             startDate={dateRange.startDate?.toISOString()}
             endDate={dateRange.endDate?.toISOString()}
+            onDataLoaded={handleReportDataLoaded}
           />
         ) : selectedReport === 'taskCompletions' ? (
           <TaskCompletionsChart
