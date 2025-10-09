@@ -140,7 +140,7 @@ export default function ReportsPage() {
           </SelectTrigger>
 
           <SelectContent
-            className="bg-popover text-popover-foreground border border-border shadow-md"
+            className="bg-popover text-popover-foreground border border-border shadow-md [&>span]:text-foreground [&>span]:font-medium"
             style={{
               backgroundColor: 'hsl(var(--popover))',
               backdropFilter: 'none',

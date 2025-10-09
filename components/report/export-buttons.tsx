@@ -1,197 +1,507 @@
-"use client";
-import { jsPDF } from "jspdf";
-import * as XLSX from "xlsx";
-import { Button } from "@/components/ui/button";
-import { FileDown, FileSpreadsheet } from "lucide-react";
+'use client';
 
-// --- Report Type Definitions ---
+import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
+import { Button } from '@/components/ui/button';
+import { FileDown, FileSpreadsheet } from 'lucide-react';
+
+// --- Type Definitions ---
+export type KPI = {
+  label: string;
+  value: string | number;
+  unit?: string;
+};
+
+export type ChartData = {
+  type: 'bar' | 'pie' | 'line';
+  title: string;
+  data: Array<{ label: string; value: number }>;
+};
+
 export interface LoggedTimeReport {
-  kind: "loggedTime";
-  totalTime: number;
-  avgTime: number;
-  completedCount: number;
-  overdueCount: number;
-  onTimeRate: number;
-  totalLateness: number;
-  wipTime: number;
-  overdueLoggedTime: number;
+  kind: 'loggedTime';
+  totalTime: number; // Total logged time (hours) across ALL tasks
+  avgTime: number; // Average logged time (hours) per COMPLETED task only
+  completedCount: number; // Count of tasks with status='Completed'
+  overdueCount: number; // Count of WIP tasks that are past their deadline
+  onTimeRate: number; // Ratio (0-1) of completed tasks done on-time
+  totalLateness: number; // Total hours that completed tasks were late
+  wipTime: number; // Total logged time (hours) for ALL non-completed tasks
+  overdueLoggedTime: number; // Total logged time (hours) for WIP tasks that are OVERDUE
   timeByTask?: Map<number, number>;
+  kpis: KPI[];
+  charts?: ChartData[];
 }
 
 export interface TeamSummaryReport {
-  kind: "teamSummary";
+  kind: 'teamSummary';
   totalTasks: number;
   tasksByCreator: Map<string, number>;
   avgTasksPerMember?: number;
+  kpis: KPI[];
+  charts?: ChartData[];
 }
 
 export interface TaskCompletionReport {
-  kind: "taskCompletions";
+  kind: 'taskCompletions';
   completionRate: number;
-  completedByProject: Map<number, number>;
+  completedByProject: Map<string, number>;
   totalCompleted?: number;
   totalPending?: number;
+  kpis: KPI[];
+  charts?: ChartData[];
 }
 
 export type AnyReport = LoggedTimeReport | TeamSummaryReport | TaskCompletionReport;
 
-// --- Field Configuration ---
-type FieldConfig = {
-  label: string;
-  accessor: (report: any) => string | number;
-  format?: (value: any) => string;
-};
+// --- Get Metric Descriptions ---
+function getMetricDescription(key: string, report: AnyReport): string {
+  if (report.kind === 'loggedTime') {
+    const descriptions: Record<string, string> = {
+      totalTime: 'Total logged time (hours) across all tasks (completed + WIP + overdue)',
+      avgTime: 'Average logged time (hours) per completed task only',
+      completedCount: "Count of tasks with status='Completed'",
+      overdueCount: 'Count of WIP tasks that are past their deadline',
+      onTimeRate: 'Ratio of completed tasks done on-time (updated_at <= deadline)',
+      totalLateness: 'Total hours that completed tasks were late (sum of hours past deadline)',
+      wipTime:
+        'Total logged time (hours) for all non-completed tasks (includes overdue and non-overdue WIP)',
+      overdueLoggedTime:
+        'Total logged time (hours) for WIP tasks that are OVERDUE (subset of wipTime)',
+    };
+    return descriptions[key] || '';
+  }
+  return '';
+}
 
-const REPORT_CONFIGS: Record<AnyReport["kind"], FieldConfig[]> = {
-  loggedTime: [
-    { label: "Total Time (hours)", accessor: (r) => r.totalTime, format: (v) => v.toFixed(2) },
-    { label: "Average Time (hours)", accessor: (r) => r.avgTime, format: (v) => v.toFixed(2) },
-    { label: "Completed Tasks", accessor: (r) => r.completedCount },
-    { label: "Overdue Tasks", accessor: (r) => r.overdueCount },
-    { label: "On-Time Rate (%)", accessor: (r) => r.onTimeRate, format: (v) => (v * 100).toFixed(1) },
-    { label: "WIP Time (hours)", accessor: (r) => r.wipTime, format: (v) => v.toFixed(2) },
-    { label: "Total Lateness (hours)", accessor: (r) => r.totalLateness, format: (v) => v.toFixed(2) },
-    { label: "Overdue Logged Time (hours)", accessor: (r) => r.overdueLoggedTime, format: (v) => v.toFixed(2) },
-  ],
-  teamSummary: [
-    { label: "Total Tasks", accessor: (r) => r.totalTasks },
-    { label: "Avg Tasks Per Member", accessor: (r) => r.avgTasksPerMember ?? "N/A", format: (v) => typeof v === "number" ? v.toFixed(1) : v },
-    { label: "Unique Contributors", accessor: (r) => r.tasksByCreator?.size ?? 0 },
-  ],
-  taskCompletions: [
-    { label: "Completion Rate (%)", accessor: (r) => r.completionRate, format: (v) => (v * 100).toFixed(1) },
-    { label: "Total Completed", accessor: (r) => r.totalCompleted ?? 0 },
-    { label: "Total Pending", accessor: (r) => r.totalPending ?? 0 },
-    { label: "Projects Tracked", accessor: (r) => r.completedByProject?.size ?? 0 },
-  ],
-};
+// --- Extract summary rows with descriptions ---
+function getSummaryRows(report: AnyReport) {
+  const rows: Array<{ label: string; value: string; description?: string }> = [];
+  Object.entries(report).forEach(([key, value]) => {
+    if (
+      key === 'kind' ||
+      key === 'kpis' ||
+      key === 'charts' ||
+      value instanceof Map ||
+      typeof value === 'function'
+    )
+      return;
 
+    rows.push({
+      label: toLabel(key),
+      value:
+        typeof value === 'number' && key.includes('Rate')
+          ? `${(value * 100).toFixed(1)}%`
+          : String(value),
+      description: getMetricDescription(key, report),
+    });
+  });
+  return rows;
+}
+
+// --- Extract breakdowns ---
+function getBreakdowns(
+  report: AnyReport
+): Array<{ title: string; data: Array<Record<string, any>> }> {
+  const breakdowns: Array<{ title: string; data: Array<Record<string, any>> }> = [];
+  Object.entries(report).forEach(([key, value]) => {
+    if (!(value instanceof Map) || value.size === 0) return;
+    breakdowns.push({
+      title: toLabel(key),
+      data: Array.from(value.entries()).map(([k, v]) => ({
+        [toLabel(key.replace(/By|Per/i, ''))]: k,
+        Hours: typeof v === 'number' ? (v / 3600).toFixed(2) : v, // Convert seconds to hours
+      })),
+    });
+  });
+  return breakdowns;
+}
+
+function renderChartInPDF(
+  doc: jsPDF,
+  chart: ChartData,
+  x: number,
+  y: number,
+  maxWidth: number
+): number {
+  const chartHeight = 140;
+  const barWidth = 50;
+  const maxValue = Math.max(...chart.data.map((d) => d.value), 1);
+
+  // Chart colors (slate/blue palette)
+  const colors = [
+    [100, 149, 237], // Cornflower blue
+    [72, 118, 255], // Royal blue
+    [220, 53, 69], // Red (destructive)
+    [255, 193, 7], // Amber
+    [40, 167, 69], // Green
+  ];
+
+  // Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(chart.title, x, y);
+  y += 20;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+
+  if (chart.type === 'bar') {
+    // Bar chart
+    chart.data.forEach((item, idx) => {
+      const barHeight = (item.value / maxValue) * 80;
+      const barX = x + idx * (barWidth + 15);
+      const color = colors[idx % colors.length];
+
+      // Bar
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(barX, y + 80 - barHeight, barWidth, barHeight, 'F');
+
+      // Label
+      doc.text(item.label.substring(0, 10), barX + barWidth / 2, y + 95, { align: 'center' });
+
+      // Value
+      doc.text(String(item.value), barX + barWidth / 2, y + 75 - barHeight, { align: 'center' });
+    });
+    return y + chartHeight;
+  } else if (chart.type === 'pie') {
+    // Pie chart as segments with legend
+    const total = chart.data.reduce((sum, d) => sum + d.value, 0);
+
+    // Draw pie segments
+    const centerX = x + 60;
+    const centerY = y + 50;
+    const radius = 40;
+    let startAngle = -90;
+
+    chart.data.forEach((item, idx) => {
+      const sliceAngle = (item.value / total) * 360;
+      const endAngle = startAngle + sliceAngle;
+      const color = colors[idx % colors.length];
+
+      // Draw pie slice
+      doc.setFillColor(color[0], color[1], color[2]);
+
+      // Calculate arc points
+      const startRad = (startAngle * Math.PI) / 180;
+      const endRad = (endAngle * Math.PI) / 180;
+
+      // Move to center
+      const path: [number, number][] = [[centerX, centerY]];
+
+      // Create arc
+      const steps = 20;
+      for (let i = 0; i <= steps; i++) {
+        const angle = startRad + (endRad - startRad) * (i / steps);
+        path.push([centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle)]);
+      }
+
+      // Draw filled triangle fan
+      doc.triangle(path[0][0], path[0][1], path[1][0], path[1][1], path[2][0], path[2][1], 'F');
+      for (let i = 2; i < path.length - 1; i++) {
+        doc.triangle(
+          path[0][0],
+          path[0][1],
+          path[i][0],
+          path[i][1],
+          path[i + 1][0],
+          path[i + 1][1],
+          'F'
+        );
+      }
+
+      startAngle = endAngle;
+    });
+
+    // Draw legend
+    const legendX = x + 130;
+    let legendY = y + 10;
+
+    chart.data.forEach((item, idx) => {
+      const color = colors[idx % colors.length];
+      const percentage = ((item.value / total) * 100).toFixed(1);
+
+      // Color box
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(legendX, legendY, 10, 10, 'F');
+
+      // Label and percentage
+      doc.setFontSize(9);
+      doc.text(`${item.label}: ${item.value} (${percentage}%)`, legendX + 15, legendY + 8);
+      legendY += 16;
+    });
+
+    return y + Math.max(100, legendY - y + 20);
+  }
+
+  return y + chartHeight;
+}
+
+// --- Component ---
 interface ExportButtonsProps {
   reportData: AnyReport;
   reportTitle?: string;
+  subTitle?: string;
 }
 
-export function ExportButtons({ reportData, reportTitle }: ExportButtonsProps) {
-  const title = reportTitle || `${reportData.kind} Report`;
-  const config = REPORT_CONFIGS[reportData.kind];
-  const timestamp = new Date().toISOString().split("T")[0];
-  const filename = `${title.replace(/\s+/g, "_")}_${timestamp}`;
+export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButtonsProps) {
+  const title = reportTitle || `${capitalize(reportData.kind)} Report`;
+  const timestamp = new Date().toISOString().split('T')[0];
+  const filename = `${title.replace(/\s+/g, '_')}_${timestamp}`;
+  const kpis = reportData.kpis || [];
+  const charts = reportData.charts || [];
+  const summaryRows = getSummaryRows(reportData);
+  const breakdowns = getBreakdowns(reportData);
 
+  // --- PDF Export with APA formatting ---
   const handleExportPDF = () => {
-    const doc = new jsPDF();
-    
-    // Title
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const page = { w: doc.internal.pageSize.getWidth(), h: doc.internal.pageSize.getHeight() };
+    const margin = 72; // 1-inch margins (APA standard)
+
+    // Title Page (APA style)
+    doc.setFont('times', 'bold');
     doc.setFontSize(16);
-    doc.text(title, 20, 20);
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 28);
-    
-    // Summary metrics
+    doc.text(title, page.w / 2, page.h / 2 - 40, { align: 'center' });
+
+    doc.setFont('times', 'normal');
     doc.setFontSize(12);
-    let y = 40;
-    config.forEach((field) => {
-      const rawValue = field.accessor(reportData);
-      const displayValue = field.format ? field.format(rawValue) : String(rawValue);
-      doc.text(`${field.label}: ${displayValue}`, 20, y);
-      y += 8;
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, page.w / 2, page.h / 2, {
+      align: 'center',
     });
-    
-    // Breakdown tables for Maps
-    if (reportData.kind === "loggedTime" && reportData.timeByTask?.size) {
-      y += 10;
+
+    if (subTitle) {
+      doc.text(String(subTitle), page.w / 2, page.h / 2 + 20, { align: 'center' });
+    }
+
+    doc.addPage();
+    let y = margin;
+
+    // Level 1 Heading: Executive Summary
+    doc.setFont('times', 'bold');
+    doc.setFontSize(14);
+    doc.text('Executive Summary', margin, y);
+    y += 24;
+
+    // KPI Table (2 columns)
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11);
+    const colWidth = (page.w - 2 * margin) / 2 - 10;
+
+    kpis.forEach((kpi, i) => {
+      const column = i % 2;
+      const row = Math.floor(i / 2);
+      const x = margin + column * (colWidth + 20);
+      const ty = y + row * 30;
+
+      if (ty > page.h - margin - 30) {
+        doc.addPage();
+        y = margin;
+        return;
+      }
+
+      // KPI label (bold)
+      doc.setFont('times', 'bold');
+      doc.text(`${kpi.label}:`, x, ty);
+
+      // KPI value (normal)
+      doc.setFont('times', 'normal');
+      const val = `${kpi.value}${kpi.unit ? ` ${kpi.unit}` : ''}`;
+      doc.text(val, x, ty + 14);
+    });
+
+    const rows = Math.ceil(kpis.length / 2);
+    y += rows * 30 + 30;
+
+    // Level 1 Heading: Visualizations
+    if (charts.length > 0) {
+      if (y > page.h - margin - 200) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.setFont('times', 'bold');
       doc.setFontSize(14);
-      doc.text("Task Breakdown", 20, y);
-      y += 8;
-      doc.setFontSize(10);
-      Array.from(reportData.timeByTask.entries()).slice(0, 25).forEach(([taskId, seconds]) => {
-        doc.text(`Task ${taskId}: ${(seconds / 3600).toFixed(2)} hours`, 25, y);
-        y += 6;
-        if (y > 280) { doc.addPage(); y = 20; }
+      doc.text('Visualizations', margin, y);
+      y += 24;
+
+      charts.forEach((chart) => {
+        if (y > page.h - margin - 180) {
+          doc.addPage();
+          y = margin;
+        }
+
+        // Level 2 Heading: Chart title
+        doc.setFont('times', 'bold');
+        doc.setFontSize(12);
+        doc.text(chart.title, margin, y);
+        y += 20;
+
+        y = renderChartInPDF(doc, chart, margin, y, page.w - 2 * margin);
+        y += 30;
       });
     }
-    
-    if (reportData.kind === "teamSummary" && reportData.tasksByCreator.size) {
-      y += 10;
-      doc.setFontSize(14);
-      doc.text("Tasks by Creator", 20, y);
-      y += 8;
-      doc.setFontSize(10);
-      Array.from(reportData.tasksByCreator.entries()).forEach(([creator, count]) => {
-        doc.text(`${creator}: ${count} tasks`, 25, y);
-        y += 6;
-        if (y > 280) { doc.addPage(); y = 20; }
-      });
+
+    // Level 1 Heading: Detailed Metrics
+    if (y > page.h - margin - 150) {
+      doc.addPage();
+      y = margin;
     }
-    
-    if (reportData.kind === "taskCompletions" && reportData.completedByProject.size) {
-      y += 10;
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(14);
+    doc.text('Detailed Metrics', margin, y);
+    y += 24;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11);
+
+    summaryRows.forEach((row) => {
+      if (y > page.h - margin - 60) {
+        doc.addPage();
+        y = margin;
+      }
+
+      // Metric label (italic)
+      doc.setFont('times', 'italic');
+      doc.text(`${row.label}:`, margin, y);
+
+      // Value (normal)
+      doc.setFont('times', 'normal');
+      doc.text(row.value, margin + 200, y);
+      y += 16;
+
+      // Description (smaller, indented)
+      if (row.description) {
+        doc.setFontSize(10);
+        doc.setTextColor(60);
+        const descLines = doc.splitTextToSize(row.description, page.w - 2 * margin - 20);
+        doc.text(descLines, margin + 20, y);
+        y += descLines.length * 12 + 8;
+        doc.setFontSize(11);
+        doc.setTextColor(0);
+      }
+    });
+
+    // Level 1 Heading: Data Breakdowns
+    breakdowns.forEach((breakdown) => {
+      if (y > page.h - margin - 100) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.setFont('times', 'bold');
       doc.setFontSize(14);
-      doc.text("Completed by Project", 20, y);
-      y += 8;
+      doc.text(breakdown.title, margin, y);
+      y += 20;
+
+      doc.setFont('times', 'normal');
       doc.setFontSize(10);
-      Array.from(reportData.completedByProject.entries()).forEach(([projectId, count]) => {
-        doc.text(`Project ${projectId}: ${count} completed`, 25, y);
-        y += 6;
-        if (y > 280) { doc.addPage(); y = 20; }
+
+      // Table header
+      doc.setFont('times', 'bold');
+      const headers = Object.keys(breakdown.data[0] || {});
+      headers.forEach((header, idx) => {
+        doc.text(header, margin + 20 + idx * 150, y);
       });
-    }
-    
+      y += 16;
+      doc.setFont('times', 'normal');
+
+      breakdown.data.slice(0, 30).forEach((item) => {
+        if (y > page.h - margin - 30) {
+          doc.addPage();
+          y = margin;
+        }
+
+        Object.values(item).forEach((val, idx) => {
+          doc.text(String(val), margin + 20 + idx * 150, y);
+        });
+        y += 14;
+      });
+
+      if (breakdown.data.length > 30) {
+        doc.setFont('times', 'italic');
+        doc.text(`... and ${breakdown.data.length - 30} more entries`, margin + 20, y);
+        y += 16;
+        doc.setFont('times', 'normal');
+      }
+      y += 20;
+    });
+
     doc.save(`${filename}.pdf`);
   };
 
+  // --- Excel Export with all data ---
   const handleExportExcel = () => {
     const wb = XLSX.utils.book_new();
-    
-    // Summary sheet
-    const summaryRows = config.map((field) => {
-      const rawValue = field.accessor(reportData);
-      const displayValue = field.format ? field.format(rawValue) : rawValue;
-      return { Metric: field.label, Value: displayValue };
+
+    // Sheet 1: Summary KPIs
+    const kpiData = kpis.map((k) => ({
+      Metric: k.label,
+      Value: k.value,
+      Unit: k.unit || '',
+    }));
+    const wsKPI = XLSX.utils.json_to_sheet(kpiData);
+    XLSX.utils.book_append_sheet(wb, wsKPI, 'Summary');
+
+    // Sheet 2: Detailed Metrics with Descriptions
+    const detailedData = summaryRows.map((r) => ({
+      Metric: r.label,
+      Value: r.value,
+      Description: r.description || '',
+    }));
+    const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
+    XLSX.utils.book_append_sheet(wb, wsDetailed, 'Detailed Metrics');
+
+    // Sheets 3+: Chart Data (one sheet per chart)
+    charts.forEach((chart, idx) => {
+      const chartData = chart.data.map((item) => ({
+        Category: item.label,
+        Value: item.value,
+      }));
+      const wsChart = XLSX.utils.json_to_sheet(chartData);
+
+      // Sanitize sheet name (max 31 chars, no special chars)
+      let sheetName = chart.title.replace(/[:\\/?*\[\]]/g, '').substring(0, 31);
+      if (!sheetName) sheetName = `Chart ${idx + 1}`;
+
+      XLSX.utils.book_append_sheet(wb, wsChart, sheetName);
     });
-    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
-    XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
-    
-    // Breakdown sheets
-    if (reportData.kind === "loggedTime" && reportData.timeByTask?.size) {
-      const taskRows = Array.from(reportData.timeByTask.entries()).map(([taskId, seconds]) => ({
-        "Task ID": taskId,
-        "Logged Time (hours)": (seconds / 3600).toFixed(2),
-      }));
-      const wsTask = XLSX.utils.json_to_sheet(taskRows);
-      XLSX.utils.book_append_sheet(wb, wsTask, "Task Breakdown");
-    }
-    
-    if (reportData.kind === "teamSummary" && reportData.tasksByCreator.size) {
-      const creatorRows = Array.from(reportData.tasksByCreator.entries()).map(([creator, count]) => ({
-        Creator: creator,
-        "Task Count": count,
-      }));
-      const wsCreator = XLSX.utils.json_to_sheet(creatorRows);
-      XLSX.utils.book_append_sheet(wb, wsCreator, "By Creator");
-    }
-    
-    if (reportData.kind === "taskCompletions" && reportData.completedByProject.size) {
-      const projectRows = Array.from(reportData.completedByProject.entries()).map(([projectId, count]) => ({
-        "Project ID": projectId,
-        Completed: count,
-      }));
-      const wsProject = XLSX.utils.json_to_sheet(projectRows);
-      XLSX.utils.book_append_sheet(wb, wsProject, "By Project");
-    }
-    
+
+    // Additional Sheets: Breakdowns (e.g., Time by Task)
+    breakdowns.forEach((breakdown, idx) => {
+      const wsBreakdown = XLSX.utils.json_to_sheet(breakdown.data);
+
+      let sheetName = breakdown.title.replace(/[:\\/?*\[\]]/g, '').substring(0, 31);
+      if (!sheetName) sheetName = `Breakdown ${idx + 1}`;
+
+      XLSX.utils.book_append_sheet(wb, wsBreakdown, sheetName);
+    });
+
     XLSX.writeFile(wb, `${filename}.xlsx`);
   };
 
   return (
     <div className="flex gap-2">
       <Button onClick={handleExportPDF} variant="outline" size="sm">
-        <FileDown className="w-4 h-4 mr-2" />
+        <FileDown className="mr-2 h-4 w-4" />
         Export PDF
       </Button>
       <Button onClick={handleExportExcel} variant="outline" size="sm">
-        <FileSpreadsheet className="w-4 h-4 mr-2" />
+        <FileSpreadsheet className="mr-2 h-4 w-4" />
         Export Excel
       </Button>
     </div>
   );
+}
+
+// --- Helpers ---
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function toLabel(fieldName: string): string {
+  return fieldName
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
 }

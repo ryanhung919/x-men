@@ -1,10 +1,18 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts';
 import type { TeamSummaryReport as TeamSummaryReportType } from '@/components/report/export-buttons';
-
 
 interface Props {
   departmentIds?: number[];
@@ -15,12 +23,17 @@ interface Props {
 
 interface TeamStatusData {
   staff: string;
-  "To Do": number;
-  "In Progress": number;
-  "Done": number;
+  'To Do': number;
+  'In Progress': number;
+  Completed: number;
 }
 
-export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDate, endDate }: Props) {
+export function TeamSummaryChart({
+  departmentIds = [],
+  projectIds = [],
+  startDate,
+  endDate,
+}: Props) {
   const [data, setData] = useState<TeamStatusData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,14 +53,20 @@ export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDat
         if (endDate) params.append('endDate', endDate);
 
         const res = await fetch(`/api/reports?${params}`);
-        if (!res.ok) throw new Error("Failed to fetch analytics");
+        if (!res.ok) throw new Error('Failed to fetch analytics');
         const json = await res.json();
         const tasks = json?.tasks ?? [];
         const summaryMap: Record<string, TeamStatusData> = {};
         tasks.forEach((t: any) => {
-          const staffName = t.assignee?.username || "Unassigned";
-          if (!summaryMap[staffName]) summaryMap[staffName] = { staff: staffName, "To Do": 0, "In Progress": 0, "Done": 0 };
-          const status = t.status as "To Do" | "In Progress" | "Done";
+          const staffName = t.assignee?.username || 'Unassigned';
+          if (!summaryMap[staffName])
+            summaryMap[staffName] = {
+              staff: staffName,
+              'To Do': 0,
+              'In Progress': 0,
+              Completed: 0,
+            };
+          const status = t.status as 'To Do' | 'In Progress' | 'Completed';
           if (status) summaryMap[staffName][status] += 1;
         });
         setData(Object.values(summaryMap));
@@ -62,16 +81,17 @@ export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDat
     fetchData();
   }, [departmentIds, projectIds, startDate, endDate]);
 
-  if (loading) return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Team Summary</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-64 bg-muted animate-pulse rounded" />
-      </CardContent>
-    </Card>
-  );
+  if (loading)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Team Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 bg-muted animate-pulse rounded" />
+        </CardContent>
+      </Card>
+    );
 
   return (
     <Card>
@@ -88,7 +108,7 @@ export function TeamSummaryChart({ departmentIds = [], projectIds = [], startDat
             <Legend />
             <Bar dataKey="To Do" stackId="a" fill="#94a3b8" />
             <Bar dataKey="In Progress" stackId="a" fill="#3b82f6" />
-            <Bar dataKey="Done" stackId="a" fill="#10b981" />
+            <Bar dataKey="Completed" stackId="a" fill="#10b981" />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

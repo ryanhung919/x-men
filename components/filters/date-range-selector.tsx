@@ -13,6 +13,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { DateRange } from 'react-day-picker';
 import { CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export type DateRangeType = {
   startDate?: Date;
@@ -79,11 +80,9 @@ export function DateRangeFilter({
       ? `${format(range.startDate, 'dd/MM/yyyy')} – ${format(range.endDate, 'dd/MM/yyyy')}`
       : 'All Time';
 
-  // Convert DateRangeType to react-day-picker DateRange format
   const dateRange: DateRange | undefined =
     value.startDate || value.endDate ? { from: value.startDate, to: value.endDate } : undefined;
 
-  // Handle calendar date selection
   const handleSelect = (range: DateRange | undefined) => {
     if (range?.from) {
       onChange({
@@ -93,7 +92,6 @@ export function DateRangeFilter({
     }
   };
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (ref.current && !ref.current.contains(event.target as Node)) {
@@ -105,7 +103,6 @@ export function DateRangeFilter({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Reset calendar when dates are cleared
   useEffect(() => {
     if (!value.startDate && !value.endDate) {
       setShowCalendar(false);
@@ -115,27 +112,49 @@ export function DateRangeFilter({
   return (
     <div className="relative w-52" ref={ref}>
       <button
-        className="w-full border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground px-2.5 py-2 rounded-md flex items-center justify-between text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className={cn(
+          "flex w-52 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
+          "ring-offset-background placeholder:text-muted-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "hover:bg-accent hover:text-accent-foreground",
+        )}
         onClick={() => setShowCalendar((v) => !v)}
       >
-        <span className="truncate flex items-center gap-2">
-          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          {formatDisplay(value)}
+        <span className="flex items-center gap-2 truncate">
+          <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="truncate">{formatDisplay(value)}</span>
         </span>
-        <span className="ml-2 text-muted-foreground flex-shrink-0">{showCalendar ? '▲' : '▼'}</span>
+        <svg
+          className="h-4 w-4 opacity-50 shrink-0"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d={showCalendar ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"}
+          />
+        </svg>
       </button>
 
       {showCalendar && (
         <div
-          className="absolute z-50 mt-2 w-auto bg-popover text-popover-foreground border border-border rounded-lg shadow-xl overflow-hidden"
+          className="absolute z-50 mt-2 w-auto border border-border rounded-lg shadow-xl overflow-hidden"
           style={{
-            backgroundColor: 'hsl(var(--popover))',
-            backdropFilter: 'none',
-            WebkitBackdropFilter: 'none',
+            backgroundColor: 'oklch(var(--popover))',
           }}
         >
           {/* Preset buttons */}
-          <div className="flex gap-2 p-3 border-b border-border bg-muted/30 flex-wrap">
+          <div
+            className="flex gap-2 p-3 border-b border-border flex-wrap"
+            style={{
+              backgroundColor: 'oklch(var(--destructive))',
+            }}
+          >
             {presets.map((p) => (
               <button
                 key={p.label}
@@ -155,9 +174,9 @@ export function DateRangeFilter({
 
           {/* Calendar */}
           <div
-            className="p-3 bg-popover"
+            className="p-3"
             style={{
-              backgroundColor: 'hsl(var(--popover))',
+              backgroundColor: 'oklch(var(--popover))',
             }}
           >
             <Calendar
@@ -166,7 +185,6 @@ export function DateRangeFilter({
               onSelect={handleSelect}
               numberOfMonths={2}
               disabled={(date) => date > maxDate}
-              autoFocus
               className="rounded-md"
               defaultMonth={dateRange?.from || new Date()}
             />
