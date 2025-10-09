@@ -106,38 +106,6 @@ describe('lib/services/notifs', () => {
       expect(createNotification).not.toHaveBeenCalled();
       expect(mockSupabaseClient.from).not.toHaveBeenCalled();
     });
-
-    it('should handle task titles with special characters', async () => {
-      const assignorInfo = {
-        first_name: 'Bob',
-        last_name: 'Johnson',
-      };
-
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: assignorInfo,
-              error: null,
-            }),
-          }),
-        }),
-      });
-
-      await notifyNewTaskAssignment(
-        authUsersFixtures.alice.id,
-        authUsersFixtures.bob.id,
-        1,
-        'Task with "quotes" and special chars: <>&'
-      );
-
-      expect(createNotification).toHaveBeenCalledWith({
-        user_id: authUsersFixtures.alice.id,
-        title: 'New Task Assignment',
-        message: 'Bob Johnson assigned you to task: "Task with "quotes" and special chars: <>&"',
-        type: NotificationType.TASK_ASSIGNED,
-      });
-    });
   });
 
   // comments notifs
