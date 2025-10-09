@@ -533,50 +533,27 @@ async function enableRLS(sql: postgres.Sql) {
   // Security definer function to check if user can view a task
   // This bypasses RLS to avoid circular dependency with task_assignments
   await sql`
-    CREATE OR REPLACE FUNCTION user_can_view_task(user_uuid uuid, task_id_param bigint)
+    CREATE OR REPLACE FUNCTION is_task_visible_to_user(task_id_arg bigint, user_id_arg uuid)
       RETURNS boolean
       LANGUAGE plpgsql
       SECURITY DEFINER
       SET search_path = public
       AS $$
-      DECLARE
-        task_creator_id uuid;
-        user_dept_id int;
-        task_project_id bigint;
       BEGIN
-        -- Get task creator and project
-        SELECT creator_id, project_id INTO task_creator_id, task_project_id
-        FROM tasks
-        WHERE id = task_id_param;
-
-        -- User created the task
-        IF task_creator_id = user_uuid THEN
-          RETURN true;
+        IF user_id_arg != auth.uid() THEN
+          RETURN FALSE;
         END IF;
-
-        -- Get user's department
-        SELECT department_id INTO user_dept_id
-        FROM user_info
-        WHERE id = user_uuid;
-
-        -- Check if task has assignee from department that shares the same project
-        -- This includes:
-        -- 1. Assignees from user's own department
-        -- 2. Assignees from other departments linked to the same project
-        RETURN EXISTS (
-          SELECT 1
-          FROM task_assignments ta
-          JOIN user_info ui ON ui.id = ta.assignee_id
-          JOIN project_departments pd ON pd.department_id = ui.department_id
-          WHERE ta.task_id = task_id_param
-            AND pd.project_id = task_project_id
-            AND EXISTS (
-              SELECT 1
-              FROM project_departments pd2
-              WHERE pd2.project_id = task_project_id
-                AND pd2.department_id = user_dept_id
-            )
-        );
+        RETURN
+          EXISTS (
+            SELECT 1 FROM tasks t WHERE t.id = task_id_arg AND t.creator_id = user_id_arg
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM task_assignments ta
+            JOIN user_info ui ON ta.assignee_id = ui.id
+            WHERE ta.task_id = task_id_arg
+              AND ui.department_id = (SELECT department_id FROM user_info WHERE id = user_id_arg)
+          );
       END;
       $$;
   `;
@@ -593,6 +570,19 @@ async function enableRLS(sql: postgres.Sql) {
       )
     );
 `;
+
+  // User Info: Users can view assignees of tasks they can see
+  await sql`
+    CREATE POLICY "Users can view task assignees" ON user_info
+    FOR SELECT
+    USING (
+      id IN (
+        SELECT ta.assignee_id
+        FROM task_assignments ta
+        WHERE is_task_visible_to_user(ta.task_id, auth.uid())
+      )
+    );
+  `;
 
   /* ---------------- USER ROLES ---------------- */
 
@@ -637,7 +627,7 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Users can view tasks assigned to their department" ON tasks
     FOR SELECT
-    USING (user_can_view_task(auth.uid(), id));
+    USING (is_task_visible_to_user(id, auth.uid()));
   `;
 
   // Tasks: Only admins can archive tasks
