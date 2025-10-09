@@ -1,39 +1,39 @@
-import { createNotification } from "@/lib/db/notifs";
-import { createClient } from "@/lib/supabase/server";
+import { createNotification } from '@/lib/db/notifs';
+import { createClient } from '@/lib/supabase/server';
 
-// Notification types
 export const NotificationType = {
-  TASK_ASSIGNED: "task_assigned",
+  TASK_ASSIGNED: 'task_assigned',
+  COMMENT_ADDED: 'comment_added',
 } as const;
 
-// Notify user of task assignment (skips self-assignment)
+// Notifies users who have been assigned a task
 export async function notifyNewTaskAssignment(
   assigneeId: string,
   assignorId: string | null,
   taskId: number,
   taskTitle: string
 ): Promise<void> {
-  console.log("Service: notifyNewTaskAssignment called", {
+  console.log('Service: notifyNewTaskAssignment called', {
     assigneeId,
     assignorId,
     taskId,
     taskTitle,
   });
 
-  // Don't notify if self-assignment
+  // No notifications for self-assignment
   if (assigneeId === assignorId) {
-    console.log("Service: Self-assignment, skipping notification");
+    console.log('Service: Self-assignment, skipping notification');
     return;
   }
 
   // Get assignor name
-  let assignorName = "Someone";
+  let assignorName = 'Someone';
   if (assignorId) {
     const supabase = await createClient();
     const { data: assignorInfo } = await supabase
-      .from("user_info")
-      .select("first_name, last_name")
-      .eq("id", assignorId)
+      .from('user_info')
+      .select('first_name, last_name')
+      .eq('id', assignorId)
       .single();
 
     if (assignorInfo) {
@@ -41,7 +41,7 @@ export async function notifyNewTaskAssignment(
     }
   }
 
-  const title = "New Task Assignment";
+  const title = 'New Task Assignment';
   const message = `${assignorName} assigned you to task: "${taskTitle}"`;
 
   await createNotification({
@@ -51,5 +51,63 @@ export async function notifyNewTaskAssignment(
     type: NotificationType.TASK_ASSIGNED,
   });
 
-  console.log("Service: Notification created successfully");
+  console.log('Service: Notification created successfully');
+}
+
+// Notify all assignees of a new comment (skips the commenter)
+export async function notifyNewComment(
+  commenterId: string,
+  taskId: number,
+  taskTitle: string
+): Promise<void> {
+  console.log('Service: notifyNewComment called', {
+    commenterId,
+    taskId,
+    taskTitle,
+  });
+
+  const supabase = await createClient();
+
+  // Get commenter name
+  let commenterName = 'Someone';
+  const { data: commenterInfo } = await supabase
+    .from('user_info')
+    .select('first_name, last_name')
+    .eq('id', commenterId)
+    .single();
+
+  if (commenterInfo) {
+    commenterName = `${commenterInfo.first_name} ${commenterInfo.last_name}`;
+  }
+
+  // Get all assignees for this task
+  const { data: assignees, error } = await supabase
+    .from('task_assignments')
+    .select('assignee_id')
+    .eq('task_id', taskId);
+
+  if (error || !assignees || assignees.length === 0) {
+    console.log('Service: No assignees found or error fetching assignees');
+    return;
+  }
+
+  const title = 'New Comment';
+  const message = `${commenterName} commented on task: "${taskTitle}"`;
+
+  // Create notifications for all assignees except the commenter
+  for (const assignment of assignees) {
+    // Skip the commenter
+    if (assignment.assignee_id === commenterId) {
+      continue;
+    }
+
+    await createNotification({
+      user_id: assignment.assignee_id,
+      title,
+      message,
+      type: NotificationType.COMMENT_ADDED,
+    });
+  }
+
+  console.log('Service: Comment notifications created successfully');
 }
