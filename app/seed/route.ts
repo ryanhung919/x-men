@@ -571,19 +571,6 @@ async function enableRLS(sql: postgres.Sql) {
     );
 `;
 
-  // User Info: Users can view assignees of tasks they can see
-  await sql`
-    CREATE POLICY "Users can view task assignees" ON user_info
-    FOR SELECT
-    USING (
-      id IN (
-        SELECT ta.assignee_id
-        FROM task_assignments ta
-        WHERE is_task_visible_to_user(ta.task_id, auth.uid())
-      )
-    );
-  `;
-
   /* ---------------- USER ROLES ---------------- */
 
   // User Roles: Users can view their own roles
