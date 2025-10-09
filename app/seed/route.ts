@@ -552,6 +552,23 @@ async function enableRLS(sql: postgres.Sql) {
       $$;
   `;
 
+  // Create security definer function to get assignee info for visible tasks
+  // This allows users to see names of assignees on tasks they can view, even if from different departments
+  await sql`
+    CREATE OR REPLACE FUNCTION get_task_assignees_info(task_ids bigint[])
+      RETURNS TABLE(id uuid, first_name varchar, last_name varchar)
+      LANGUAGE sql
+      SECURITY DEFINER
+      SET search_path = public
+      AS $$
+        SELECT DISTINCT ui.id, ui.first_name, ui.last_name
+        FROM user_info ui
+        JOIN task_assignments ta ON ta.assignee_id = ui.id
+        WHERE ta.task_id = ANY(task_ids)
+          AND is_task_visible_to_user(ta.task_id, auth.uid());
+      $$;
+  `;
+
   // Create basic RLS policies
 
   /* ---------------- USER INFO ---------------- */
@@ -569,10 +586,16 @@ async function enableRLS(sql: postgres.Sql) {
 
   //User Info: Users can see colleagues in their department
   await sql`
-    CREATE POLICY "Users can view relevant users" ON user_info
+    CREATE POLICY "Users can view colleagues in their department" ON user_info
     FOR SELECT
-    USING (can_view_user_info(id));
-`;
+    USING (
+      EXISTS (
+        SELECT 1
+        FROM get_department_colleagues(auth.uid()) AS g
+        WHERE g.id = user_info.id
+      )
+    );
+  `;
 
   /* ---------------- USER ROLES ---------------- */
 

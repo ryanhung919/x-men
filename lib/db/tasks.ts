@@ -9,13 +9,18 @@ type UserInfo = {
 
 export async function getUserTasks(
   userId: string,
-  { isAdmin, isManager, departmentId }: { isAdmin: boolean; isManager: boolean; departmentId: number | null }
+  {
+    isAdmin,
+    isManager,
+    departmentId,
+  }: { isAdmin: boolean; isManager: boolean; departmentId: number | null }
 ) {
   const supabase = await createClient();
 
   let query = supabase
     .from('tasks')
-    .select(`
+    .select(
+      `
       id,
       title,
       description,
@@ -29,7 +34,8 @@ export async function getUserTasks(
       recurrence_date,
       task_assignments(assignee_id),
       tags:task_tags(tags(name))
-    `)
+    `
+    )
     .neq('is_archived', true);
 
   const { data, error } = await query.order('deadline', { ascending: true });
@@ -81,23 +87,13 @@ export async function getUserTasks(
     });
   });
 
-  // Fetch user_info for assignees
-  const assigneeIds = [
-    ...new Set(
-      data.flatMap((task: any) =>
-        task.task_assignments.map((a: any) => a.assignee_id)
-      )
-    ),
-  ];
-
-  console.log(assigneeIds);
-
+  // Fetch user_info for assignees using security definer function
+  // allow getting names of assignees even if they're from different departments
   let userInfoData: UserInfo[] = [];
-  if (assigneeIds.length > 0) {
-    const { data: userInfo, error: userInfoError } = await supabase
-      .from('user_info')
-      .select('id, first_name, last_name')
-      .in('id', assigneeIds);
+  if (taskIds.length > 0) {
+    const { data: userInfo, error: userInfoError } = await supabase.rpc('get_task_assignees_info', {
+      task_ids: taskIds,
+    });
 
     if (userInfoError) throw new Error(userInfoError.message);
     userInfoData = (userInfo ?? []) as UserInfo[];
@@ -106,25 +102,25 @@ export async function getUserTasks(
   // Map user_info to tasks
   const userInfoMap = new Map(userInfoData.map((user) => [user.id, user]));
 
-  console.log(userInfoMap);
-
-  return data.map((task: any) => ({
-    ...task,
-    subtasks: subtasksMap.get(task.id) || [],
-    assignees: task.task_assignments
-      .map((a: any) => {
-        const user = userInfoMap.get(a.assignee_id);
-        return user
-          ? {
-              assignee_id: a.assignee_id,
-              user_info: {
-                first_name: user.first_name,
-                last_name: user.last_name,
-              },
-            }
-          : null;
-      })
-      .filter(Boolean),
-    attachments: attachmentsMap.get(task.id) || [],
-  })).map(mapTaskAttributes);
+  return data
+    .map((task: any) => ({
+      ...task,
+      subtasks: subtasksMap.get(task.id) || [],
+      assignees: task.task_assignments
+        .map((a: any) => {
+          const user = userInfoMap.get(a.assignee_id);
+          return user
+            ? {
+                assignee_id: a.assignee_id,
+                user_info: {
+                  first_name: user.first_name,
+                  last_name: user.last_name,
+                },
+              }
+            : null;
+        })
+        .filter(Boolean),
+      attachments: attachmentsMap.get(task.id) || [],
+    }))
+    .map(mapTaskAttributes);
 }
