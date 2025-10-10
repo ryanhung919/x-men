@@ -243,7 +243,7 @@ export const tasks = [
     title: 'Design budget dashboard layout',
     description: 'Create FY25 dashboard (KPI tiles, spend vs plan).',
     priority_bucket: '9',
-    status: 'Done',
+    status: 'Completed',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     project_name: 'Annual Budget FY25',
     deadline: new Date('2025-10-05T17:00:00Z'),
@@ -277,7 +277,7 @@ export const tasks = [
     title: 'Connect sales data source',
     description: 'ETL from SG data mart into DWH; nightly batch.',
     priority_bucket: '7',
-    status: 'Done',
+    status: 'Completed',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     project_name: 'Data Warehouse Lift',
     deadline: new Date('2025-10-12T17:00:00Z'),
@@ -328,7 +328,7 @@ export const tasks = [
     title: 'Develop finance KPIs for dashboard',
     description: 'Define metrics, create dashboard mockups, link to accounting data.',
     priority_bucket: '9',
-    status: 'Done',
+    status: 'Completed',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Internal Analytics Dashboard',
     deadline: new Date('2025-10-18T17:00:00Z'),
@@ -345,7 +345,7 @@ export const tasks = [
     title: 'Migrate docs to cloud platform',
     description: 'Move legacy files and folders to new cloud solution.',
     priority_bucket: '6',
-    status: 'Done',
+    status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Cloud Doc Management',
     deadline: new Date('2025-09-29T17:00:00Z'),
@@ -360,7 +360,7 @@ export const tasks = [
   },
   {
     title: 'Plan regional training sessions',
-    description: 'Schedule training for Indonesia and Malaysia offices.',
+    description: 'Schedule training for InCompletedsia and Malaysia offices.',
     priority_bucket: '5',
     status: 'To Do',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
@@ -430,7 +430,7 @@ export const tasks = [
     title: 'Setup CI/CD pipeline',
     description: 'Automate deployments for staging & prod.',
     priority_bucket: 7,
-    status: 'Done',
+    status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Website Redesign',
     deadline: new Date('2025-10-28T17:00:00Z'),
@@ -532,7 +532,7 @@ export const tasks = [
     title: 'Refactor data pipelines',
     description: 'Improve ETL reliability and logging.',
     priority_bucket: 7,
-    status: 'Done',
+    status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Data Warehouse Lift',
     deadline: new Date('2025-11-07T17:00:00Z'),
