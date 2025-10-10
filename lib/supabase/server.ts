@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { createDevAuthClient, isDevMode } from "@/lib/dev-user"
 
 /**
  * Creates a Supabase client with the given URL and anon key.
@@ -9,11 +8,6 @@ import { createDevAuthClient, isDevMode } from "@/lib/dev-user"
  * @returns {Promise<SupabaseClient>} A promise that resolves to a Supabase client.
  */
 export async function createClient() {
-  // Return mock client in development mode
-  if (isDevMode()) {
-    console.log('🚧 Using development auth server client')
-    return createDevAuthClient() as any
-  }
 
   const cookieStore = await cookies();
 

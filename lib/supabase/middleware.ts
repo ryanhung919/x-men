@@ -2,17 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
-  // Development mode bypass - set BYPASS_AUTH=true in your .env.local
-  const bypassAuth = process.env.BYPASS_AUTH === 'true'
-  
   let supabaseResponse = NextResponse.next({
     request,
   })
-
-  if (bypassAuth) {
-    console.log('🚧 Development mode: Bypassing authentication')
-    return supabaseResponse
-  }
 
   // With Fluid compute, don't put this client in a global environment
   // variable. Always create a new one on each request.
@@ -48,8 +40,6 @@ export async function updateSession(request: NextRequest) {
 
   if (
     !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth') &&
     !request.nextUrl.pathname.startsWith('/api') &&
     request.nextUrl.pathname !== '/' &&
     request.nextUrl.pathname !== '/seed'
