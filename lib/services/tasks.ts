@@ -21,7 +21,7 @@ export type Task = {
   title: string;
   description: string | null;
   priority: number; // Changed from 'Low' | 'Medium' | 'High' to number (1–10)
-  status: 'To Do' | 'In Progress' | 'Done' | 'Blocked';
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked';
   deadline: string | null;
   notes: string | null;
   recurrence_interval: number;
@@ -35,7 +35,7 @@ export type Task = {
 };
 
 export function mapTaskAttributes(task: RawTask): Task {
-  const isOverdue = task.deadline ? new Date(task.deadline) < new Date() && task.status !== 'Done' : false;
+  const isOverdue = task.deadline ? new Date(task.deadline) < new Date() && task.status !== 'Completed' : false;
 
   return {
     ...task,
@@ -59,7 +59,7 @@ export function calculateNextDueDate(task: Task): Task {
     return {
       ...task,
       deadline: nextDue.toISOString(),
-      isOverdue: new Date(nextDue) < new Date() && task.status !== 'Done',
+      isOverdue: new Date(nextDue) < new Date() && task.status !== 'Completed',
     };
   }
   return task;

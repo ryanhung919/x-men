@@ -9,11 +9,6 @@ type UserInfo = {
 
 export async function getUserTasks(
   userId: string,
-  {
-    isAdmin,
-    isManager,
-    departmentId,
-  }: { isAdmin: boolean; isManager: boolean; departmentId: number | null }
 ) {
   const supabase = await createClient();
 

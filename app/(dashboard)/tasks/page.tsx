@@ -30,23 +30,15 @@ export default async function TasksPage() {
     .select('role, user_id')
     .eq('user_id', user.id)) as { data: UserRole[] | null };
 
-  const isManager = userRoles?.some((r) => r.role === 'manager') || false;
-  const isAdmin = userRoles?.some((r) => r.role === 'admin') || false;
-
   console.log('User roles:', userRoles);
-  console.log('isManager:', isManager, 'isAdmin:', isAdmin);
 
   // Fetch tasks based on role
-  const tasks = await getUserTasks(user.id, {
-    isAdmin,
-    isManager,
-    departmentId: userInfo?.department_id,
-  });
+  const tasks = await getUserTasks(user.id);
 
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">My Tasks</h1>
-      <TasksList tasks={tasks} isManager={isManager} isAdmin={isAdmin} />
+      <TasksList tasks={tasks} />
     </div>
   );
 }

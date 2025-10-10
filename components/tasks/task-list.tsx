@@ -13,33 +13,17 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import TaskDetails from '@/components/tasks/task-details';
-import { format, isBefore } from 'date-fns';
+import { format } from 'date-fns';
 import { type Task, calculateNextDueDate } from '@/lib/services/tasks';
-import {
-  Calendar,
-  Paperclip,
-  CheckSquare,
-  AlertCircle,
-  ArrowUpDown,
-  Filter,
-  X,
-} from 'lucide-react';
+import { Calendar, Paperclip, CheckSquare, AlertCircle, ArrowUpDown, X } from 'lucide-react';
+import { PrioritySelector } from '@/components/filters/priority-selector';
+import { StatusSelector } from '@/components/filters/status-selector';
+import { ProjectSelector, Project } from '@/components/filters/project-selector';
+import { TagSelector } from '@/components/filters/tag-selector';
+import TaskDetails from '@/components/tasks/task-details';
 
 type TasksListProps = {
   tasks: Task[];
-  isManager: boolean;
-  isAdmin: boolean;
 };
 
 type SortConfig = {
@@ -47,27 +31,37 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
-export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps) {
+export default function TasksList({ tasks }: TasksListProps) {
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filters, setFilters] = useState({
-    priority: '',
-    project: '',
-    status: '',
+    priorities: [] as string[],
+    projects: [] as number[],
+    statuses: [] as string[],
     tags: [] as string[],
-    assignee: '',
   });
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   // Unique values for filters
-  // Replace priorities with numeric range 1–10
   const priorities = Array.from({ length: 10 }, (_, i) => (i + 1).toString());
-  const statuses = ['To Do', 'In Progress', 'Done', 'Blocked'] as const;
-  const projects = Array.from(
-    new Set(tasks.map((task) => task.project?.name).filter((name): name is string => Boolean(name)))
-  );
+  const statuses = ['To Do', 'In Progress', 'Completed', 'Blocked'] as const;
+  const projects: Project[] = Array.from(
+    new Set(
+      tasks
+        .map((task) => task.project?.id)
+        .filter((id): id is number => id !== null && id !== undefined)
+    )
+  ).map((id) => {
+    const task = tasks.find((t) => t.project?.id === id)!;
+    return {
+      id: id, // Use number directly
+      name: task.project!.name,
+      is_archived: false, // Dummy value
+      created_at: new Date().toISOString(), // Dummy value
+      updated_at: new Date().toISOString(), // Dummy value
+    };
+  });
   const allTags = Array.from(new Set(tasks.flatMap((task) => task.tags)));
-  const assignees = Array.from(new Set(tasks.flatMap((task) => task.assignees)));
 
   // Filter tasks
   const filteredTasks = tasks
@@ -76,11 +70,12 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
     )
     .filter(
       (task) =>
-        (!filters.priority || task.priority.toString() === filters.priority) && // Updated to handle number as string
-        (!filters.project || task.project.name === filters.project) &&
-        (!filters.status || task.status === filters.status) &&
-        (filters.tags.length === 0 || filters.tags.every((tag) => task.tags.includes(tag))) &&
-        (!filters.assignee || task.assignees.some((a) => a.assignee_id === filters.assignee))
+        (filters.priorities.length === 0 ||
+          filters.priorities.includes(task.priority.toString())) &&
+        (filters.projects.length === 0 ||
+          (task.project?.id && filters.projects.includes(task.project.id))) &&
+        (filters.statuses.length === 0 || filters.statuses.includes(task.status)) &&
+        (filters.tags.length === 0 || filters.tags.some((tag) => task.tags.includes(tag)))
     );
 
   // Handle sorting
@@ -98,9 +93,8 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
         const aValue = a[key as keyof Task];
         const bValue = b[key as keyof Task];
 
-        // Handle null/undefined safely
         if (aValue == null && bValue == null) return 0;
-        if (aValue == null) return 1; // nulls go to bottom
+        if (aValue == null) return 1;
         if (bValue == null) return -1;
 
         if (typeof aValue === 'string' && typeof bValue === 'string') {
@@ -111,12 +105,10 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
           return (aValue.getTime() - bValue.getTime()) * direction;
         }
 
-        // Generic comparison fallback for numbers
         if (typeof aValue === 'number' && typeof bValue === 'number') {
           return (aValue - bValue) * direction;
         }
 
-        // Final fallback for mixed/unknown types
         return String(aValue).localeCompare(String(bValue)) * direction;
       })
     : filteredTasks;
@@ -134,13 +126,13 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
 
   // Clear filters
   const clearFilters = () => {
-    setFilters({ priority: '', project: '', status: '', tags: [], assignee: '' });
+    setFilters({ priorities: [], projects: [], statuses: [], tags: [] });
   };
 
   // Get status badge variant
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'Done':
+      case 'Completed':
         return 'default';
       case 'In Progress':
         return 'secondary';
@@ -151,11 +143,11 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
     }
   };
 
-  // Get priority badge variant based on numeric priority (1–10)
+  // Get priority badge variant
   const getPriorityVariant = (priority: number) => {
-    if (priority >= 8) return 'destructive'; // 8–10 (critical)
-    if (priority >= 4) return 'secondary'; // 4–7 (moderate)
-    return 'outline'; // 1–3 (low)
+    if (priority >= 8) return 'destructive';
+    if (priority >= 4) return 'secondary';
+    return 'outline';
   };
 
   return (
@@ -171,131 +163,30 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
           {showCompleted ? 'Hide Completed' : 'Show Completed'}
         </Button>
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={filters.priority || 'all'}
-            onValueChange={(value) =>
-              setFilters({ ...filters, priority: value === 'all' ? '' : value })
-            }
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              {priorities.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.status || 'all'}
-            onValueChange={(value) =>
-              setFilters({ ...filters, status: value === 'all' ? '' : value })
-            }
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {statuses.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.project || 'all'}
-            onValueChange={(value) =>
-              setFilters({ ...filters, project: value === 'all' ? '' : value })
-            }
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {p}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {(isManager || isAdmin) && (
-            <Select
-              value={filters.assignee || 'all'}
-              onValueChange={(value) =>
-                setFilters({ ...filters, assignee: value === 'all' ? '' : value })
-              }
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Assignee" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Assignees</SelectItem>
-
-                {/*
-        1. Flatten all assignees from all tasks.
-        2. Use Map to deduplicate by assignee_id.
-        3. Render each unique assignee with assignee_id as key and value.
-      */}
-                {Array.from(
-                  new Map(
-                    tasks.flatMap((task) => task.assignees).map((a) => [a.assignee_id, a])
-                  ).values()
-                ).map((a) => (
-                  <SelectItem key={a.assignee_id} value={a.assignee_id}>
-                    {`${a.user_info.first_name} ${a.user_info.last_name}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-[140px] justify-between">
-                {filters.tags.length > 0 ? `${filters.tags.length} Tags` : 'Tags'}
-                <Filter className="h-4 w-4 ml-2" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-4">
-              <div className="space-y-2">
-                {allTags.map((tag) => (
-                  <div key={tag} className="flex items-center gap-2">
-                    <Checkbox
-                      id={tag}
-                      checked={filters.tags.includes(tag)}
-                      onCheckedChange={(checked) => {
-                        setFilters({
-                          ...filters,
-                          tags: checked
-                            ? [...filters.tags, tag]
-                            : filters.tags.filter((t) => t !== tag),
-                        });
-                      }}
-                    />
-                    <Label htmlFor={tag} className="text-sm">
-                      {tag}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {(filters.priority ||
-            filters.project ||
-            filters.status ||
-            filters.tags.length > 0 ||
-            filters.assignee) && (
+          <PrioritySelector
+            priorities={priorities}
+            selectedPriorities={filters.priorities}
+            onChange={(priorities) => setFilters({ ...filters, priorities })}
+          />
+          <StatusSelector
+            statuses={statuses}
+            selectedStatuses={filters.statuses}
+            onChange={(statuses) => setFilters({ ...filters, statuses })}
+          />
+          <ProjectSelector
+            projects={projects}
+            selectedProjects={filters.projects}
+            onChange={(projects) => setFilters({ ...filters, projects })}
+          />
+          <TagSelector
+            tags={allTags}
+            selectedTags={filters.tags}
+            onChange={(tags) => setFilters({ ...filters, tags })}
+          />
+          {(filters.priorities.length > 0 ||
+            filters.projects.length > 0 ||
+            filters.statuses.length > 0 ||
+            filters.tags.length > 0) && (
             <Button variant="ghost" onClick={clearFilters} className="flex items-center gap-2">
               <X className="h-4 w-4" />
               Clear Filters
@@ -395,31 +286,16 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getPriorityVariant(task.priority)}>
-                      {task.priority} {/* Display the number */}
-                    </Badge>
+                    <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <>
-                        {console.log(
-                          'Assignees for task:',
-                          task.id,
-                          task.assignees.map((a) => ({
-                            assignee_id: a.assignee_id,
-                            user_info: a.user_info
-                              ? `${a.user_info.first_name} ${a.user_info.last_name}`
-                              : 'MISSING',
-                          }))
-                        )}
-                      </>
                       {task.assignees.length > 0 ? (
                         task.assignees.slice(0, 3).map((assignee) => {
                           const { first_name, last_name } = assignee.user_info;
-                          console.log(assignee.user_info);
                           return (
                             <Avatar
                               key={assignee.assignee_id}
@@ -434,7 +310,6 @@ export default function TasksList({ tasks, isManager, isAdmin }: TasksListProps)
                       ) : (
                         <span className="text-muted-foreground">None</span>
                       )}
-
                       {task.assignees.length > 3 && (
                         <Avatar className="h-6 w-6 border-2 border-background">
                           <AvatarFallback className="text-xs bg-muted">
