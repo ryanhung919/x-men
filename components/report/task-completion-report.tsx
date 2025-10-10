@@ -45,7 +45,7 @@ export function TaskCompletionsChart({ departmentIds = [], projectIds = [], star
         const tasks = json?.tasks ?? [];
         const map: Record<string, number> = {};
         tasks.forEach((t: any) => {
-          if (t.status === "Done") {
+          if (t.status === "Completed") {
             const assignee = t.assignee?.username || "Unassigned";
             map[assignee] = (map[assignee] || 0) + 1;
           }

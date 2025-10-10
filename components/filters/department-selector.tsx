@@ -39,7 +39,8 @@ export function DepartmentSelector({
           className={cn(
             'w-52 border border-input bg-background text-foreground',
             'hover:bg-accent hover:text-accent-foreground',
-            'focus:ring-2 focus:ring-ring focus:ring-offset-2'
+            'focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            '[&>span]:text-foreground [&>span]:font-medium'
           )}
         >
           {' '}
@@ -54,7 +55,7 @@ export function DepartmentSelector({
           />
         </SelectTrigger>
         <SelectContent
-          className="bg-popover text-popover-foreground border border-border shadow-md"
+          className="bg-popover text-popover-foreground border border-border shadow-md "
           style={{
             backgroundColor: 'hsl(var(--popover))',
             backdropFilter: 'none',

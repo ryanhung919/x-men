@@ -225,7 +225,7 @@ export const tasksFixtures = {
     title: 'Task 3',
     description: 'Team meeting',
     priority_bucket: 3,
-    status: 'Done',
+    status: 'Completed',
     creator_id: authUsersFixtures.carol.id,
     project_id: projectsFixtures.beta.id,
     deadline: new Date('2024-02-10'),

@@ -220,7 +220,7 @@ async function seedTestDatabase(sql: postgres.Sql) {
       title VARCHAR(255) NOT NULL,
       description TEXT,
       priority_bucket INT NOT NULL CHECK (priority_bucket BETWEEN 1 AND 10),
-      status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Done')),
+      status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Completed')),
       creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       deadline TIMESTAMPTZ,
