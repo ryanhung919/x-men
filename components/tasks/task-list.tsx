@@ -12,7 +12,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { type Task, calculateNextDueDate } from '@/lib/services/tasks';
 import { Calendar, Paperclip, CheckSquare, AlertCircle, ArrowUpDown, X } from 'lucide-react';
@@ -20,7 +19,7 @@ import { PrioritySelector } from '@/components/filters/priority-selector';
 import { StatusSelector } from '@/components/filters/status-selector';
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
 import { TagSelector } from '@/components/filters/tag-selector';
-import TaskDetails from '@/components/tasks/task-details';
+import Link from 'next/link';
 
 type TasksListProps = {
   tasks: Task[];
@@ -33,7 +32,6 @@ type SortConfig = {
 
 export default function TasksList({ tasks }: TasksListProps) {
   const [showCompleted, setShowCompleted] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filters, setFilters] = useState({
     priorities: [] as string[],
     projects: [] as number[],
@@ -54,11 +52,11 @@ export default function TasksList({ tasks }: TasksListProps) {
   ).map((id) => {
     const task = tasks.find((t) => t.project?.id === id)!;
     return {
-      id: id, // Use number directly
+      id: id,
       name: task.project!.name,
-      is_archived: false, // Dummy value
-      created_at: new Date().toISOString(), // Dummy value
-      updated_at: new Date().toISOString(), // Dummy value
+      is_archived: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
   });
   const allTags = Array.from(new Set(tasks.flatMap((task) => task.tags)));
@@ -78,7 +76,7 @@ export default function TasksList({ tasks }: TasksListProps) {
         (filters.tags.length === 0 || filters.tags.some((tag) => task.tags.includes(tag)))
     );
 
-  // Handle sorting
+  // Sort tasks
   const sortedTasks = sortConfig
     ? [...filteredTasks].sort((a, b) => {
         const key = sortConfig.key;
@@ -277,13 +275,14 @@ export default function TasksList({ tasks }: TasksListProps) {
                 <TableRow
                   key={task.id}
                   className={`cursor-pointer ${task.isOverdue ? 'bg-destructive/10' : ''}`}
-                  onClick={() => setSelectedTask(task)}
                 >
                   <TableCell className={`font-medium ${task.isOverdue ? 'text-destructive' : ''}`}>
-                    <div className="flex items-center gap-2">
-                      {task.isOverdue && <AlertCircle className="h-4 w-4 text-destructive" />}
-                      {task.title}
-                    </div>
+                    <Link href={`/tasks/${task.id}`}>
+                      <div className="flex items-center gap-2">
+                        {task.isOverdue && <AlertCircle className="h-4 w-4 text-destructive" />}
+                        {task.title}
+                      </div>
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
@@ -374,15 +373,6 @@ export default function TasksList({ tasks }: TasksListProps) {
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Task Details</DialogTitle>
-          </DialogHeader>
-          {selectedTask && <TaskDetails taskId={selectedTask.id} />}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
