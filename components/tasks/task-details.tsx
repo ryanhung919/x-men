@@ -10,24 +10,57 @@ type TaskDetailsProps = {
   taskId: number;
 };
 
-type DetailedTask = {
+type UserInfo = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
+
+type TaskData = {
+  id: number;
   title: string;
-  description: string;
+  description: string | null;
+  priority_bucket: number;
+  status: string;
+  deadline: string | null;
+  notes: string | null;
+  project: { id: number; name: string } | null;
+  parent_task_id: string | null;
+  recurrence_interval: string | null;
+  recurrence_date: string | null;
+  task_assignments: { assignee_id: string }[];
+  tags: { tags: { name: string } }[];
+};
+
+type CommentData = {
+  id: number;
+  task_id: number;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  is_archived: boolean;
+};
+
+type DetailedTask = {
+  id: number;
+  title: string;
+  description: string | null;
   priority: number;
   status: string;
-  assignees: string[];
   deadline: string | null;
-  tags: string[];
-  project: { name: string };
-  subtasks: { id: number; title: string; status: string; deadline: string | null }[];
-  attachments: { storage_path: string }[];
   notes: string | null;
+  project: { id: number; name: string } | null;
+  assignees: { assignee_id: string; user_info: UserInfo }[];
+  tags: string[];
+  subtasks: { id: number; title: string; status: string; deadline: string | null }[];
+  attachments: { id: number; storage_path: string }[];
   comments: {
     id: number;
     content: string;
     created_at: string;
     user_id: string;
-    user: { first_name: string; last_name: string };
+    user_info: UserInfo;
   }[];
 };
 
@@ -39,22 +72,28 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
     const fetchTaskDetails = async () => {
       const supabase = await createClient();
 
-      // Fetch base task data
-      const { data, error: taskError } = await supabase
+      // Fetch task data
+      const { data: taskData, error: taskError } = await supabase
         .from('tasks')
         .select(
           `
-            title,
-            description,
-            priority_bucket,
-            status,
-            deadline,
-            notes,
-            project:projects(name),
-            tags:task_tags(tag:tags(name))
+          id,
+          title,
+          description,
+          priority_bucket,
+          status,
+          deadline,
+          notes,
+          project:projects(id, name),
+          parent_task_id,
+          recurrence_interval,
+          recurrence_date,
+          task_assignments(assignee_id),
+          tags:task_tags(tags(name))
           `
         )
         .eq('id', taskId)
+        .neq('is_archived', true)
         .single();
 
       if (taskError) {
@@ -63,30 +102,13 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
         return;
       }
 
-      // Fetch assignees
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('task_assignments')
-        .select('assignee_id')
-        .eq('task_id', taskId);
-      let assignees: string[] = ['None'];
-      if (assignmentsData && assignmentsData.length > 0) {
-        const assigneeIds = assignmentsData.map((a: any) => a.assignee_id);
-        const { data: userInfoData, error: userInfoError } = await supabase
-          .from('user_info')
-          .select('id, first_name, last_name')
-          .in('id', assigneeIds);
-        if (userInfoError) {
-          console.error('Error fetching user info:', userInfoError);
-        } else {
-          assignees = userInfoData.map((u: any) => `${u.first_name} ${u.last_name}`);
-        }
-      }
-
       // Fetch subtasks
       const { data: subtasksData, error: subtasksError } = await supabase
         .from('tasks')
         .select('id, title, status, deadline')
-        .eq('parent_task_id', taskId);
+        .eq('parent_task_id', taskId)
+        .neq('is_archived', true);
+
       if (subtasksError) {
         console.error('Error fetching subtasks:', subtasksError);
       }
@@ -94,54 +116,122 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
       // Fetch attachments
       const { data: attachmentsData, error: attachmentsError } = await supabase
         .from('task_attachments')
-        .select('storage_path')
+        .select('id, storage_path')
         .eq('task_id', taskId);
+
       if (attachmentsError) {
         console.error('Error fetching attachments:', attachmentsError);
       }
 
-      // Fetch comments and user info
+      // Fetch comments
       const { data: commentsData, error: commentsError } = await supabase
         .from('task_comments')
         .select('id, content, created_at, user_id')
-        .eq('task_id', taskId);
-      let comments: {
-        id: number;
-        content: string;
-        created_at: string;
-        user_id: string;
-        user: { first_name: string; last_name: string };
-      }[] = [];
-      if (commentsData && commentsData.length > 0) {
-        const userIds = commentsData.map((c: any) => c.user_id);
-        const { data: userInfoData, error: userInfoError } = await supabase
-          .from('user_info')
-          .select('id, first_name, last_name')
-          .in('id', userIds);
-        if (userInfoError) {
-          console.error('Error fetching user info for comments:', userInfoError);
+        .eq('task_id', taskId)
+        .neq('is_archived', false);
+
+      if (commentsError) {
+        console.error('Error fetching comments:', commentsError);
+      }
+
+      // Fetch user info for assignees and commenters
+      let assignees: DetailedTask['assignees'] = [];
+      let userInfoMap = new Map<string, UserInfo>();
+      const userIds = [
+        ...new Set([
+          ...(taskData.task_assignments || []).map((a: { assignee_id: string }) => a.assignee_id),
+          ...(commentsData || []).map((c: CommentData) => c.user_id),
+        ]),
+      ];
+
+      if (userIds.length > 0) {
+        // Use get_task_assignees_info for assignees
+        const { data: assigneeInfoData, error: assigneeInfoError } = await supabase.rpc(
+          'get_task_assignees_info',
+          { task_ids: [taskId] }
+        );
+
+        if (assigneeInfoError) {
+          console.error('Error fetching assignee user info:', assigneeInfoError);
         } else {
-          const userMap = new Map(userInfoData.map((u: any) => [u.id, u]));
-          comments = commentsData.map((c: any) => ({
-            ...c,
-            user: userMap.get(c.user_id) || { first_name: 'Unknown', last_name: '' },
-          }));
+          userInfoMap = new Map(
+            (assigneeInfoData || []).map((user: UserInfo) => [
+              user.id,
+              { id: user.id, first_name: user.first_name, last_name: user.last_name },
+            ])
+          );
+          assignees = taskData.task_assignments
+            .map((a: { assignee_id: string }) => {
+              const user = userInfoMap.get(a.assignee_id);
+              return user ? { assignee_id: a.assignee_id, user_info: user } : null;
+            })
+            .filter(
+              (
+                a: { assignee_id: string; user_info: UserInfo } | null
+              ): a is { assignee_id: string; user_info: UserInfo } => a !== null
+            );
+        }
+
+        // Fetch additional user info for commenters not covered by get_task_assignees_info
+        const missingUserIds = userIds.filter((id) => !userInfoMap.has(id));
+        if (missingUserIds.length > 0) {
+          const { data: additionalUserInfo, error: userInfoError } = await supabase
+            .from('user_info')
+            .select('id, first_name, last_name')
+            .in('id', missingUserIds);
+
+          if (userInfoError) {
+            console.error('Error fetching additional user info:', userInfoError);
+          } else {
+            additionalUserInfo.forEach((user: UserInfo) => {
+              userInfoMap.set(user.id, {
+                id: user.id,
+                first_name: user.first_name,
+                last_name: user.last_name,
+              });
+            });
+          }
         }
       }
 
-      const tags = data.tags.map((t: any) => t.tag.name);
-
-      setTask({
-        ...data,
-        priority: data.priority_bucket,
-        assignees: assignees.length > 0 ? assignees : ['None'],
+      const formattedTask: DetailedTask = {
+        id: taskData.id,
+        title: taskData.title,
+        description: taskData.description,
+        priority: taskData.priority_bucket,
+        status: taskData.status,
+        deadline: taskData.deadline,
+        notes: taskData.notes,
+        project: taskData.project,
+        assignees,
+        tags: taskData.tags
+          ? taskData.tags.map((t: { tags: { name: string } }) => t.tags.name)
+          : [],
         subtasks: subtasksData || [],
         attachments: attachmentsData || [],
-        tags,
-        comments,
-      });
+        comments: commentsData
+          ? commentsData.map((c: CommentData) => ({
+              id: c.id,
+              content: c.content,
+              created_at: c.created_at,
+              user_id: c.user_id,
+              user_info: userInfoMap.get(c.user_id) || {
+                id: c.user_id,
+                first_name: 'Unknown',
+                last_name: '',
+              },
+            }))
+          : [],
+      };
+
+      console.log('Task details assignees:', assignees);
+      console.log('Task comments:', commentsData);
+      console.log('User info map:', Array.from(userInfoMap.entries()));
+
+      setTask(formattedTask);
       setLoading(false);
     };
+
     fetchTaskDetails();
   }, [taskId]);
 
@@ -165,7 +255,12 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
             <strong>Status:</strong> <Badge>{task.status}</Badge>
           </p>
           <p>
-            <strong>Assignees:</strong> {task.assignees.join(', ') || 'None'}
+            <strong>Assignees:</strong>{' '}
+            {task.assignees.length > 0
+              ? task.assignees
+                  .map((a) => `${a.user_info.first_name} ${a.user_info.last_name}`)
+                  .join(', ')
+              : 'None'}
           </p>
           <p>
             <strong>Due Date:</strong>{' '}
@@ -182,7 +277,7 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
               : 'None'}
           </p>
           <p>
-            <strong>Project:</strong> {task.project.name || 'None'}
+            <strong>Project:</strong> {task.project?.name || 'None'}
           </p>
           <p>
             <strong>Notes:</strong> {task.notes || 'None'}
@@ -217,8 +312,8 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
         <CardContent>
           {task.attachments.length > 0 ? (
             <ul className="list-disc pl-4">
-              {task.attachments.map((att, idx) => (
-                <li key={idx}>{att.storage_path}</li>
+              {task.attachments.map((att) => (
+                <li key={att.id}>{att.storage_path}</li>
               ))}
             </ul>
           ) : (
@@ -238,7 +333,7 @@ export default function TaskDetails({ taskId }: TaskDetailsProps) {
                 <li key={comment.id} className="border-b pb-2">
                   <p>
                     <strong>
-                      {comment.user.first_name} {comment.user.last_name}
+                      {comment.user_info.first_name} {comment.user_info.last_name}
                     </strong>{' '}
                     - {format(new Date(comment.created_at), 'PPP p')}
                   </p>
