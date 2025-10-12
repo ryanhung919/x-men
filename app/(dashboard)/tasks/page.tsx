@@ -18,20 +18,6 @@ export default async function TasksPage() {
     redirect('/');
   }
 
-  // Fetch user's department and roles
-  const { data: userInfo } = await supabase
-    .from('user_info')
-    .select('department_id')
-    .eq('id', user.id)
-    .single();
-
-  const { data: userRoles } = (await supabase
-    .from('user_roles')
-    .select('role, user_id')
-    .eq('user_id', user.id)) as { data: UserRole[] | null };
-
-  console.log('User roles:', userRoles);
-
   // Fetch tasks based on role
   const tasks = await getUserTasks(user.id);
 

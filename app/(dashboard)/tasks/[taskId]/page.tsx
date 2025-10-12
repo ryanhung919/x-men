@@ -2,8 +2,10 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 type UserInfo = {
   id: string;
@@ -61,6 +63,7 @@ async function fetchTaskDetails(taskId: number): Promise<DetailedTask | null> {
     .single();
 
   if (taskError || !taskData) {
+    console.error('Error fetching task details:', taskError);
     return null;
   }
 
@@ -195,7 +198,9 @@ export default async function TaskDetailsPage({ params }: { params: { taskId: st
     redirect('/');
   }
 
-  const taskId = parseInt(params.taskId, 10);
+  // Await params to resolve the Promise and access taskId
+  const resolvedParam = await params;
+  const taskId = parseInt(resolvedParam.taskId, 10);
   if (isNaN(taskId)) {
     notFound();
   }
@@ -208,6 +213,7 @@ export default async function TaskDetailsPage({ params }: { params: { taskId: st
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">Task Details</h1>
+      <BackButton />
       <div className="space-y-4">
         <Card>
           <CardHeader>
