@@ -230,7 +230,7 @@ async function seedTasks(sql: postgres.Sql, deps: { projKeyToId: Map<string, num
       title VARCHAR(255) NOT NULL,
       description TEXT,
       priority_bucket INT NOT NULL CHECK (priority_bucket BETWEEN 1 AND 10),
-      status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Completed')),
+      status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Completed', 'Blocked')),
       creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       deadline TIMESTAMPTZ,
@@ -503,19 +503,8 @@ async function enableRLS(sql: postgres.Sql) {
 
   // Create basic RLS policies
 
-  /* ---------------- USER INFO ---------------- */
-
-  // User Info: Users can only access their own info
-  await sql`
-    CREATE POLICY "Users can view own settings/info" ON user_info
-    FOR SELECT USING (auth.uid() = id)
-  `;
-
-  await sql`
-    CREATE POLICY "Users can update own settings/info" ON user_info
-    FOR UPDATE USING (auth.uid() = id)
-  `;
-
+  /* ---------------- USER INFO ---------------- */  
+  
   // Security definer function that returns all colleagues in the same department:
   await sql`
     CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
@@ -556,6 +545,34 @@ async function enableRLS(sql: postgres.Sql) {
           );
       END;
       $$;
+  `;
+
+  // Create security definer function to get assignee info for visible tasks
+  // This allows users to see names of assignees on tasks they can view, even if from different departments
+  await sql`
+    CREATE OR REPLACE FUNCTION get_task_assignees_info(task_ids bigint[])
+      RETURNS TABLE(id uuid, first_name varchar, last_name varchar)
+      LANGUAGE sql
+      SECURITY DEFINER
+      SET search_path = public
+      AS $$
+        SELECT DISTINCT ui.id, ui.first_name, ui.last_name
+        FROM user_info ui
+        JOIN task_assignments ta ON ta.assignee_id = ui.id
+        WHERE ta.task_id = ANY(task_ids)
+          AND is_task_visible_to_user(ta.task_id, auth.uid());
+      $$;
+  `;
+
+  // User Info: Users can only access their own info
+  await sql`
+    CREATE POLICY "Users can view own settings/info" ON user_info
+    FOR SELECT USING (auth.uid() = id)
+  `;
+
+  await sql`
+    CREATE POLICY "Users can update own settings/info" ON user_info
+    FOR UPDATE USING (auth.uid() = id)
   `;
 
   //User Info: Users can see colleagues in their department
@@ -748,17 +765,11 @@ async function enableRLS(sql: postgres.Sql) {
 
   // Task Assignments: Users can view assignments where they are assignor/assignee or in their department
   await sql`
-    CREATE POLICY "Users can view task assignments relevant to their department" ON task_assignments
+    CREATE POLICY "Users can view assignments for visible tasks" ON task_assignments
     FOR SELECT
     USING (
-        assignee_id = auth.uid()
-        OR assignor_id = auth.uid()
-        OR EXISTS (
-            SELECT 1
-            FROM user_info ui
-            WHERE ui.id = task_assignments.assignee_id
-              AND ui.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
-        )
+      is_task_visible_to_user(task_id, auth.uid())
+      OR assignee_id = auth.uid()
     );
   `;
 
