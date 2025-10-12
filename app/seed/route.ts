@@ -590,6 +590,22 @@ async function enableRLS(sql: postgres.Sql) {
 
   /* ---------------- USER ROLES ---------------- */
 
+  // Security definer function to check if user has a specific role
+  // This bypasses RLS to avoid circular dependency
+  await sql`
+    CREATE OR REPLACE FUNCTION user_has_role(user_uuid uuid, role_name text)
+      RETURNS boolean
+      LANGUAGE sql
+      SECURITY DEFINER
+      SET search_path = public
+      AS $$
+        SELECT EXISTS (
+          SELECT 1 FROM user_roles
+          WHERE user_id = user_uuid AND role = role_name
+        );
+      $$;
+  `;
+
   // User Roles: Users can view their own roles
   await sql`
     CREATE POLICY "Users can view their own roles" ON user_roles
@@ -601,12 +617,8 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Admins can manage roles" ON user_roles
     FOR ALL
-    USING (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
-    WITH CHECK (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
+    USING (user_has_role(auth.uid(), 'admin'))
+    WITH CHECK (user_has_role(auth.uid(), 'admin'))
   `;
 
   /* ---------------- TASKS ---------------- */
@@ -638,15 +650,8 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Admins can archive tasks" ON tasks
     FOR UPDATE
-    USING (
-      EXISTS (
-        SELECT 1 FROM user_roles
-        WHERE user_id = auth.uid() AND role = 'admin'
-      )
-    )
-    WITH CHECK (
-      is_archived = true
-    )
+    USING (user_has_role(auth.uid(), 'admin'))
+    WITH CHECK (is_archived = true)
   `;
 
   /* ---------------- PROJECTS ---------------- */
@@ -882,9 +887,7 @@ async function enableRLS(sql: postgres.Sql) {
     CREATE POLICY "Admins can delete comments"
     ON task_comments
     FOR DELETE
-    USING (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
+    USING (user_has_role(auth.uid(), 'admin'))
   `;
 
   /* ---------------- TASK TAGS ---------------- */
@@ -1033,6 +1036,72 @@ async function createTriggers(sql: postgres.Sql) {
     AFTER INSERT ON task_assignments
     FOR EACH ROW
     EXECUTE FUNCTION notify_task_assignment();
+  `;
+
+  await sql`
+    -- Trigger function to create notifications when a new comment is added
+    -- SECURITY DEFINER allows it to bypass RLS policies
+    CREATE OR REPLACE FUNCTION notify_new_comment()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        commenter_first_name TEXT;
+        commenter_last_name TEXT;
+        commenter_full_name TEXT;
+        assignee_record RECORD;
+    BEGIN
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = NEW.task_id;
+
+        -- Get commenter name (bypass RLS)
+        SELECT first_name, last_name INTO commenter_first_name, commenter_last_name
+        FROM user_info
+        WHERE id = NEW.user_id;
+
+        IF commenter_first_name IS NOT NULL AND commenter_last_name IS NOT NULL THEN
+            commenter_full_name := commenter_first_name || ' ' || commenter_last_name;
+        ELSE
+            commenter_full_name := 'Someone';
+        END IF;
+
+        -- Create notifications for all assignees except the commenter
+        FOR assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = NEW.task_id
+        LOOP
+            -- Skip the commenter
+            IF assignee_record.assignee_id != NEW.user_id THEN
+                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                VALUES (
+                    assignee_record.assignee_id,
+                    'New Comment',
+                    commenter_full_name || ' commented on task: "' || task_title_var || '"',
+                    'comment_added',
+                    false,
+                    NOW(),
+                    NOW()
+                );
+            END IF;
+        END LOOP;
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_comments table for notifications
+    CREATE TRIGGER trg_notify_new_comment
+    AFTER INSERT ON task_comments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_new_comment();
   `;
 }
 
