@@ -14,13 +14,17 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => mockSupabaseClient),
 }));
 
+/**
+ * NOTE: Production uses database triggers for notifications, service layer not involved
+ * These tests checks the expected behavior and validate business logic/service layer
+ */
 describe('lib/services/notifs', () => {
   beforeEach(() => {
     mockSupabaseClient = createMockSupabaseClient();
     vi.clearAllMocks();
   });
 
-  // task assignments notifs
+  // Task assignments: fallback to "Someone" if assignor not found; no self-notification
   describe('notifyNewTaskAssignment', () => {
     it('should create notification with assignor name when assignor exists', async () => {
       const assignorInfo = {
@@ -108,8 +112,7 @@ describe('lib/services/notifs', () => {
     });
   });
 
-  // comments notifs
-
+  // Comments: notify all assignees except the commenter
   describe('notifyNewComment', () => {
     it('should create notifications for all assignees when commenter name exists', async () => {
       const commenterInfo = {
@@ -149,7 +152,6 @@ describe('lib/services/notifs', () => {
 
       await notifyNewComment(authUsersFixtures.alice.id, 1, 'Design Homepage');
 
-      // Should create 2 notifications (one for bob, one for carol)
       expect(createNotification).toHaveBeenCalledTimes(2);
 
       expect(createNotification).toHaveBeenCalledWith({
@@ -212,7 +214,7 @@ describe('lib/services/notifs', () => {
       };
 
       const assignees = [
-        { assignee_id: authUsersFixtures.alice.id }, // Only the commenter is assigned
+        { assignee_id: authUsersFixtures.alice.id }, // only the commenter is assigned
       ];
 
       mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
@@ -242,7 +244,6 @@ describe('lib/services/notifs', () => {
 
       await notifyNewComment(authUsersFixtures.alice.id, 1, 'Design Homepage');
 
-      // Should not create any notifications
       expect(createNotification).not.toHaveBeenCalled();
     });
 
@@ -253,7 +254,7 @@ describe('lib/services/notifs', () => {
       };
 
       const assignees = [
-        { assignee_id: authUsersFixtures.alice.id }, // Commenter
+        { assignee_id: authUsersFixtures.alice.id }, // commenter
         { assignee_id: authUsersFixtures.bob.id },
         { assignee_id: authUsersFixtures.carol.id },
       ];
@@ -285,10 +286,8 @@ describe('lib/services/notifs', () => {
 
       await notifyNewComment(authUsersFixtures.alice.id, 1, 'Design Homepage');
 
-      // Should create 2 notifications (exclude alice)
       expect(createNotification).toHaveBeenCalledTimes(2);
 
-      // Verify alice did not receive a notification
       const calls = (createNotification as any).mock.calls;
       const aliceNotification = calls.find(
         (call: any) => call[0].user_id === authUsersFixtures.alice.id
@@ -365,7 +364,6 @@ describe('lib/services/notifs', () => {
 
       await notifyNewComment(authUsersFixtures.alice.id, 1, 'Design Homepage');
 
-      // Should not create any notifications on error
       expect(createNotification).not.toHaveBeenCalled();
     });
   });
