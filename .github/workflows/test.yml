@@ -42,7 +42,7 @@ jobs:
 
       - name: Upload unit test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: unit-test-results-node-${{ matrix.node-version }}
           path: |
@@ -174,7 +174,7 @@ jobs:
 
   #     - name: Upload integration test results
   #       if: always()
-  #       uses: actions/upload-artifact@v3
+  #       uses: actions/upload-artifact@v4
   #       with:
   #         name: integration-test-results
   #         path: |
@@ -254,7 +254,7 @@ jobs:
 #         PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
 #
 #     - name: Upload Playwright report
-#       uses: actions/upload-artifact@v3
+#       uses: actions/upload-artifact@v4
 #       if: always()
 #       with:
 #         name: playwright-report
