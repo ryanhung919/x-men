@@ -51,12 +51,13 @@ export const notificationsFixtures = {
 
 /* --------------------- DEPARTMENTS --------------------- */
 export const departmentsFixtures = {
-  engineering: { id: 1, name: 'Engineering' },
-  finance: { id: 2, name: 'Finance' },
-  operations: { id: 3, name: 'Operations' },
-  marketing: { id: 4, name: 'Marketing' },
-  hr: { id: 5, name: 'HR' },
+  engineering: { id: 1, name: 'Engineering', parent_department_id: null },
+  finance: { id: 2, name: 'Finance', parent_department_id: null },
+  operations: { id: 3, name: 'Operations', parent_department_id: 1 }, // child of Engineering
+  marketing: { id: 4, name: 'Marketing', parent_department_id: null },
+  hr: { id: 5, name: 'HR', parent_department_id: 4 }, // child of Marketing
 };
+
 
 export const departments = Object.values(departmentsFixtures);
 

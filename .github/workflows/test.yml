@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit-tests:
     name: Unit Tests
@@ -32,13 +37,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 
-      # --- Linting (optional) ---
-      # - name: Run linter
-      #   run: pnpm lint
-
-      # --- Unit tests ---
       - name: Run unit tests
         run: pnpm test:unit
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-test-results-node-${{ matrix.node-version }}
+          path: |
+            coverage/
+          retention-days: 7
 
   # integration-tests:
   #   name: Integration Tests
@@ -46,11 +55,38 @@ jobs:
   #   needs: unit-tests
     
   #   # Only run integration tests on main/develop or PRs to those branches
-    # if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.base_ref == 'main' || github.base_ref == 'develop'
+  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.base_ref == 'main' || github.base_ref == 'develop'
 
   #   steps:
   #     - name: Checkout code
   #       uses: actions/checkout@v4
+
+  #     - name: Verify required secrets are set
+  #       run: |
+  #         echo "Checking required secrets..."
+          
+  #         if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
+  #           echo "❌ Error: NEXT_PUBLIC_SUPABASE_URL secret is not set"
+  #           echo "Please add it in: Settings → Secrets and variables → Actions → New repository secret"
+  #           exit 1
+  #         fi
+          
+  #         if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
+  #           echo "❌ Error: NEXT_PUBLIC_SUPABASE_ANON_KEY secret is not set"
+  #           exit 1
+  #         fi
+          
+  #         if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+  #           echo "❌ Error: SUPABASE_SERVICE_ROLE_KEY secret is not set"
+  #           exit 1
+  #         fi
+          
+  #         if [ -z "${{ secrets.POSTGRES_URL }}" ]; then
+  #           echo "❌ Error: POSTGRES_URL secret is not set"
+  #           exit 1
+  #         fi
+          
+  #         echo "✅ All required secrets are set"
 
   #     - name: Setup pnpm
   #       uses: pnpm/action-setup@v2
@@ -66,13 +102,75 @@ jobs:
   #     - name: Install dependencies
   #       run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 
+  #     - name: Check database status
+  #       env:
+  #         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  #         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  #         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  #         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+  #       run: |
+  #         echo "Checking database connection..."
+  #         pnpm db:status || echo "⚠️ Database status check failed, will seed during tests"
+
+  #     - name: Build Next.js app
+  #       env:
+  #         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  #         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  #         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  #         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+  #       run: pnpm build
+
+  #     - name: Start Next.js server in background
+  #       env:
+  #         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  #         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  #         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  #         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+  #         PORT: 3000
+  #       run: |
+  #         echo "Starting Next.js server..."
+  #         pnpm start &
+  #         echo $! > .next-pid
+          
+  #         echo "Waiting for server to be ready..."
+  #         timeout 60 bash -c 'until curl -f http://localhost:3000/api/health 2>/dev/null || curl -f http://localhost:3000 2>/dev/null; do 
+  #           echo "Waiting for server..."
+  #           sleep 2
+  #         done'
+          
+  #         echo "✅ Server is ready"
+
+  #     - name: Seed database
+  #       env:
+  #         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  #         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+  #         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  #         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+  #         NEXT_PUBLIC_APP_URL: http://localhost:3000
+  #       run: |
+  #         echo "Seeding database..."
+  #         pnpm db:seed
+  #         echo "✅ Database seeded"
+
   #     - name: Run integration tests
   #       env:
   #         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
   #         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
   #         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   #         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-  #       run: pnpm test:integration
+  #         NEXT_PUBLIC_APP_URL: http://localhost:3000
+  #       run: |
+  #         echo "Running integration tests..."
+  #         pnpm test:integration
+
+  #     - name: Stop Next.js server
+  #       if: always()
+  #       run: |
+  #         if [ -f .next-pid ]; then
+  #           echo "Stopping Next.js server..."
+  #           kill $(cat .next-pid) || true
+  #           rm .next-pid
+  #         fi
 
   #     - name: Upload integration test results
   #       if: always()
@@ -83,72 +181,47 @@ jobs:
   #           coverage/
   #           test-results/
   #         retention-days: 7
+
+  # test-summary:
+  #   name: Test Summary
+  #   runs-on: ubuntu-latest
+  #   needs: [unit-tests, integration-tests]
+  #   if: always()
+    
+  #   steps:
+  #     - name: Generate test summary
+  #       run: |
+  #         echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
+  #         echo "" >> $GITHUB_STEP_SUMMARY
           
-# Optional: Linting
-# lint:
-#   name: Lint
-#   runs-on: ubuntu-latest
-#   steps:
-#     - name: Checkout code
-#       uses: actions/checkout@v4
-#
-#     - name: Setup pnpm
-#       uses: pnpm/action-setup@v2
-#       with:
-#         version: 8
-#
-#     - name: Setup Node.js
-#       uses: actions/setup-node@v4
-#       with:
-#         node-version: 20.x
-#         cache: 'pnpm'
-#
-#     - name: Install dependencies
-#       run: pnpm install --frozen-lockfile
-#
-#     - name: Run linter
-#       run: pnpm lint
+  #         if [ "${{ needs.unit-tests.result }}" == "success" ]; then
+  #           echo "✅ **Unit Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+  #         else
+  #           echo "❌ **Unit Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+  #         fi
+          
+  #         if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+  #           echo "✅ **Integration Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+  #         elif [ "${{ needs.integration-tests.result }}" == "skipped" ]; then
+  #           echo "⏭️ **Integration Tests**: Skipped (only run on main/develop)" >> $GITHUB_STEP_SUMMARY
+  #         else
+  #           echo "❌ **Integration Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+  #         fi
 
-# Optional: Coverage reporting
-# coverage:
-#   name: Coverage Report
-#   runs-on: ubuntu-latest
-#   needs: [unit-tests, integration-tests]
-#   if: github.ref == 'refs/heads/main'
-#   
-#   steps:
-#     - name: Checkout code
-#       uses: actions/checkout@v4
-#
-#     - name: Setup pnpm
-#       uses: pnpm/action-setup@v2
-#       with:
-#         version: 8
-#
-#     - name: Setup Node.js
-#       uses: actions/setup-node@v4
-#       with:
-#         node-version: 20.x
-#         cache: 'pnpm'
-#
-#     - name: Install dependencies
-#       run: pnpm install --frozen-lockfile
-#
-#     - name: Generate coverage
-#       env:
-#         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-#         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-#         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-#         POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-#       run: pnpm test:coverage
-#
-#     - name: Upload coverage to Codecov
-#       uses: codecov/codecov-action@v3
-#       with:
-#         files: ./coverage/coverage-final.json
-#         flags: unittests,integration
-#         name: codecov-umbrella
-
+  #     - name: Check overall result
+  #       run: |
+  #         if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+  #           echo "❌ Unit tests failed"
+  #           exit 1
+  #         fi
+          
+  #         # Integration tests can be skipped on feature branches
+  #         if [ "${{ needs.integration-tests.result }}" != "success" ] && [ "${{ needs.integration-tests.result }}" != "skipped" ]; then
+  #           echo "❌ Integration tests failed"
+  #           exit 1
+  #         fi
+          
+  #         echo "✅ All tests passed"
 
 # e2e-tests:
 #   name: End-to-End Tests

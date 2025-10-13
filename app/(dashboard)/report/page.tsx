@@ -216,7 +216,7 @@ export default function ReportsPage() {
       <div className="mt-4">
         {!selectedDepartments.length && !selectedProjects.length ? (
           <div className="text-muted-foreground">
-            Please select department(s) and/or project(s).{' '}
+            Please select depuartment(s) and/or project(s).{' '}
           </div>
         ) : selectedReport === 'loggedTime' ? (
           <LoggedTimeReport
