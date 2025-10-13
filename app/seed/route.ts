@@ -84,12 +84,15 @@ async function seedDepartments(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS departments (
       id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-      name VARCHAR(255) NOT NULL UNIQUE
+      name VARCHAR(255) NOT NULL UNIQUE,
+      parent_department_id BIGINT NULL REFERENCES departments(id) ON DELETE SET NULL,
+      CONSTRAINT chk_dept_not_self CHECK (parent_department_id IS NULL OR parent_department_id <> id)
     );
   `;
   await sql`TRUNCATE TABLE departments RESTART IDENTITY CASCADE;`;
 
   type DeptRow = { id: number; name: string };
+  // First, insert all departments without parent relationships
   const inserted = await Promise.all(
     departments.map(
       (d) => sql<DeptRow[]>`
@@ -102,6 +105,23 @@ async function seedDepartments(sql: postgres.Sql) {
   );
   const rows = inserted.flat();
   const nameToId = new Map<string, number>(rows.map((r) => [r.name, Number(r.id)]));
+
+  // Update parent relationships after all departments are inserted
+  for (const dept of departments) {
+    if (dept.parent_department_name) {
+      const deptId = nameToId.get(dept.name);
+      const parentId = nameToId.get(dept.parent_department_name);
+
+      if (deptId && parentId) {
+        await sql`
+          UPDATE departments
+          SET parent_department_id = ${parentId}
+          WHERE id = ${deptId}
+        `;
+      }
+    }
+  }
+
   return nameToId;
 }
 
@@ -230,7 +250,7 @@ async function seedTasks(sql: postgres.Sql, deps: { projKeyToId: Map<string, num
       title VARCHAR(255) NOT NULL,
       description TEXT,
       priority_bucket INT NOT NULL CHECK (priority_bucket BETWEEN 1 AND 10),
-      status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Completed', 'Blocked')),
+      status VARCHAR(15) CHECK (status IN ('To Do','In Progress','Completed','Blocked')),
       creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
       project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       deadline TIMESTAMPTZ,
@@ -503,8 +523,8 @@ async function enableRLS(sql: postgres.Sql) {
 
   // Create basic RLS policies
 
-  /* ---------------- USER INFO ---------------- */  
-  
+  /* ---------------- USER INFO ---------------- */
+
   // Security definer function that returns all colleagues in the same department:
   await sql`
     CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
@@ -564,17 +584,6 @@ async function enableRLS(sql: postgres.Sql) {
       $$;
   `;
 
-  // User Info: Users can only access their own info
-  await sql`
-    CREATE POLICY "Users can view own settings/info" ON user_info
-    FOR SELECT USING (auth.uid() = id)
-  `;
-
-  await sql`
-    CREATE POLICY "Users can update own settings/info" ON user_info
-    FOR UPDATE USING (auth.uid() = id)
-  `;
-
   //User Info: Users can see colleagues in their department
   await sql`
     CREATE POLICY "Users can view colleagues in their department" ON user_info
@@ -590,22 +599,6 @@ async function enableRLS(sql: postgres.Sql) {
 
   /* ---------------- USER ROLES ---------------- */
 
-  // Security definer function to check if user has a specific role
-  // This bypasses RLS to avoid circular dependency
-  await sql`
-    CREATE OR REPLACE FUNCTION user_has_role(user_uuid uuid, role_name text)
-      RETURNS boolean
-      LANGUAGE sql
-      SECURITY DEFINER
-      SET search_path = public
-      AS $$
-        SELECT EXISTS (
-          SELECT 1 FROM user_roles
-          WHERE user_id = user_uuid AND role = role_name
-        );
-      $$;
-  `;
-
   // User Roles: Users can view their own roles
   await sql`
     CREATE POLICY "Users can view their own roles" ON user_roles
@@ -617,8 +610,12 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Admins can manage roles" ON user_roles
     FOR ALL
-    USING (user_has_role(auth.uid(), 'admin'))
-    WITH CHECK (user_has_role(auth.uid(), 'admin'))
+    USING (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
+    WITH CHECK (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
   `;
 
   /* ---------------- TASKS ---------------- */
@@ -650,8 +647,15 @@ async function enableRLS(sql: postgres.Sql) {
   await sql`
     CREATE POLICY "Admins can archive tasks" ON tasks
     FOR UPDATE
-    USING (user_has_role(auth.uid(), 'admin'))
-    WITH CHECK (is_archived = true)
+    USING (
+      EXISTS (
+        SELECT 1 FROM user_roles
+        WHERE user_id = auth.uid() AND role = 'admin'
+      )
+    )
+    WITH CHECK (
+      is_archived = true
+    )
   `;
 
   /* ---------------- PROJECTS ---------------- */
@@ -768,7 +772,7 @@ async function enableRLS(sql: postgres.Sql) {
 
   /* ---------------- TASK ASSIGNMENTS ---------------- */
 
-  // Task Assignments: Users can view assignments where they are assignor/assignee or in their department
+  // Task Assignments: Users can view assignments for tasks they can see
   await sql`
     CREATE POLICY "Users can view assignments for visible tasks" ON task_assignments
     FOR SELECT
@@ -887,7 +891,9 @@ async function enableRLS(sql: postgres.Sql) {
     CREATE POLICY "Admins can delete comments"
     ON task_comments
     FOR DELETE
-    USING (user_has_role(auth.uid(), 'admin'))
+    USING (
+      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+    )
   `;
 
   /* ---------------- TASK TAGS ---------------- */
@@ -943,6 +949,45 @@ async function enableRLS(sql: postgres.Sql) {
 /* --------------------- TRIGGERS --------------------- */
 
 async function createTriggers(sql: postgres.Sql) {
+  await sql`
+    -- Trigger function to validate task has at least 1 and at most 5 assignees
+    CREATE OR REPLACE FUNCTION validate_task_assignee_count()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+        assignee_count int;
+    BEGIN
+        -- Count assignees for the task
+        SELECT COUNT(*) INTO assignee_count
+        FROM task_assignments
+        WHERE task_id = NEW.id;
+
+        -- Check if task has at least one assignee
+        IF assignee_count < 1 THEN
+            RAISE EXCEPTION 'Task must have at least 1 assignee';
+        END IF;
+
+        -- Check if task has at most 5 assignees
+        IF assignee_count > 5 THEN
+            RAISE EXCEPTION 'Task cannot have more than 5 assignees';
+        END IF;
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Trigger to validate assignee count after task creation
+    -- This runs AFTER INSERT to allow assignments to be added first
+    CREATE CONSTRAINT TRIGGER trg_validate_task_assignee_count
+    AFTER INSERT ON tasks
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_task_assignee_count();
+  `;
+
   await sql`
       -- Trigger function to update project_departments when a new task assignment is inserted
     CREATE OR REPLACE FUNCTION update_project_departments()
@@ -1036,72 +1081,6 @@ async function createTriggers(sql: postgres.Sql) {
     AFTER INSERT ON task_assignments
     FOR EACH ROW
     EXECUTE FUNCTION notify_task_assignment();
-  `;
-
-  await sql`
-    -- Trigger function to create notifications when a new comment is added
-    -- SECURITY DEFINER allows it to bypass RLS policies
-    CREATE OR REPLACE FUNCTION notify_new_comment()
-    RETURNS TRIGGER
-    LANGUAGE plpgsql
-    SECURITY DEFINER
-    SET search_path = public
-    AS $$
-    DECLARE
-        task_title_var TEXT;
-        commenter_first_name TEXT;
-        commenter_last_name TEXT;
-        commenter_full_name TEXT;
-        assignee_record RECORD;
-    BEGIN
-        -- Get task title (bypass RLS)
-        SELECT title INTO task_title_var
-        FROM tasks
-        WHERE id = NEW.task_id;
-
-        -- Get commenter name (bypass RLS)
-        SELECT first_name, last_name INTO commenter_first_name, commenter_last_name
-        FROM user_info
-        WHERE id = NEW.user_id;
-
-        IF commenter_first_name IS NOT NULL AND commenter_last_name IS NOT NULL THEN
-            commenter_full_name := commenter_first_name || ' ' || commenter_last_name;
-        ELSE
-            commenter_full_name := 'Someone';
-        END IF;
-
-        -- Create notifications for all assignees except the commenter
-        FOR assignee_record IN
-            SELECT assignee_id
-            FROM task_assignments
-            WHERE task_id = NEW.task_id
-        LOOP
-            -- Skip the commenter
-            IF assignee_record.assignee_id != NEW.user_id THEN
-                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
-                VALUES (
-                    assignee_record.assignee_id,
-                    'New Comment',
-                    commenter_full_name || ' commented on task: "' || task_title_var || '"',
-                    'comment_added',
-                    false,
-                    NOW(),
-                    NOW()
-                );
-            END IF;
-        END LOOP;
-
-        RETURN NEW;
-    END;
-    $$;
-  `;
-
-  await sql`
-    -- Create the trigger on task_comments table for notifications
-    CREATE TRIGGER trg_notify_new_comment
-    AFTER INSERT ON task_comments
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_new_comment();
   `;
 }
 

@@ -48,7 +48,7 @@ export const auth_users = [
   },
   {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kester.yeo.2024@computing.smu.edu.sg',
+    email: 'kesteryeo.2024@computing.smu.edu.sg',
     password: 'password123',
   },
 ];
@@ -56,12 +56,12 @@ export const auth_users = [
 /* ======================== ORGANISATION CATALOG ======================== */
 /** Based on the briefing: core SG dev/ops team + finance. */
 export const departments = [
-  { name: 'Engineering' },
-  { name: 'Finance' },
-  { name: 'Operations' },
-  { name: 'Technology' },
-  { name: 'Marketing' },
-  { name: 'Accounting' },
+  { name: 'Engineering', parent_department_name: null },
+  { name: 'Finance', parent_department_name: null },
+  { name: 'Operations', parent_department_name: null },
+  { name: 'Technology', parent_department_name: 'Engineering' },
+  { name: 'Marketing', parent_department_name: null },
+  { name: 'Accounting', parent_department_name: 'Finance' },
 ];
 
 export const roles = [{ role: 'staff' }, { role: 'manager' }, { role: 'admin' }];
@@ -244,12 +244,12 @@ export const tasks = [
     status: 'Completed',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-10-05T17:00:00Z'),
+    deadline: new Date('2025-10-05T17:00:00+08:00'),
     notes: 'Use shadcn DataTable; filters in URL.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-19T10:20:00Z'),
-    updated_at: new Date('2025-09-19T10:20:00Z'),
+    created_at: new Date('2025-09-19T10:20:00+08:00'),
+    updated_at: new Date('2025-09-19T10:20:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 7200,
@@ -261,12 +261,12 @@ export const tasks = [
     status: 'To Do',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     project_name: 'Website Redesign',
-    deadline: new Date('2025-10-10T17:00:00Z'),
+    deadline: new Date('2025-10-10T17:00:00+08:00'),
     notes: 'Prevent self-parenting on move.',
     parent_task_external_key: 'Design budget dashboard layout',
     is_archived: false,
-    created_at: new Date('2025-09-19T10:22:00Z'),
-    updated_at: new Date('2025-09-19T10:22:00Z'),
+    created_at: new Date('2025-09-19T10:22:00+08:00'),
+    updated_at: new Date('2025-09-19T10:22:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 0,
@@ -278,12 +278,12 @@ export const tasks = [
     status: 'Completed',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     project_name: 'Data Warehouse Lift',
-    deadline: new Date('2025-10-12T17:00:00Z'),
+    deadline: new Date('2025-10-12T17:00:00+08:00'),
     notes: 'Mask PII; agree on schema v1.0.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-20T09:00:00Z'),
-    updated_at: new Date('2025-09-20T09:00:00Z'),
+    created_at: new Date('2025-09-20T09:00:00+08:00'),
+    updated_at: new Date('2025-09-20T09:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 9120,
@@ -295,12 +295,12 @@ export const tasks = [
     status: 'To Do',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
     project_name: 'Digital Collaboration Rollout',
-    deadline: new Date('2025-10-15T17:00:00Z'),
+    deadline: new Date('2025-10-15T17:00:00+08:00'),
     notes: 'Coordinate with IT for licenses and onboarding sessions.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-21T09:00:00Z'),
-    updated_at: new Date('2025-09-21T09:00:00Z'),
+    created_at: new Date('2025-09-21T09:00:00+08:00'),
+    updated_at: new Date('2025-09-21T09:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 0,
@@ -312,12 +312,12 @@ export const tasks = [
     status: 'In Progress',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Client Onboarding Portal',
-    deadline: new Date('2025-10-20T17:00:00Z'),
+    deadline: new Date('2025-10-20T17:00:00+08:00'),
     notes: 'Include regional language support (MY, VN, HK).',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-22T10:00:00Z'),
-    updated_at: new Date('2025-09-22T10:00:00Z'),
+    created_at: new Date('2025-09-22T10:00:00+08:00'),
+    updated_at: new Date('2025-09-22T10:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 30000,
@@ -329,12 +329,12 @@ export const tasks = [
     status: 'Completed',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Internal Analytics Dashboard',
-    deadline: new Date('2025-10-18T17:00:00Z'),
+    deadline: new Date('2025-10-18T17:00:00+08:00'),
     notes: 'Ensure drill-down for monthly and quarterly reports.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-23T09:30:00Z'),
-    updated_at: new Date('2025-09-23T09:30:00Z'),
+    created_at: new Date('2025-09-23T09:30:00+08:00'),
+    updated_at: new Date('2025-09-23T09:30:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 40901,
@@ -346,12 +346,12 @@ export const tasks = [
     status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Cloud Doc Management',
-    deadline: new Date('2025-09-29T17:00:00Z'),
+    deadline: new Date('2025-09-29T17:00:00+08:00'),
     notes: 'Maintain folder structure and access control.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-23T11:00:00Z'),
-    updated_at: new Date('2025-09-30T11:00:00Z'),
+    created_at: new Date('2025-09-23T11:00:00+08:00'),
+    updated_at: new Date('2025-09-30T11:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 22000,
@@ -363,12 +363,12 @@ export const tasks = [
     status: 'To Do',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
     project_name: 'Regional Training Program',
-    deadline: new Date('2025-10-25T17:00:00Z'),
+    deadline: new Date('2025-10-25T17:00:00+08:00'),
     notes: 'Include onboarding for new cloud tools and workflows.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-24T09:00:00Z'),
-    updated_at: new Date('2025-09-24T09:00:00Z'),
+    created_at: new Date('2025-09-24T09:00:00+08:00'),
+    updated_at: new Date('2025-09-24T09:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 0,
@@ -380,12 +380,12 @@ export const tasks = [
     status: 'To Do',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Workflow Automation Pilot',
-    deadline: new Date('2025-10-28T17:00:00Z'),
+    deadline: new Date('2025-10-28T17:00:00+08:00'),
     notes: 'Use test data from FY24 invoices.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-24T10:00:00Z'),
-    updated_at: new Date('2025-09-24T10:00:00Z'),
+    created_at: new Date('2025-09-24T10:00:00+08:00'),
+    updated_at: new Date('2025-09-24T10:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 0,
@@ -397,12 +397,12 @@ export const tasks = [
     status: 'In Progress',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'FY25 Forecast Review',
-    deadline: new Date('2025-10-30T17:00:00Z'),
+    deadline: new Date('2025-10-30T17:00:00+08:00'),
     notes: 'Compare with previous 3 years of actuals.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-25T09:30:00Z'),
-    updated_at: new Date('2025-09-25T09:30:00Z'),
+    created_at: new Date('2025-09-25T09:30:00+08:00'),
+    updated_at: new Date('2025-09-25T09:30:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 10900,
@@ -414,12 +414,12 @@ export const tasks = [
     status: 'In Progress',
     creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
     project_name: 'Workflow Automation Pilot',
-    deadline: new Date('2025-10-25T17:00:00Z'),
+    deadline: new Date('2025-10-25T17:00:00+08:00'),
     notes: 'Ensure refresh token handling.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-25T10:00:00Z'),
-    updated_at: new Date('2025-09-25T10:00:00Z'),
+    created_at: new Date('2025-09-25T10:00:00+08:00'),
+    updated_at: new Date('2025-09-25T10:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 98080,
@@ -431,12 +431,12 @@ export const tasks = [
     status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Website Redesign',
-    deadline: new Date('2025-10-28T17:00:00Z'),
+    deadline: new Date('2025-10-28T17:00:00+08:00'),
     notes: 'Use GitHub Actions.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-25T12:00:00Z'),
-    updated_at: new Date('2025-09-25T12:00:00Z'),
+    created_at: new Date('2025-09-25T12:00:00+08:00'),
+    updated_at: new Date('2025-09-25T12:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 30123,
@@ -448,12 +448,12 @@ export const tasks = [
     status: 'In Progress',
     creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
     project_name: 'Client Onboarding Portal',
-    deadline: new Date('2025-10-27T17:00:00Z'),
+    deadline: new Date('2025-10-27T17:00:00+08:00'),
     notes: 'Include captions for APAC regions.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-26T09:00:00Z'),
-    updated_at: new Date('2025-09-26T09:00:00Z'),
+    created_at: new Date('2025-09-26T09:00:00+08:00'),
+    updated_at: new Date('2025-09-26T09:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 2120,
@@ -465,12 +465,12 @@ export const tasks = [
     status: 'To Do',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-10-30T17:00:00Z'),
+    deadline: new Date('2025-10-30T17:00:00+08:00'),
     notes: 'Add indexes on key tables.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-26T11:00:00Z'),
-    updated_at: new Date('2025-09-26T11:00:00Z'),
+    created_at: new Date('2025-09-26T11:00:00+08:00'),
+    updated_at: new Date('2025-09-26T11:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 0,
@@ -482,12 +482,12 @@ export const tasks = [
     status: 'In Progress',
     creator_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // Ryan
     project_name: 'Internal Analytics Dashboard',
-    deadline: new Date('2025-11-01T17:00:00Z'),
+    deadline: new Date('2025-11-01T17:00:00+08:00'),
     notes: 'Follow RESTful best practices.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-27T10:00:00Z'),
-    updated_at: new Date('2025-09-27T10:00:00Z'),
+    created_at: new Date('2025-09-27T10:00:00+08:00'),
+    updated_at: new Date('2025-09-27T10:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 30120,
@@ -499,12 +499,12 @@ export const tasks = [
     status: 'To Do',
     creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
     project_name: 'Website Redesign',
-    deadline: new Date('2025-11-03T17:00:00Z'),
+    deadline: new Date('2025-11-03T17:00:00+08:00'),
     notes: 'Record issues in JIRA.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-28T09:00:00Z'),
-    updated_at: new Date('2025-09-28T09:00:00Z'),
+    created_at: new Date('2025-09-28T09:00:00+08:00'),
+    updated_at: new Date('2025-09-28T09:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 0,
@@ -516,12 +516,12 @@ export const tasks = [
     status: 'In Progress',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
     project_name: 'Digital Collaboration Rollout',
-    deadline: new Date('2025-11-05T17:00:00Z'),
+    deadline: new Date('2025-11-05T17:00:00+08:00'),
     notes: 'Use Confluence; tag owners.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-28T11:00:00Z'),
-    updated_at: new Date('2025-09-28T11:00:00Z'),
+    created_at: new Date('2025-09-28T11:00:00+08:00'),
+    updated_at: new Date('2025-09-28T11:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 1390,
@@ -533,12 +533,12 @@ export const tasks = [
     status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Data Warehouse Lift',
-    deadline: new Date('2025-11-07T17:00:00Z'),
+    deadline: new Date('2025-11-07T17:00:00+08:00'),
     notes: 'Add retry logic; monitor failed batches.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-29T09:30:00Z'),
-    updated_at: new Date('2025-09-29T09:30:00Z'),
+    created_at: new Date('2025-09-29T09:30:00+08:00'),
+    updated_at: new Date('2025-09-29T09:30:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 42180,
@@ -550,12 +550,12 @@ export const tasks = [
     status: 'In Progress',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-11-10T17:00:00Z'),
+    deadline: new Date('2025-11-10T17:00:00+08:00'),
     notes: 'Send PDF to CFO.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-09-30T10:00:00Z'),
-    updated_at: new Date('2025-09-30T10:00:00Z'),
+    created_at: new Date('2025-09-30T10:00:00+08:00'),
+    updated_at: new Date('2025-09-30T10:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 41230,
@@ -567,49 +567,15 @@ export const tasks = [
     status: 'In Progress',
     creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
     project_name: 'Internal Analytics Dashboard',
-    deadline: new Date('2025-11-12T17:00:00Z'),
+    deadline: new Date('2025-11-12T17:00:00+08:00'),
     notes: 'Integrate with accounting and CRM systems.',
     parent_task_external_key: null,
     is_archived: false,
-    created_at: new Date('2025-10-01T09:00:00Z'),
-    updated_at: new Date('2025-10-01T09:00:00Z'),
+    created_at: new Date('2025-10-01T09:00:00+08:00'),
+    updated_at: new Date('2025-10-01T09:00:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 52120,
-  },
-  {
-    title: 'Test Reminder',
-    description: 'Prepare slides for client presentation.',
-    priority_bucket: 2,
-    status: 'In Progress',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-10-11T09:00:00Z'),
-    notes: 'Include updated revenue forecasts.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-09-20T14:30:00Z'),
-    updated_at: new Date('2025-09-25T09:15:00Z'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 9500,
-  },
-  {
-    title: 'Test Deadline',
-    description: 'Submit final tax documents to finance department.',
-    priority_bucket: 5,
-    status: 'In Progress',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-10-09T17:00:00Z'),
-    notes: 'Double-check for missing receipts.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-09-15T08:00:00Z'),
-    updated_at: new Date('2025-09-29T16:45:00Z'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 21000,
   },
 ];
 
@@ -627,6 +593,21 @@ export const task_tags = [
   { task_title: 'Plan regional training sessions', tag_name: 'Onboarding' },
   { task_title: 'Automate invoice approval workflow', tag_name: 'Automation' },
   { task_title: 'Review FY25 revenue forecast', tag_name: 'Budget' },
+  { task_title: 'Implement login auth flow', tag_name: 'Infra' },
+  { task_title: 'Setup CI/CD pipeline', tag_name: 'Infra' },
+  { task_title: 'Setup CI/CD pipeline', tag_name: 'Automation' },
+  { task_title: 'Create onboarding video', tag_name: 'Onboarding' },
+  { task_title: 'Optimize dashboard queries', tag_name: 'Budget' },
+  { task_title: 'Optimize dashboard queries', tag_name: 'Analytics' },
+  { task_title: 'Design API for mobile app', tag_name: 'Design' },
+  { task_title: 'Conduct UX testing', tag_name: 'Design' },
+  { task_title: 'Update project documentation', tag_name: 'Collaboration' },
+  { task_title: 'Refactor data pipelines', tag_name: 'Infra' },
+  { task_title: 'Refactor data pipelines', tag_name: 'Automation' },
+  { task_title: 'Prepare finance report', tag_name: 'Budget' },
+  { task_title: 'Prepare finance report', tag_name: 'Reporting' },
+  { task_title: 'Setup analytics dashboards', tag_name: 'Analytics' },
+  { task_title: 'Setup analytics dashboards', tag_name: 'Reporting' },
 ];
 
 /* ======================== ASSIGNMENTS (<=5 per task enforced in DB) ======================== */
@@ -635,127 +616,241 @@ export const task_assignments = [
     task_title: 'Design budget dashboard layout',
     assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-19T10:20:00Z'),
+    created_at: new Date('2025-09-19T10:20:00+08:00'),
   },
   {
     task_title: 'Design budget dashboard layout',
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel self-assign to help
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    created_at: new Date('2025-09-19T10:25:00Z'),
+    created_at: new Date('2025-09-19T10:25:00+08:00'),
   },
   {
     task_title: 'Implement task board drag/drop',
     assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-19T10:22:00Z'),
+    created_at: new Date('2025-09-19T10:22:00+08:00'),
+  },
+  {
+    task_title: 'Implement task board drag/drop',
+    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-19T10:23:00+08:00'),
   },
   {
     task_title: 'Connect sales data source',
     assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
     assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    created_at: new Date('2025-09-20T09:05:00Z'),
+    created_at: new Date('2025-09-20T09:05:00+08:00'),
+  },
+  {
+    task_title: 'Connect sales data source',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    created_at: new Date('2025-09-20T09:06:00+08:00'),
   },
   {
     task_title: 'Roll out collaboration tools to SG office',
     assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // self-assign
-    created_at: new Date('2025-09-21T09:05:00Z'),
+    created_at: new Date('2025-09-21T09:05:00+08:00'),
+  },
+  {
+    task_title: 'Roll out collaboration tools to SG office',
+    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    created_at: new Date('2025-09-21T09:06:00+08:00'),
   },
   {
     task_title: 'Design client onboarding forms',
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-22T10:05:00Z'),
+    created_at: new Date('2025-09-22T10:05:00+08:00'),
+  },
+  {
+    task_title: 'Design client onboarding forms',
+    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-22T10:06:00+08:00'),
   },
   {
     task_title: 'Develop finance KPIs for dashboard',
     assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-23T09:35:00Z'),
+    created_at: new Date('2025-09-23T09:35:00+08:00'),
+  },
+  {
+    task_title: 'Develop finance KPIs for dashboard',
+    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-23T09:36:00+08:00'),
   },
   {
     task_title: 'Migrate docs to cloud platform',
     assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // self-assign
-    created_at: new Date('2025-09-23T11:05:00Z'),
+    created_at: new Date('2025-09-23T11:05:00+08:00'),
   },
   {
     task_title: 'Migrate docs to cloud platform',
     assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    created_at: new Date('2025-09-23T11:05:00Z'),
+    created_at: new Date('2025-09-23T11:05:00+08:00'),
   },
   {
     task_title: 'Plan regional training sessions',
     assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // self-assign
-    created_at: new Date('2025-09-24T09:05:00Z'),
+    created_at: new Date('2025-09-24T09:05:00+08:00'),
+  },
+  {
+    task_title: 'Plan regional training sessions',
+    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    created_at: new Date('2025-09-24T09:06:00+08:00'),
   },
   {
     task_title: 'Automate invoice approval workflow',
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-24T10:05:00Z'),
+    created_at: new Date('2025-09-24T10:05:00+08:00'),
+  },
+  {
+    task_title: 'Automate invoice approval workflow',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-24T10:06:00+08:00'),
   },
   {
     task_title: 'Review FY25 revenue forecast',
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-25T09:35:00Z'),
+    created_at: new Date('2025-09-25T09:35:00+08:00'),
+  },
+  {
+    task_title: 'Review FY25 revenue forecast',
+    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-25T09:36:00+08:00'),
   },
   {
     task_title: 'Implement login auth flow',
     assignee_id: 'aa344933-c44b-4097-b0ac-56987a10734b', // Mitch (personal)
     assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-25T10:05:00Z'),
+    created_at: new Date('2025-09-25T10:05:00+08:00'),
+  },
+  {
+    task_title: 'Implement login auth flow',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    created_at: new Date('2025-09-25T10:06:00+08:00'),
   },
   {
     task_title: 'Setup CI/CD pipeline',
     assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // self-assign
-    created_at: new Date('2025-09-25T12:05:00Z'),
+    created_at: new Date('2025-09-25T12:05:00+08:00'),
+  },
+  {
+    task_title: 'Setup CI/CD pipeline',
+    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    created_at: new Date('2025-09-25T12:06:00+08:00'),
   },
   {
     task_title: 'Create onboarding video',
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-26T09:05:00Z'),
+    created_at: new Date('2025-09-26T09:05:00+08:00'),
   },
   {
     task_title: 'Create onboarding video',
     assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
     assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-26T09:05:00Z'),
+    created_at: new Date('2025-09-26T09:05:00+08:00'),
   },
   {
     task_title: 'Optimize dashboard queries',
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-26T11:05:00Z'),
+    created_at: new Date('2025-09-26T11:05:00+08:00'),
   },
   {
-    task_title: 'Test Reminder',
-    assignee_id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    created_at: new Date('2025-09-28T09:00:00Z'),
+    task_title: 'Optimize dashboard queries',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-26T11:06:00+08:00'),
   },
   {
-    task_title: 'Test Deadline',
-    assignee_id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    created_at: new Date('2025-09-28T09:05:00Z'),
+    task_title: 'Design API for mobile app',
+    assignee_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // Ryan (personal)
+    assignor_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // self-assign
+    created_at: new Date('2025-09-27T10:05:00+08:00'),
   },
   {
-    task_title: 'Test Reminder',
-    assignee_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    created_at: new Date('2025-09-28T09:10:00Z'),
+    task_title: 'Design API for mobile app',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // Ryan (personal)
+    created_at: new Date('2025-09-27T10:05:00+08:00'),
   },
   {
-    task_title: 'Test Deadline',
-    assignee_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    created_at: new Date('2025-09-28T09:15:00Z'),
+    task_title: 'Conduct UX testing',
+    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // self-assign
+    created_at: new Date('2025-09-28T09:05:00+08:00'),
+  },
+  {
+    task_title: 'Conduct UX testing',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    created_at: new Date('2025-09-28T09:06:00+08:00'),
+  },
+  {
+    task_title: 'Update project documentation',
+    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // self-assign
+    created_at: new Date('2025-09-28T11:05:00+08:00'),
+  },
+  {
+    task_title: 'Update project documentation',
+    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    created_at: new Date('2025-09-28T11:06:00+08:00'),
+  },
+  {
+    task_title: 'Refactor data pipelines',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // self-assign
+    created_at: new Date('2025-09-29T09:35:00+08:00'),
+  },
+  {
+    task_title: 'Refactor data pipelines',
+    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
+    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    created_at: new Date('2025-09-29T09:35:00+08:00'),
+  },
+  {
+    task_title: 'Prepare finance report',
+    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
+    created_at: new Date('2025-09-30T10:05:00+08:00'),
+  },
+  {
+    task_title: 'Prepare finance report',
+    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-30T10:05:00+08:00'),
+  },
+  {
+    task_title: 'Setup analytics dashboards',
+    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // self-assign
+    created_at: new Date('2025-10-01T09:05:00+08:00'),
+  },
+  {
+    task_title: 'Setup analytics dashboards',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    created_at: new Date('2025-10-01T09:05:00+08:00'),
   },
 ];
 
@@ -765,31 +860,31 @@ export const task_attachments = [
     task_title: 'Design budget dashboard layout',
     storage_path: 'task-attachments/1/design_doc.pdf',
     uploaded_by: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    uploaded_at: new Date('2025-09-19T10:30:00Z'),
+    uploaded_at: new Date('2025-09-19T10:30:00+08:00'),
   },
   {
     task_title: 'Design budget dashboard layout',
     storage_path: 'task-attachments/1/wireframe.png',
     uploaded_by: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    uploaded_at: new Date('2025-09-19T11:10:00Z'),
+    uploaded_at: new Date('2025-09-19T11:10:00+08:00'),
   },
   {
     task_title: 'Connect sales data source',
     storage_path: 'task-attachments/3/etl_mapping.xlsx',
     uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    uploaded_at: new Date('2025-09-20T09:30:00Z'),
+    uploaded_at: new Date('2025-09-20T09:30:00+08:00'),
   },
   {
     task_title: 'Roll out collaboration tools to SG office',
     storage_path: 'task-attachments/4/collab_tools_guide.pdf',
     uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c',
-    uploaded_at: new Date('2025-09-21T09:15:00Z'),
+    uploaded_at: new Date('2025-09-21T09:15:00+08:00'),
   },
   {
     task_title: 'Design client onboarding forms',
     storage_path: 'task-attachments/5/onboarding_forms.xlsx',
     uploaded_by: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    uploaded_at: new Date('2025-09-22T10:15:00Z'),
+    uploaded_at: new Date('2025-09-22T10:15:00+08:00'),
   },
 ];
 
@@ -798,11 +893,11 @@ export const notifications = [
   {
     user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     title: 'Task assigned',
-    message: 'You have been assigned to “Implement task board drag/drop”.',
+    message: 'You have been assigned to "Implement task board drag/drop".',
     type: 'task',
     read: false,
-    created_at: new Date('2025-09-19T10:22:05Z'),
-    updated_at: new Date('2025-09-19T10:22:05Z'),
+    created_at: new Date('2025-09-19T10:22:05+08:00'),
+    updated_at: new Date('2025-09-19T10:22:05+08:00'),
   },
 ];
 
@@ -812,21 +907,70 @@ export const task_comments = [
     task_title: 'Design budget dashboard layout',
     user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     content: 'Add KPI tiles (spend, forecast, burn rate).',
-    created_at: new Date('2025-09-19T10:40:00Z'),
-    updated_at: new Date('2025-09-19T10:40:00Z'),
+    created_at: new Date('2025-09-19T10:40:00+08:00'),
+    updated_at: new Date('2025-09-19T10:40:00+08:00'),
   },
   {
     task_title: 'Design budget dashboard layout',
     user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     content: "Yup, I'll draft a KPI list and metrics definitions.",
-    created_at: new Date('2025-09-19T11:00:00Z'),
-    updated_at: new Date('2025-09-19T11:00:00Z'),
+    created_at: new Date('2025-09-19T11:00:00+08:00'),
+    updated_at: new Date('2025-09-19T11:00:00+08:00'),
   },
   {
     task_title: 'Connect sales data source',
     user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
     content: 'Need access to SG mart. Who can approve?',
-    created_at: new Date('2025-09-20T09:45:00Z'),
-    updated_at: new Date('2025-09-20T09:45:00Z'),
+    created_at: new Date('2025-09-20T09:45:00+08:00'),
+    updated_at: new Date('2025-09-20T09:45:00+08:00'),
+  },
+  {
+    task_title: 'Implement login auth flow',
+    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    content: 'Remember to implement token refresh before expiry.',
+    created_at: new Date('2025-09-25T14:00:00+08:00'),
+    updated_at: new Date('2025-09-25T14:00:00+08:00'),
+  },
+  {
+    task_title: 'Setup CI/CD pipeline',
+    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    content: 'Pipeline configured with automatic deployment on PR merge.',
+    created_at: new Date('2025-09-25T15:30:00+08:00'),
+    updated_at: new Date('2025-09-25T15:30:00+08:00'),
+  },
+  {
+    task_title: 'Create onboarding video',
+    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    content: 'Should we include a section on regional compliance requirements?',
+    created_at: new Date('2025-09-26T13:00:00+08:00'),
+    updated_at: new Date('2025-09-26T13:00:00+08:00'),
+  },
+  {
+    task_title: 'Design API for mobile app',
+    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    content: "Let's use OpenAPI spec for documentation.",
+    created_at: new Date('2025-09-27T14:00:00+08:00'),
+    updated_at: new Date('2025-09-27T14:00:00+08:00'),
+  },
+  {
+    task_title: 'Refactor data pipelines',
+    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
+    content: 'Added retry logic with exponential backoff.',
+    created_at: new Date('2025-09-29T16:00:00+08:00'),
+    updated_at: new Date('2025-09-29T16:00:00+08:00'),
+  },
+  {
+    task_title: 'Prepare finance report',
+    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    content: 'Need Q3 actuals from accounting before finalizing.',
+    created_at: new Date('2025-09-30T12:00:00+08:00'),
+    updated_at: new Date('2025-09-30T12:00:00+08:00'),
+  },
+  {
+    task_title: 'Setup analytics dashboards',
+    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    content: 'Connected to 3 data sources so far, working on CRM integration.',
+    created_at: new Date('2025-10-01T15:00:00+08:00'),
+    updated_at: new Date('2025-10-01T15:00:00+08:00'),
   },
 ];
