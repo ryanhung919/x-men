@@ -20,7 +20,7 @@ export type Task = {
   id: number;
   title: string;
   description: string | null;
-  priority: number; // Changed from 'Low' | 'Medium' | 'High' to number (1–10)
+  priority: number; 
   status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked';
   deadline: string | null;
   notes: string | null;

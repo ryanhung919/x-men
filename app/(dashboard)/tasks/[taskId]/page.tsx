@@ -6,6 +6,8 @@ import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { SubtaskLink } from '@/components/tasks/subtask-link';
+import { enUS } from 'date-fns/locale';
 
 type UserInfo = {
   id: string;
@@ -25,7 +27,7 @@ type DetailedTask = {
   assignees: { assignee_id: string; user_info: UserInfo }[];
   tags: string[];
   subtasks: { id: number; title: string; status: string; deadline: string | null }[];
-  attachments: { id: number; storage_path: string }[];
+  attachments: { id: number; storage_path: string; public_url?: string }[];
   comments: {
     id: number;
     content: string;
@@ -34,6 +36,16 @@ type DetailedTask = {
     user_info: UserInfo;
   }[];
 };
+
+interface TaskAttachment {
+  id: number;
+  storage_path: string;
+}
+
+function isImageFile(storagePath: string): boolean {
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+  return imageExtensions.some((ext) => storagePath.toLowerCase().endsWith(ext));
+}
 
 async function fetchTaskDetails(taskId: number): Promise<DetailedTask | null> {
   const supabase = await createClient();
@@ -78,14 +90,28 @@ async function fetchTaskDetails(taskId: number): Promise<DetailedTask | null> {
     console.error('Error fetching subtasks:', subtasksError);
   }
 
-  // Fetch attachments
-  const { data: attachmentsData, error: attachmentsError } = await supabase
+  // Fetch attachments and generate public URLs
+  let attachments: { id: number; storage_path: string; public_url?: string }[] = [];
+  const { data: attachmentsData, error: attachmentsError } = (await supabase
     .from('task_attachments')
     .select('id, storage_path')
-    .eq('task_id', taskId);
+    .eq('task_id', taskId)) as { data: TaskAttachment[] | null; error: any };
 
   if (attachmentsError) {
     console.error('Error fetching attachments:', attachmentsError);
+  } else if (attachmentsData?.length) {
+    attachments = attachmentsData.map((attachment) => {
+      const { data } = supabase.storage
+        .from('task-attachments')
+        .getPublicUrl(attachment.storage_path);
+      console.log(`Storage path: ${attachment.storage_path}`);
+      console.log(`Generated Public URL: ${data.publicUrl}`);
+      return {
+        id: attachment.id,
+        storage_path: attachment.storage_path,
+        public_url: data.publicUrl,
+      };
+    });
   }
 
   // Fetch comments
@@ -169,7 +195,7 @@ async function fetchTaskDetails(taskId: number): Promise<DetailedTask | null> {
     assignees,
     tags: taskData.tags ? taskData.tags.map((t: { tags: { name: string } }) => t.tags.name) : [],
     subtasks: subtasksData || [],
-    attachments: attachmentsData || [],
+    attachments,
     comments: commentsData
       ? commentsData.map(
           (c: { id: number; content: string; created_at: string; user_id: string }) => ({
@@ -266,11 +292,17 @@ export default async function TaskDetailsPage({ params }: { params: { taskId: st
           </CardHeader>
           <CardContent>
             {task.subtasks.length > 0 ? (
-              <ul className="list-disc pl-4">
+              <ul className="list-disc pl-4 space-y-2">
                 {task.subtasks.map((sub) => (
-                  <li key={sub.id}>
-                    {sub.title} - {sub.status}{' '}
-                    {sub.deadline ? `(Due: ${format(new Date(sub.deadline), 'PPP')})` : ''}
+                  <li key={sub.id} className="flex items-center gap-2">
+                    <SubtaskLink id={sub.id} title={sub.title} />
+                    <span>-</span>
+                    <Badge variant="outline">{sub.status}</Badge>
+                    {sub.deadline ? (
+                      <span className="text-sm text-muted-foreground">
+                        (Due: {format(new Date(sub.deadline), 'PPP', { locale: enUS })})
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -286,9 +318,30 @@ export default async function TaskDetailsPage({ params }: { params: { taskId: st
           </CardHeader>
           <CardContent>
             {task.attachments.length > 0 ? (
-              <ul className="list-disc pl-4">
+              <ul className="list-disc pl-4 space-y-2">
                 {task.attachments.map((att) => (
-                  <li key={att.id}>{att.storage_path}</li>
+                  <li key={att.id}>
+                    {att.public_url ? (
+                      isImageFile(att.storage_path) ? (
+                        <img
+                          src={att.public_url}
+                          alt={att.storage_path}
+                          className="max-w-xs h-auto mt-2"
+                        />
+                      ) : (
+                        <a
+                          href={att.public_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {att.storage_path}
+                        </a>
+                      )
+                    ) : (
+                      <span className="text-gray-500">{att.storage_path} (Access unavailable)</span>
+                    )}
+                  </li>
                 ))}
               </ul>
             ) : (
