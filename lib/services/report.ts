@@ -1,5 +1,4 @@
-import { getTasks } from '@/lib/db/report';
-
+import { getTasks, getUsersByIds, UserInfo, getWeeklyTaskStatsByUser } from '@/lib/db/report';
 // Shared types
 export type ReportFormat = 'pdf' | 'xlsx';
 export interface ReportFilters {
@@ -121,35 +120,167 @@ export async function generateLoggedTimeReport(filters: ReportFilters): Promise<
 }
 
 // Team Summary Report (example shape — tailor to your needs)
+// Team Summary Report
+export interface WeeklyUserTaskBreakdown {
+  week: string; // "2024-W01"
+  weekStart: string;
+  userId: string;
+  userName: string;
+  todo: number;
+  inProgress: number;
+  completed: number;
+  blocked: number;
+  total: number;
+}
+
 export interface TeamSummaryReport {
   kind: 'teamSummary';
   totalTasks: number;
-  tasksByCreator: Map<string, number>;
+  totalUsers: number;
+  weeklyBreakdown: WeeklyUserTaskBreakdown[];
+  userTotals: Map<
+    string,
+    {
+      userName: string;
+      todo: number;
+      inProgress: number;
+      completed: number;
+      blocked: number;
+      total: number;
+    }
+  >;
+  weekTotals: Map<
+    string,
+    {
+      weekStart: string;
+      todo: number;
+      inProgress: number;
+      completed: number;
+      blocked: number;
+      total: number;
+    }
+  >;
 }
 
 export async function generateTeamSummaryReport(
   filters: ReportFilters
 ): Promise<TeamSummaryReport> {
   const { projectIds, startDate, endDate } = filters;
-  const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
+  const weeklyStats = await getWeeklyTaskStatsByUser({ projectIds, startDate, endDate });
 
-  const tasksByCreator = new Map<string, number>();
-  for (const t of tasks) {
-    const key = t.creator_id ?? 'unknown';
-    tasksByCreator.set(key, (tasksByCreator.get(key) ?? 0) + 1);
-  }
+  // Calculate user totals
+  const userTotals = new Map<
+    string,
+    {
+      userName: string;
+      todo: number;
+      inProgress: number;
+      completed: number;
+      blocked: number;
+      total: number;
+    }
+  >();
+
+  // Calculate week totals
+  const weekTotals = new Map<
+    string,
+    {
+      weekStart: string;
+      todo: number;
+      inProgress: number;
+      completed: number;
+      blocked: number;
+      total: number;
+    }
+  >();
+
+  weeklyStats.forEach((stat) => {
+    // Aggregate by user
+    if (!userTotals.has(stat.userId)) {
+      userTotals.set(stat.userId, {
+        userName: stat.userName,
+        todo: 0,
+        inProgress: 0,
+        completed: 0,
+        blocked: 0,
+        total: 0,
+      });
+    }
+    const userTotal = userTotals.get(stat.userId)!;
+    userTotal.todo += stat.todo;
+    userTotal.inProgress += stat.inProgress;
+    userTotal.completed += stat.completed;
+    userTotal.blocked += stat.blocked;
+    userTotal.total += stat.total;
+
+    // Aggregate by week
+    if (!weekTotals.has(stat.week)) {
+      weekTotals.set(stat.week, {
+        weekStart: stat.weekStart,
+        todo: 0,
+        inProgress: 0,
+        completed: 0,
+        blocked: 0,
+        total: 0,
+      });
+    }
+    const weekTotal = weekTotals.get(stat.week)!;
+    weekTotal.todo += stat.todo;
+    weekTotal.inProgress += stat.inProgress;
+    weekTotal.completed += stat.completed;
+    weekTotal.blocked += stat.blocked;
+    weekTotal.total += stat.total;
+  });
+
+  const totalTasks = weeklyStats.reduce((sum, stat) => sum + stat.total, 0);
+  const uniqueUsers = new Set(weeklyStats.map((s) => s.userId)).size;
 
   return {
     kind: 'teamSummary',
-    totalTasks: tasks.length,
-    tasksByCreator,
+
+    // Total number of tasks across all users and weeks in the filtered date range
+    totalTasks,
+
+    // Count of unique users who have tasks in the filtered date range
+    totalUsers: uniqueUsers,
+
+    // Array of weekly task breakdowns per user (week, userId, userName, status counts)
+    weeklyBreakdown: weeklyStats,
+    
+    // Map of userId to aggregated task counts across all weeks (userName, todo, inProgress, completed, blocked, total)
+    userTotals,
+
+    // Map of week identifier to aggregated task counts across all users (weekStart, todo, inProgress, completed, blocked, total)
+    weekTotals,
   };
 }
 
 // Task Completions Report (example shape — tailor to your needs)
+export interface UserTaskStats {
+  userId: string;
+  userName: string;
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  todoTasks: number;
+  blockedTasks: number;
+  completionRate: number; // 0-1
+  avgCompletionTime: number; // hours (from created_at to updated_at for completed tasks)
+  onTimeCompletions: number;
+  lateCompletions: number;
+  onTimeRate: number; // 0-1
+  totalLoggedTime: number; // hours
+  avgLoggedTimePerTask: number; // hours
+}
+
 export interface TaskCompletionReport {
   kind: 'taskCompletions';
-  completionRate: number; // completed / total
+  totalTasks: number;
+  totalCompleted: number;
+  totalInProgress: number;
+  totalTodo: number;
+  overallCompletionRate: number; // 0-1
+  userStats: UserTaskStats[];
   completedByProject: Map<number, number>;
 }
 
@@ -159,20 +290,126 @@ export async function generateTaskCompletionReport(
   const { projectIds, startDate, endDate } = filters;
   const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
 
-  const total = tasks.length || 1;
-  const completed = tasks.filter((t) => t.status === 'Completed').length;
-  const completionRate = completed / total;
+  // Get user info for display names
+  const uniqueUserIds = [...new Set(tasks.map((t) => t.creator_id))].filter(
+    (id): id is string => typeof id === 'string'
+  );
+  const usersData = await getUsersByIds(uniqueUserIds);
 
-  const completedByProject = new Map<number, number>();
-  for (const t of tasks) {
-    if (t.status === 'Completed') {
-      completedByProject.set(t.project_id, (completedByProject.get(t.project_id) ?? 0) + 1);
+  const userNameMap = new Map(
+    usersData.map((u: UserInfo) => [u.id, `${u.first_name} ${u.last_name}`])
+  );
+
+  // Calculate overall stats
+  const totalCompleted = tasks.filter((t) => t.status === 'Completed').length;
+  const totalInProgress = tasks.filter((t) => t.status === 'In Progress').length;
+  const totalTodo = tasks.filter((t) => t.status === 'To Do').length;
+  const totalBlocked = tasks.filter((t) => t.status === 'Blocked').length;
+  const overallCompletionRate = tasks.length > 0 ? totalCompleted / tasks.length : 0;
+
+  // Group tasks by creator
+  const tasksByUser = new Map<string, Task[]>();
+  tasks.forEach((task) => {
+    const userId = task.creator_id || 'Unassigned';
+    if (!tasksByUser.has(userId)) {
+      tasksByUser.set(userId, []);
     }
-  }
+    tasksByUser.get(userId)!.push(task);
+  });
+
+  // Calculate per-user statistics
+  const userStats: UserTaskStats[] = Array.from(tasksByUser.entries()).map(
+    ([userId, userTasks]) => {
+      const completed = userTasks.filter((t) => t.status === 'Completed');
+      const inProgress = userTasks.filter((t) => t.status === 'In Progress');
+      const todo = userTasks.filter((t) => t.status === 'To Do');
+      const blocked = userTasks.filter(t => t.status === 'Blocked');
+
+      // Calculate average completion time (created_at to updated_at for completed tasks)
+      const avgCompletionTime =
+        completed.length > 0
+          ? completed.reduce((sum, t) => {
+              if (t.updated_at && t.created_at) {
+                const duration =
+                  (new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) /
+                  1000 /
+                  3600;
+                return sum + duration;
+              }
+              return sum;
+            }, 0) / completed.length
+          : 0;
+
+      // Calculate on-time vs late completions
+      const onTimeCompletions = completed.filter((t) => {
+        if (!t.deadline || !t.updated_at) return false;
+        return new Date(t.updated_at) <= new Date(t.deadline);
+      }).length;
+
+      const lateCompletions = completed.filter((t) => {
+        if (!t.deadline || !t.updated_at) return false;
+        return new Date(t.updated_at) > new Date(t.deadline);
+      }).length;
+
+      const onTimeRate = completed.length > 0 ? onTimeCompletions / completed.length : 0;
+
+      // Calculate total logged time
+      const totalLoggedTime = userTasks.reduce((sum, t) => sum + (t.logged_time || 0), 0) / 3600;
+      const avgLoggedTimePerTask = userTasks.length > 0 ? totalLoggedTime / userTasks.length : 0;
+
+      return {
+        userId,
+        userName:
+          userNameMap.get(userId) || (userId === 'Unassigned' ? 'Unassigned' : 'Unknown User'),
+        totalTasks: userTasks.length,
+        completedTasks: completed.length,
+        inProgressTasks: inProgress.length,
+        todoTasks: todo.length,
+        blockedTasks: blocked.length,
+        completionRate: userTasks.length > 0 ? completed.length / userTasks.length : 0,
+        avgCompletionTime,
+        onTimeCompletions,
+        lateCompletions,
+        onTimeRate,
+        totalLoggedTime,
+        avgLoggedTimePerTask,
+      };
+    }
+  );
+
+  // Sort by total tasks descending
+  userStats.sort((a, b) => b.totalTasks - a.totalTasks);
+
+  // Calculate completed by project
+  const completedByProject = new Map<number, number>();
+  tasks.forEach((t) => {
+    if (t.status === 'Completed') {
+      completedByProject.set(t.project_id, (completedByProject.get(t.project_id) || 0) + 1);
+    }
+  });
 
   return {
     kind: 'taskCompletions',
-    completionRate,
+
+    // Total number of tasks (all statuses) for the filtered projects/date range
+    totalTasks: tasks.length,
+
+    // Count of tasks with status='Completed'
+    totalCompleted,
+
+    // Count of tasks with status='In Progress'
+    totalInProgress,
+
+    // Count of tasks with status='To Do'
+    totalTodo,
+
+    // Ratio (0-1) of completed tasks vs total tasks
+    overallCompletionRate,
+
+    // Array of per-user statistics (sorted by totalTasks descending) including completion rates, timing, and logged hours
+    userStats,
+
+    // Map of project_id to count of completed tasks in that project
     completedByProject,
   };
 }

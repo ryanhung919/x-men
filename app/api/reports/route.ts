@@ -42,13 +42,19 @@ export async function GET(req: NextRequest) {
 
     switch (action) {
       case 'departments': {
-        const deptIds = parseArrayParam(searchParams.get('departmentIds')); // optional narrowing
+      const deptIds = parseArrayParam(searchParams.get('departmentIds'));
+      try {
         const departments = await filterDepartments(
           user.id,
           projectIds.length ? projectIds : undefined
         );
+        console.log('DB: Departments found:', departments); // Add this
         return NextResponse.json(departments);
+      } catch (err) {
+        console.error('DB: Error fetching departments:', err); // Add this
+        throw err;
       }
+    }
       case 'projects': {
         const departmentIds = parseArrayParam(searchParams.get('departmentIds'));
         const projects = await filterProjects(
@@ -64,7 +70,14 @@ export async function GET(req: NextRequest) {
       }
       case 'team': {
         const reportData = await generateTeamSummaryReport({ projectIds, startDate, endDate });
-        return NextResponse.json(reportData);
+        return NextResponse.json({
+          kind: reportData.kind,
+          totalTasks: reportData.totalTasks,
+          totalUsers: reportData.totalUsers,
+          weeklyBreakdown: reportData.weeklyBreakdown,
+          userTotals: Object.fromEntries(reportData.userTotals),
+          weekTotals: Object.fromEntries(reportData.weekTotals),
+        });
       }
       case 'task': {
         const reportData = await generateTaskCompletionReport({ projectIds, startDate, endDate });

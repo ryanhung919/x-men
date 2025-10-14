@@ -54,14 +54,56 @@ export const auth_users = [
 ];
 
 /* ======================== ORGANISATION CATALOG ======================== */
-/** Based on the briefing: core SG dev/ops team + finance. */
 export const departments = [
-  { name: 'Engineering', parent_department_name: null },
-  { name: 'Finance', parent_department_name: null },
-  { name: 'Operations', parent_department_name: null },
-  { name: 'Technology', parent_department_name: 'Engineering' },
-  { name: 'Marketing', parent_department_name: null },
-  { name: 'Accounting', parent_department_name: 'Finance' },
+  // Top Level (Orange)
+  { name: 'Managing Director', parent_department_name: null },
+
+  // Second Level (Yellow - Directors)
+  { name: 'Sales Director', parent_department_name: 'Managing Director' },
+  { name: 'Consultancy Division Director', parent_department_name: 'Managing Director' },
+  { name: 'System Solutioning Division Director', parent_department_name: 'Managing Director' },
+  { name: 'Engineering Operations Division Director', parent_department_name: 'Managing Director' },
+  { name: 'HR and Admin Director', parent_department_name: 'Managing Director' },
+  { name: 'Finance Director', parent_department_name: 'Managing Director' },
+  { name: 'IT Director', parent_department_name: 'Managing Director' },
+
+  // Third Level (Blue - Teams/Managers)
+
+  // Sales Branch (3-tier)
+  { name: 'Sales Manager', parent_department_name: 'Sales Director' },
+
+  // Consultancy Branch
+  { name: 'Consultant', parent_department_name: 'Consultancy Division Director' },
+
+  // System Solutioning Branch
+  { name: 'Developers', parent_department_name: 'System Solutioning Division Director' },
+  { name: 'Support Team', parent_department_name: 'System Solutioning Division Director' },
+
+  // Engineering Operations Branch
+  { name: 'Senior Engineers', parent_department_name: 'Engineering Operations Division Director' },
+  { name: 'Junior Engineers', parent_department_name: 'Engineering Operations Division Director' },
+  { name: 'Call Centre', parent_department_name: 'Engineering Operations Division Director' },
+  { name: 'Operation Planning Team', parent_department_name: 'Engineering Operations Division Director',
+  },
+
+  // HR and Admin Branch
+  { name: 'HR Team', parent_department_name: 'HR and Admin Director' },
+  { name: 'L&D Team', parent_department_name: 'HR and Admin Director' },
+  { name: 'Admin Team', parent_department_name: 'HR and Admin Director' },
+
+  // Finance Branch (3-tier)
+  { name: 'Finance Managers', parent_department_name: 'Finance Director' },
+
+  // IT Branch
+  { name: 'IT Team', parent_department_name: 'IT Director' },
+
+  // Fourth Level (Blue - Leaf nodes, only for Sales and Finance)
+
+  // Sales 4th tier
+  { name: 'Account Managers', parent_department_name: 'Sales Manager' },
+
+  // Finance 4th tier
+  { name: 'Finance Executive', parent_department_name: 'Finance Managers' },
 ];
 
 export const roles = [{ role: 'staff' }, { role: 'manager' }, { role: 'admin' }];
@@ -76,7 +118,7 @@ export const user_info = [
     last_name: 'Hung',
     mode: 'light',
     default_view: 'tasks',
-    department_name: 'Engineering',
+    department_name: 'Finance Director',
   },
   {
     id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
@@ -84,7 +126,7 @@ export const user_info = [
     last_name: 'Wang',
     mode: 'dark',
     default_view: 'calendar',
-    department_name: 'Finance',
+    department_name: 'Engineering Operations Division Director',
   },
   {
     id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
@@ -92,7 +134,7 @@ export const user_info = [
     last_name: 'Shona',
     mode: 'light',
     default_view: 'tasks',
-    department_name: 'Engineering',
+    department_name: 'Finance Director',
   },
   {
     id: '32635261-038c-4405-b6ed-2d446738f94c',
@@ -100,7 +142,7 @@ export const user_info = [
     last_name: 'Koh',
     mode: 'light',
     default_view: 'calendar',
-    department_name: 'Operations',
+    department_name: 'System Solutioning Division Director',
   },
   {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
@@ -108,7 +150,7 @@ export const user_info = [
     last_name: 'Yeo',
     mode: 'dark',
     default_view: 'tasks',
-    department_name: 'Finance',
+    department_name: 'Engineering Operations Division Director',
   },
 
   // Personal accounts
@@ -118,7 +160,7 @@ export const user_info = [
     last_name: 'Hung',
     mode: 'light',
     default_view: 'tasks',
-    department_name: 'Engineering',
+    department_name: 'Finance Managers',
   },
   {
     id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
@@ -126,7 +168,7 @@ export const user_info = [
     last_name: 'Wang',
     mode: 'dark',
     default_view: 'tasks',
-    department_name: 'Finance',
+    department_name: 'Senior Engineers',
   },
   {
     id: 'aa344933-c44b-4097-b0ac-56987a10734b',
@@ -134,7 +176,7 @@ export const user_info = [
     last_name: 'Shona',
     mode: 'light',
     default_view: 'tasks',
-    department_name: 'Engineering',
+    department_name: 'Finance Executive',
   },
   {
     id: '235d62da-62cc-484b-8715-6683b2a3805a',
@@ -142,7 +184,7 @@ export const user_info = [
     last_name: 'Koh',
     mode: 'light',
     default_view: 'tasks',
-    department_name: 'Operations',
+    department_name: 'System Solutioning Division Director',
   },
   {
     id: '9a3c4306-8beb-494a-aee9-ba71a444f19a',
@@ -150,12 +192,12 @@ export const user_info = [
     last_name: 'Yeo',
     mode: 'dark',
     default_view: 'tasks',
-    department_name: 'Finance',
+    department_name: 'Junior Engineers',
   },
 ];
 
 /* ======================== USER ROLES ======================== */
-/** Joel manages finance and is also admin; Mitch is admin; others staff. */
+/** Joel manages Finance Director and is also admin; Mitch is admin; others staff. */
 export const user_roles = [
   { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'admin' },
   { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'manager' }, // Joel (SMU)
@@ -187,40 +229,95 @@ export const user_roles = [
 
 /* ======================== PROJECTS & LINKS ======================== */
 export const projects = [
-  { name: 'Annual Budget FY25', department_name: 'Finance', is_archived: false },
-  { name: 'Website Redesign', department_name: 'Engineering', is_archived: false },
-  { name: 'Data Warehouse Lift', department_name: 'Operations', is_archived: false },
-  { name: 'Digital Collaboration Rollout', department_name: 'Engineering', is_archived: false },
-  { name: 'Client Onboarding Portal', department_name: 'Operations', is_archived: false },
-  { name: 'Internal Analytics Dashboard', department_name: 'Finance', is_archived: false },
-  { name: 'Cloud Doc Management', department_name: 'Engineering', is_archived: false },
-  { name: 'Regional Training Program', department_name: 'Operations', is_archived: false },
-  { name: 'Workflow Automation Pilot', department_name: 'Engineering', is_archived: false },
-  { name: 'FY25 Forecast Review', department_name: 'Finance', is_archived: false },
+  { name: 'Annual Budget FY25', department_name: 'Finance Director', is_archived: false },
+  {
+    name: 'Website Redesign',
+    department_name: 'Engineering Operations Division Director',
+    is_archived: false,
+  },
+  {
+    name: 'Data Warehouse Lift',
+    department_name: 'System Solutioning Division Director',
+    is_archived: false,
+  },
+  {
+    name: 'Digital Collaboration Rollout',
+    department_name: 'Engineering Operations Division Director',
+    is_archived: false,
+  },
+  {
+    name: 'Client Onboarding Portal',
+    department_name: 'System Solutioning Division Director',
+    is_archived: false,
+  },
+  { name: 'Internal Analytics Dashboard', department_name: 'Finance Director', is_archived: false },
+  {
+    name: 'Cloud Doc Management',
+    department_name: 'Engineering Operations Division Director',
+    is_archived: false,
+  },
+  {
+    name: 'Regional Training Program',
+    department_name: 'System Solutioning Division Director',
+    is_archived: false,
+  },
+  {
+    name: 'Workflow Automation Pilot',
+    department_name: 'Engineering Operations Division Director',
+    is_archived: false,
+  },
+  { name: 'FY25 Forecast Review', department_name: 'Finance Director', is_archived: false },
 ];
 
 /* ======================== PROJECT DEPARTMENTS ======================== */
 export const project_departments = [
-  { project_name: 'Annual Budget FY25', department_name: 'Engineering' },
-  { project_name: 'Annual Budget FY25', department_name: 'Finance' },
-  { project_name: 'Annual Budget FY25', department_name: 'Accounting' },
-  { project_name: 'Website Redesign', department_name: 'Engineering' },
-  { project_name: 'Data Warehouse Lift', department_name: 'Engineering' },
-  { project_name: 'Data Warehouse Lift', department_name: 'Finance' },
-  { project_name: 'Data Warehouse Lift', department_name: 'Operations' },
-  { project_name: 'Digital Collaboration Rollout', department_name: 'Operations' },
-  { project_name: 'Digital Collaboration Rollout', department_name: 'Marketing' },
-  { project_name: 'Client Onboarding Portal', department_name: 'Engineering' },
-  { project_name: 'Client Onboarding Portal', department_name: 'Finance' },
-  { project_name: 'Client Onboarding Portal', department_name: 'Operations' },
-  { project_name: 'Internal Analytics Dashboard', department_name: 'Engineering' },
-  { project_name: 'Internal Analytics Dashboard', department_name: 'Finance' },
-  { project_name: 'Cloud Doc Management', department_name: 'Engineering' },
-  { project_name: 'Cloud Doc Management', department_name: 'Operations' },
-  { project_name: 'Regional Training Program', department_name: 'Operations' },
-  { project_name: 'Workflow Automation Pilot', department_name: 'Engineering' },
-  { project_name: 'Workflow Automation Pilot', department_name: 'Finance' },
-  { project_name: 'FY25 Forecast Review', department_name: 'Finance' },
+  {
+    project_name: 'Annual Budget FY25',
+    department_name: 'Engineering Operations Division Director',
+  },
+  { project_name: 'Annual Budget FY25', department_name: 'Finance Director' },
+  { project_name: 'Annual Budget FY25', department_name: 'Consultancy Division Director' },
+  { project_name: 'Website Redesign', department_name: 'Engineering Operations Division Director' },
+  {
+    project_name: 'Data Warehouse Lift',
+    department_name: 'Engineering Operations Division Director',
+  },
+  { project_name: 'Data Warehouse Lift', department_name: 'Finance Director' },
+  { project_name: 'Data Warehouse Lift', department_name: 'System Solutioning Division Director' },
+  {
+    project_name: 'Digital Collaboration Rollout',
+    department_name: 'System Solutioning Division Director',
+  },
+  { project_name: 'Digital Collaboration Rollout', department_name: 'Sales Director' },
+  {
+    project_name: 'Client Onboarding Portal',
+    department_name: 'Engineering Operations Division Director',
+  },
+  { project_name: 'Client Onboarding Portal', department_name: 'Finance Director' },
+  {
+    project_name: 'Client Onboarding Portal',
+    department_name: 'System Solutioning Division Director',
+  },
+  {
+    project_name: 'Internal Analytics Dashboard',
+    department_name: 'Engineering Operations Division Director',
+  },
+  { project_name: 'Internal Analytics Dashboard', department_name: 'Finance Director' },
+  {
+    project_name: 'Cloud Doc Management',
+    department_name: 'Engineering Operations Division Director',
+  },
+  { project_name: 'Cloud Doc Management', department_name: 'System Solutioning Division Director' },
+  {
+    project_name: 'Regional Training Program',
+    department_name: 'System Solutioning Division Director',
+  },
+  {
+    project_name: 'Workflow Automation Pilot',
+    department_name: 'Engineering Operations Division Director',
+  },
+  { project_name: 'Workflow Automation Pilot', department_name: 'Finance Director' },
+  { project_name: 'FY25 Forecast Review', department_name: 'Finance Director' },
 ];
 
 /* ======================== TAGS ======================== */

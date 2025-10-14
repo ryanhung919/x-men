@@ -527,16 +527,47 @@ async function enableRLS(sql: postgres.Sql) {
 
   // Security definer function that returns all colleagues in the same department:
   await sql`
-    CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
-      RETURNS TABLE(id uuid, department_id int)
-      LANGUAGE sql
-      SECURITY DEFINER
-      AS $$
-        SELECT u.id, u.department_id
-        FROM user_info u
-        JOIN user_info me ON me.id = user_uuid
-        WHERE u.department_id = me.department_id;
-      $$;
+    CREATE OR REPLACE FUNCTION can_view_user(target_user_id uuid, user_uuid uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  my_dept_id BIGINT;
+  target_dept_id BIGINT;
+BEGIN
+  -- Get the current user's department
+  SELECT department_id INTO my_dept_id FROM user_info WHERE id = user_uuid;
+  -- Get the target user's department
+  SELECT department_id INTO target_dept_id FROM user_info WHERE id = target_user_id;
+
+  -- 1. Colleagues in their department
+  IF target_dept_id = my_dept_id THEN
+    RETURN TRUE;
+  END IF;
+
+  -- 2. Users in descendant departments
+  IF EXISTS (
+    SELECT 1 FROM get_department_hierarchy(my_dept_id) d WHERE d.id = target_dept_id
+  ) THEN
+    RETURN TRUE;
+  END IF;
+
+  -- 3. Users who are assignees on tasks shared with my department mates
+  IF EXISTS (
+    SELECT 1
+    FROM task_assignments ta1
+    JOIN get_department_colleagues(user_uuid) colleagues ON ta1.assignee_id = colleagues.id
+    JOIN task_assignments ta2 ON ta1.task_id = ta2.task_id
+    WHERE ta2.assignee_id = target_user_id
+  ) THEN
+    RETURN TRUE;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$;
+
   `;
 
   // Security definer function to check if user can view a task
@@ -586,15 +617,17 @@ async function enableRLS(sql: postgres.Sql) {
 
   //User Info: Users can see colleagues in their department
   await sql`
-    CREATE POLICY "Users can view colleagues in their department" ON user_info
-    FOR SELECT
-    USING (
-      EXISTS (
-        SELECT 1
-        FROM get_department_colleagues(auth.uid()) AS g
-        WHERE g.id = user_info.id
-      )
-    );
+  DROP POLICY IF EXISTS "Users can view colleagues in their department" ON user_info;
+  `;
+  
+  await sql`
+    CREATE POLICY "Users can view colleagues, descendants, and shared task assignees"
+ON user_info
+FOR SELECT
+USING (
+  can_view_user(user_info.id, auth.uid())
+);
+
 `;
 
   /* ---------------- USER ROLES ---------------- */
@@ -710,24 +743,53 @@ async function enableRLS(sql: postgres.Sql) {
 
   /* ---------------- DEPARTMENTS ---------------- */
 
-  // Departments: Users can view departments linked to their department's projects
+  
+  // Security definer function to get full department hierarchy (upwards and downwards)
   await sql`
-    CREATE POLICY "Users can view departments linked to their department's projects"
+    CREATE OR REPLACE FUNCTION get_department_hierarchy(dept_id BIGINT)
+    RETURNS TABLE(id BIGINT, name VARCHAR(255), parent_department_id BIGINT) AS $$
+    BEGIN
+      RETURN QUERY
+      WITH RECURSIVE dept_tree AS (
+        SELECT d.id, d.name, d.parent_department_id, ARRAY[d.id] AS path
+        FROM departments d
+        WHERE d.id = dept_id
+        UNION ALL
+        SELECT d.id, d.name, d.parent_department_id, dt.path || d.id
+        FROM departments d
+        INNER JOIN dept_tree dt ON d.parent_department_id = dt.id
+        WHERE NOT d.id = ANY(dt.path)
+      )
+      SELECT dept_tree.id, dept_tree.name, dept_tree.parent_department_id FROM dept_tree;
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+  `;
+
+  // Departments: Users can view departments in their hierarchy and departments of users sharing tasks
+  await sql`
+    CREATE POLICY "Users can view their department hierarchy and shared task departments"
     ON departments
     FOR SELECT
     USING (
-      EXISTS (
-        SELECT 1
-        FROM project_departments pd
-        JOIN projects p ON p.id = pd.project_id
-        JOIN tasks t ON t.project_id = p.id
-        JOIN task_assignments ta ON ta.task_id = t.id
-        JOIN user_info ui ON ui.id = ta.assignee_id
-        WHERE pd.department_id = departments.id
-          AND ui.department_id = (
-            SELECT department_id FROM user_info me
-            WHERE me.id = auth.uid()
-          )
+      -- User's department hierarchy (including their own department)
+      id IN (
+        SELECT d.id 
+        FROM get_department_hierarchy(
+          (SELECT department_id FROM user_info WHERE id = auth.uid())
+        ) d
+      )
+      OR
+      -- Departments of users who share tasks with user's department colleagues
+      id IN (
+        SELECT DISTINCT ui.department_id
+        FROM task_assignments ta1
+        -- Tasks assigned to user's department colleagues
+        JOIN get_department_colleagues(auth.uid()) colleagues ON ta1.assignee_id = colleagues.id
+        -- All assignees on those shared tasks
+        JOIN task_assignments ta2 ON ta1.task_id = ta2.task_id
+        -- Departments of those assignees
+        JOIN user_info ui ON ta2.assignee_id = ui.id
+        WHERE ui.department_id IS NOT NULL
       )
     );
   `;
