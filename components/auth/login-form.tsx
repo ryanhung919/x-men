@@ -2,14 +2,9 @@
 
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { getRolesForUserClient } from '@/lib/db/roles'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
@@ -30,15 +25,28 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push('/report')
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
+
+      const { data: userRes } = await supabase.auth.getUser()
+      const userId = userRes.user?.id
+      if (userId) {
+        try {
+          const roles = await getRolesForUserClient(supabase, userId)
+          if (roles.includes('manager')) {
+            router.push('/dashboard')
+            return
+          }
+          else {
+            router.push('/report')
+          }
+        } catch (rolesErr) {
+          console.warn('Failed to load roles, defaulting redirect', rolesErr)
+        }
+      }
+
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsLoading(false)
     }
