@@ -743,6 +743,7 @@ USING (
 
   /* ---------------- DEPARTMENTS ---------------- */
 
+  
   // Security definer function to get full department hierarchy (upwards and downwards)
   await sql`
     CREATE OR REPLACE FUNCTION get_department_hierarchy(dept_id BIGINT)

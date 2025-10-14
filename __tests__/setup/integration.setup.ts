@@ -1,8 +1,12 @@
+import * as dotenv from 'dotenv';
+// Load environment variables from .env file
+dotenv.config();
+
 import { beforeAll, afterAll, beforeEach } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 
-// Create Supabase client for integration tests
-const supabase = createClient(
+// Create admin Supabase client for setup/teardown operations
+const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!, // Use service role for full access
   {
@@ -13,72 +17,51 @@ const supabase = createClient(
   }
 );
 
-// Store test user sessions
+// Test user credentials from sample-data.ts
 export const testUsers = {
   joel: {
     id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
     email: 'joel.wang.2023@scis.smu.edu.sg',
+    password: 'password123',
     department: 'Engineering Operations Division Director',
   },
   mitch: {
     id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
     email: 'mitch.shona.2023@scis.smu.edu.sg',
+    password: 'password123',
     department: 'Finance Director',
   },
   garrison: {
     id: '32635261-038c-4405-b6ed-2d446738f94c',
     email: 'garrisonkoh.2023@scis.smu.edu.sg',
+    password: 'password123',
     department: 'System Solutioning Division Director',
   },
   ryan: {
     id: '61ca6b82-6d42-4058-bb4c-9316e7079b24',
     email: 'ryan.hung.2023@scis.smu.edu.sg',
+    password: 'password123',
     department: 'Finance Director',
   },
   kester: {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
     email: 'kesteryeo.2024@computing.smu.edu.sg',
+    password: 'password123',
     department: 'Engineering Operations Division Director',
   },
 };
 
-// Helper to create authenticated client for a specific user
-export async function getAuthenticatedClient(userId: string) {
-  const { data, error } = await supabase.auth.admin.generateLink({
-    type: 'magiclink',
-    email: Object.values(testUsers).find((u) => u.id === userId)?.email || '',
-  });
-
-  if (error) throw error;
-
-  // Create client with user session
-  const userClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          Authorization: `Bearer ${data.properties.hashed_token}`,
-        },
-      },
-    }
-  );
-
-  return userClient;
-}
-
-// Helper to authenticate as a specific user and return the client
+/**
+ * Authenticate as a specific test user and return an authenticated client
+ * This creates a new client instance with a valid session for the user
+ */
 export async function authenticateAs(userKey: keyof typeof testUsers) {
   const user = testUsers[userKey];
-
-  // Sign in the user
-  const { data: authData, error } = await supabase.auth.signInWithPassword({
+  
+  // Sign in the user using password authentication
+  const { data: authData, error } = await adminClient.auth.signInWithPassword({
     email: user.email,
-    password: 'password123',
+    password: user.password,
   });
 
   if (error) {
@@ -86,7 +69,11 @@ export async function authenticateAs(userKey: keyof typeof testUsers) {
     throw error;
   }
 
-  // Create client with session
+  if (!authData.session) {
+    throw new Error(`No session returned for user ${userKey}`);
+  }
+
+  // Create a new client with the user's session
   const authenticatedClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -97,7 +84,7 @@ export async function authenticateAs(userKey: keyof typeof testUsers) {
       },
       global: {
         headers: {
-          Authorization: `Bearer ${authData.session?.access_token}`,
+          Authorization: `Bearer ${authData.session.access_token}`,
         },
       },
     }
@@ -110,84 +97,116 @@ export async function authenticateAs(userKey: keyof typeof testUsers) {
   };
 }
 
-// Check if database is seeded
-async function isDatabaseSeeded() {
+/**
+ * Check if database is seeded by querying user_info table
+ */
+async function isDatabaseSeeded(): Promise<boolean> {
   try {
-    const { count, error } = await supabase
+    const { count, error } = await adminClient
       .from('user_info')
       .select('*', { count: 'exact', head: true });
 
-    if (error) throw error;
-    return count && count > 0;
+    if (error) {
+      console.error('Error checking database seed status:', error);
+      return false;
+    }
+    
+    return count !== null && count > 0;
   } catch (error) {
-    console.error('Error checking database seed status:', error);
+    console.error('Error checking database:', error);
     return false;
   }
 }
 
-// Seed the database by calling the seed endpoint
-async function seedDatabase() {
+/**
+ * Seed the database by calling the /seed endpoint
+ */
+async function seedDatabase(): Promise<void> {
   console.log('🌱 Seeding database for integration tests...');
-
+  
   try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/seed`
-    );
-
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${appUrl}/seed`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Seed endpoint failed: ${response.status} - ${errorText}`);
     }
-
+    
     const result = await response.json();
-    console.log('✅ Database seeded successfully:', result);
+    console.log('✅ Database seeded successfully');
+    console.log('   Message:', result.message);
   } catch (error) {
     console.error('❌ Failed to seed database:', error);
+    console.error('   Make sure your Next.js dev server is running on', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
     throw error;
   }
 }
 
 // Run before all integration tests
 beforeAll(async () => {
-  console.log('🔧 Setting up integration test environment...');
+  console.log('\n🔧 Setting up integration test environment...');
 
   // Verify environment variables
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set');
-  }
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
+  const requiredEnvVars = [
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'SUPABASE_SERVICE_ROLE_KEY',
+  ];
+
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      throw new Error(`${envVar} is not set. Please check your .env.local file`);
+    }
   }
 
   // Check if database is already seeded
   const isSeeded = await isDatabaseSeeded();
-
+  
   if (!isSeeded) {
-    console.log('⚠️  Database not seeded. Seeding now...');
+    console.log('⚠️  Database not seeded. Attempting to seed...');
     await seedDatabase();
+    
+    // Verify seeding was successful
+    const isSeededNow = await isDatabaseSeeded();
+    if (!isSeededNow) {
+      throw new Error('Database seeding failed. Please run: pnpm db:seed');
+    }
   } else {
     console.log('✅ Database already seeded');
   }
 
-  console.log('✅ Integration test environment ready');
+  console.log('✅ Integration test environment ready\n');
 }, 120000); // 2 minute timeout for setup
 
 // Clean up after all tests
 afterAll(async () => {
-  console.log('🧹 Cleaning up integration test environment...');
+  console.log('\n🧹 Cleaning up integration test environment...');
+  
   // Sign out all sessions
-  await supabase.auth.signOut();
-  console.log('✅ Integration test cleanup complete');
+  try {
+    await adminClient.auth.signOut();
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+  }
+  
+  console.log('✅ Integration test cleanup complete\n');
 });
 
-// Reset state before each test (optional - only if tests modify data)
+// Reset state before each test
 beforeEach(async () => {
-  // Note: We don't reset the database between tests to avoid overhead
-  // If tests need isolation, they should use transactions or test-specific data
-
-  // Sign out any existing sessions
-  await supabase.auth.signOut();
+  // Sign out any existing sessions to ensure clean state
+  try {
+    await adminClient.auth.signOut();
+  } catch (error) {
+    // Ignore errors during cleanup
+  }
 });
 
-// Export the service role client for admin operations
-export { supabase as adminClient };
+// Export the admin client for direct database operations
+export { adminClient };

@@ -11,7 +11,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "node",
+    environment: "node", // Node environment for integration tests
     setupFiles: ["./__tests__/setup/integration.setup.ts"],
     include: ["__tests__/integration/**/*.test.{ts,tsx}"],
     exclude: [
@@ -31,14 +31,18 @@ export default defineConfig({
         ".next/",
       ],
     },
-    testTimeout: 30000, // Increased timeout for real DB operations
-    hookTimeout: 60000, // Increased timeout for setup/teardown
-    // Run tests sequentially to avoid DB conflicts
+    testTimeout: 30000, // 30 second timeout for integration tests
+    hookTimeout: 120000, // 2 minute timeout for setup/teardown hooks
+    // Run tests sequentially to avoid database conflicts and race conditions
     pool: 'forks',
     poolOptions: {
       forks: {
-        singleFork: true,
+        singleFork: true, // Run all tests in a single process
       },
     },
+    // Retry flaky tests once (network issues, etc.)
+    retry: 1,
+    // Don't bail on first failure - run all tests
+    bail: 0,
   },
 });

@@ -21,57 +21,48 @@ const supabase = createClient(
 async function checkDatabaseStatus() {
   console.log('Checking database status...\n');
 
+  // Use label as key for both display and object
+  const tables = [
+    { key: 'Users', table: 'user_info' },
+    { key: 'Departments', table: 'departments' },
+    { key: 'Notifications', table: 'notifications' },
+    { key: 'Project-Departments', table: 'project_departments' },
+    { key: 'Projects', table: 'projects' },
+    { key: 'Roles', table: 'roles' },
+    { key: 'Tags', table: 'tags' },
+    { key: 'Task-Assignments', table: 'task_assignments' },
+    { key: 'Task-Attachments', table: 'task_attachments' },
+    { key: 'Task-Comments', table: 'task_comments' },
+    { key: 'Task-Tags', table: 'task_tags' },
+    { key: 'Tasks', table: 'tasks' },
+    { key: 'User-Info', table: 'user_info' },
+    { key: 'User-Roles', table: 'user_roles' }
+  ];
+
   try {
-    // Check user_info table
-    const { count: userCount, error: userError } = await supabase
-      .from('user_info')
-      .select('*', { count: 'exact', head: true });
+    const results = await Promise.all(
+      tables.map(({ table }) =>
+        supabase.from(table).select('*', { count: 'exact', head: true })
+      )
+    );
 
-    if (userError) throw userError;
+    let status: Record<string, number> = {};
+    results.forEach((result, i) => {
+      const { key } = tables[i];
+      if (result.error) throw result.error;
+      status[key] = result.count ?? 0;
+      console.log(`   ${key}: ${status[key]}`);
+    });
 
-    // Check departments
-    const { count: deptCount, error: deptError } = await supabase
-      .from('departments')
-      .select('*', { count: 'exact', head: true });
-
-    if (deptError) throw deptError;
-
-    // Check projects
-    const { count: projCount, error: projError } = await supabase
-      .from('projects')
-      .select('*', { count: 'exact', head: true });
-
-    if (projError) throw projError;
-
-    // Check tasks
-    const { count: taskCount, error: taskError } = await supabase
-      .from('tasks')
-      .select('*', { count: 'exact', head: true });
-
-    if (taskError) throw taskError;
-
-    //Check assignments
-    const { count: assignCount, error: assignError } = await supabase
-      .from('task_assignments')
-      .select('*', { count: 'exact', head: true });
-
-    if (assignError) throw assignError;
-
-    console.log('✅ Database Status:');
-    console.log(`   Users:       ${userCount}`);
-    console.log(`   Departments: ${deptCount}`);
-    console.log(`   Projects:    ${projCount}`);
-    console.log(`   Tasks:       ${taskCount}`);
-    console.log(`   Assignments: ${assignCount}`);
     console.log('');
 
-    if (userCount === 0) {
+    if (status['Users'] === 0) {
       console.log('⚠️  Database appears empty. Run `pnpm db:seed` to populate it.');
     } else {
       console.log('✅ Database is populated and ready.');
     }
 
-    return { userCount, deptCount, projCount, taskCount };
+    return status;
   } catch (error) {
     console.error('❌ Error checking database:', error);
     throw error;
