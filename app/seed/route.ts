@@ -367,7 +367,21 @@ async function seedTaskTags(sql: postgres.Sql) {
 async function resetTaskAttachmentsBucket(sql: postgres.Sql) {
   console.log('Resetting storage bucket: task-attachments');
 
-  // Drop bucket if exists
+  // Remove objects referencing the bucket first to satisfy FK constraint objects.bucket_id -> buckets.id
+  // (Different self-hosted versions may use bucket_id or bucketId; handle both defensively)
+  try {
+    await sql`DELETE FROM storage.objects WHERE bucket_id = 'task-attachments'`;
+  } catch (e) {
+    console.warn('Attempted delete on storage.objects.bucket_id failed (maybe column named bucketId). Proceeding.', e);
+    try {
+      // @ts-ignore fallback column name
+      await sql`DELETE FROM storage.objects WHERE "bucketId" = 'task-attachments'`;
+    } catch (e2) {
+      console.warn('Fallback delete on storage.objects.bucketId also failed (may be no objects table).', e2);
+    }
+  }
+
+  // Now drop bucket if exists
   await sql`DELETE FROM storage.buckets WHERE id = 'task-attachments'`;
 
   // Recreate bucket (private by default)
@@ -632,23 +646,65 @@ USING (
 
   /* ---------------- USER ROLES ---------------- */
 
-  // User Roles: Users can view their own roles
+  // Drop any existing policies to avoid duplicates when reseeding
+  await sql`DROP POLICY IF EXISTS "Users can view their own roles" ON user_roles;`;
+  await sql`DROP POLICY IF EXISTS "Admins can manage roles" ON user_roles;`;
+  await sql`DROP POLICY IF EXISTS "Users view own roles" ON user_roles;`;
+  await sql`DROP POLICY IF EXISTS "Admins view all roles" ON user_roles;`;
+  await sql`DROP POLICY IF EXISTS "Admins grant roles" ON user_roles;`;
+  await sql`DROP POLICY IF EXISTS "Admins revoke roles" ON user_roles;`;
+  await sql`DROP POLICY IF EXISTS "Admins update roles" ON user_roles;`;
+
+  // SECURITY DEFINER helper to check admin status without triggering recursive RLS evaluation
   await sql`
-    CREATE POLICY "Users can view their own roles" ON user_roles
-    FOR SELECT
-    USING (user_id = auth.uid())
+    CREATE OR REPLACE FUNCTION is_admin(u uuid)
+    RETURNS boolean
+    LANGUAGE sql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+      SELECT EXISTS (
+        SELECT 1 FROM user_roles ur
+        WHERE ur.user_id = u AND ur.role = 'admin'
+      );
+    $$;
   `;
 
-  // User Roles: Only admins can assign or revoke roles
+  // Granular, non-recursive policies
+  // 1. Regular users can see only their own roles
   await sql`
-    CREATE POLICY "Admins can manage roles" ON user_roles
-    FOR ALL
-    USING (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
-    WITH CHECK (
-      EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-    )
+    CREATE POLICY "Users view own roles" ON user_roles
+    FOR SELECT
+    USING (user_id = auth.uid());
+  `;
+
+  // 2. Admins can see all roles
+  await sql`
+    CREATE POLICY "Admins view all roles" ON user_roles
+    FOR SELECT
+    USING (is_admin(auth.uid()));
+  `;
+
+  // 3. Admins can grant (insert) roles to any user
+  await sql`
+    CREATE POLICY "Admins grant roles" ON user_roles
+    FOR INSERT
+    WITH CHECK (is_admin(auth.uid()));
+  `;
+
+  // 4. Admins can revoke (delete) roles from any user
+  await sql`
+    CREATE POLICY "Admins revoke roles" ON user_roles
+    FOR DELETE
+    USING (is_admin(auth.uid()));
+  `;
+
+  // 5. (Optional) Admins can update existing role rows (rarely used; included for completeness)
+  await sql`
+    CREATE POLICY "Admins update roles" ON user_roles
+    FOR UPDATE
+    USING (is_admin(auth.uid()))
+    WITH CHECK (is_admin(auth.uid()));
   `;
 
   /* ---------------- TASKS ---------------- */
@@ -708,6 +764,33 @@ USING (
     )
   )
 `;
+
+  // Projects: Managers and admins can create new projects
+  await sql`
+    CREATE POLICY "Managers and admins can create projects" ON projects
+    FOR INSERT
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM user_roles
+        WHERE user_id = auth.uid() AND role IN ('manager','admin')
+      )
+    )
+  `;
+
+  // Project-Departments: Managers/Admins can link a project to their own department
+  await sql`
+    CREATE POLICY "Managers and admins can link projects to own department" ON project_departments
+    FOR INSERT
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM user_roles ur
+        WHERE ur.user_id = auth.uid() AND ur.role IN ('manager','admin')
+      )
+      AND department_id = (
+        SELECT department_id FROM user_info WHERE id = auth.uid()
+      )
+    )
+  `;
 
   /* ---------------- NOTIFICATIONS ---------------- */
 
