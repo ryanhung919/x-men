@@ -83,7 +83,6 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
       first_name VARCHAR(255) NOT NULL,
       last_name  VARCHAR(255) NOT NULL,
-      mode       VARCHAR(10) NOT NULL DEFAULT 'light',
       default_view VARCHAR(20) NOT NULL DEFAULT 'tasks',
       department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT
     );
@@ -96,14 +95,13 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       if (!depId) throw new Error(`Unknown department: ${ui.department_name}`);
 
       return sql`
-        INSERT INTO user_info (id, first_name, last_name, mode, default_view, department_id)
-        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${ui.mode}, ${
+        INSERT INTO user_info (id, first_name, last_name, default_view, department_id)
+        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${
         ui.default_view ?? 'tasks'
       }, ${depId})
         ON CONFLICT (id) DO UPDATE
           SET first_name = EXCLUDED.first_name,
               last_name  = EXCLUDED.last_name,
-              mode       = EXCLUDED.mode,
               default_view = EXCLUDED.default_view,
               department_id = EXCLUDED.department_id
       `;
