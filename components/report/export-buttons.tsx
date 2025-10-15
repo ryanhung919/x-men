@@ -22,12 +22,13 @@ export interface LoggedTimeReport {
   kind: 'loggedTime';
   totalTime: number; // Total logged time (hours) across ALL tasks
   avgTime: number; // Average logged time (hours) per COMPLETED task only
-  completedCount: number; // Count of tasks with status='Completed'
-  overdueCount: number; // Count of WIP tasks that are past their deadline
-  onTimeRate: number; // Ratio (0-1) of completed tasks done on-time
-  totalLateness: number; // Total hours that completed tasks were late
-  wipTime: number; // Total logged time (hours) for ALL non-completed tasks
-  overdueLoggedTime: number; // Total logged time (hours) for WIP tasks that are OVERDUE
+  completedTasks: number; // Count of tasks with status='Completed'
+  overdueTasks: number; // Count of incomplete tasks (In Progress/Blocked/To Do) past deadline
+  blockedTasks: number; // Count of tasks with status='Blocked'
+  onTimeCompletionRate: number; // Ratio (0-1) of completed tasks done on-time
+  totalDelayHours: number; // Total hours that completed tasks were late
+  incompleteTime: number; // Total logged time (hours) for ALL incomplete tasks (In Progress + Blocked + To Do)
+  overdueTime: number; // Total logged time (hours) for incomplete tasks that are OVERDUE
   timeByTask?: Map<number, number>;
   kpis: KPI[];
   charts?: ChartData[];
@@ -58,16 +59,15 @@ export type AnyReport = LoggedTimeReport | TeamSummaryReport | TaskCompletionRep
 function getMetricDescription(key: string, report: AnyReport): string {
   if (report.kind === 'loggedTime') {
     const descriptions: Record<string, string> = {
-      totalTime: 'Total logged time (hours) across all tasks (completed + WIP + overdue)',
+      totalTime: 'Total logged time (hours) across all tasks (Completed + In Progress + Blocked + To Do + Overdue)',
       avgTime: 'Average logged time (hours) per completed task only',
-      completedCount: "Count of tasks with status='Completed'",
-      overdueCount: 'Count of WIP tasks that are past their deadline',
-      onTimeRate: 'Ratio of completed tasks done on-time (updated_at <= deadline)',
-      totalLateness: 'Total hours that completed tasks were late (sum of hours past deadline)',
-      wipTime:
-        'Total logged time (hours) for all non-completed tasks (includes overdue and non-overdue WIP)',
-      overdueLoggedTime:
-        'Total logged time (hours) for WIP tasks that are OVERDUE (subset of wipTime)',
+      completedTasks: "Count of tasks with status='Completed'",
+      overdueTasks: 'Count of incomplete tasks (In Progress/Blocked/To Do) that are past their deadline',
+      blockedTasks: "Count of tasks with status='Blocked' (waiting on dependencies or external events)",
+      onTimeCompletionRate: 'Ratio (0-1) of completed tasks done on-time, where updated_at <= deadline',
+      totalDelayHours: 'Total hours that completed tasks were late (sum of hours past deadline for completed tasks)',
+      incompleteTime: 'Total logged time (hours) for all incomplete tasks (In Progress + Blocked + To Do), includes both overdue and non-overdue',
+      overdueTime: 'Total logged time (hours) for incomplete tasks that are OVERDUE (subset of incompleteTime)',
     };
     return descriptions[key] || '';
   }
@@ -90,7 +90,7 @@ function getSummaryRows(report: AnyReport) {
     rows.push({
       label: toLabel(key),
       value:
-        typeof value === 'number' && key.includes('Rate')
+        typeof value === 'number' && (key.includes('Rate') || key.includes('Completion'))
           ? `${(value * 100).toFixed(1)}%`
           : String(value),
       description: getMetricDescription(key, report),

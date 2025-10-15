@@ -528,46 +528,45 @@ async function enableRLS(sql: postgres.Sql) {
   // Security definer function that returns all colleagues in the same department:
   await sql`
     CREATE OR REPLACE FUNCTION can_view_user(target_user_id uuid, user_uuid uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  my_dept_id BIGINT;
-  target_dept_id BIGINT;
-BEGIN
-  -- Get the current user's department
-  SELECT department_id INTO my_dept_id FROM user_info WHERE id = user_uuid;
-  -- Get the target user's department
-  SELECT department_id INTO target_dept_id FROM user_info WHERE id = target_user_id;
+    RETURNS boolean
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    AS $$
+    DECLARE
+      my_dept_id BIGINT;
+      target_dept_id BIGINT;
+    BEGIN
+      -- Get the current user's department
+      SELECT department_id INTO my_dept_id FROM user_info WHERE id = user_uuid;
+      -- Get the target user's department
+      SELECT department_id INTO target_dept_id FROM user_info WHERE id = target_user_id;
 
-  -- 1. Colleagues in their department
-  IF target_dept_id = my_dept_id THEN
-    RETURN TRUE;
-  END IF;
+      -- 1. Colleagues in their department
+      IF target_dept_id = my_dept_id THEN
+        RETURN TRUE;
+      END IF;
 
-  -- 2. Users in descendant departments
-  IF EXISTS (
-    SELECT 1 FROM get_department_hierarchy(my_dept_id) d WHERE d.id = target_dept_id
-  ) THEN
-    RETURN TRUE;
-  END IF;
+      -- 2. Users in descendant departments
+      IF EXISTS (
+        SELECT 1 FROM get_department_hierarchy(my_dept_id) d WHERE d.id = target_dept_id
+      ) THEN
+        RETURN TRUE;
+      END IF;
 
-  -- 3. Users who are assignees on tasks shared with my department mates
-  IF EXISTS (
-    SELECT 1
-    FROM task_assignments ta1
-    JOIN get_department_colleagues(user_uuid) colleagues ON ta1.assignee_id = colleagues.id
-    JOIN task_assignments ta2 ON ta1.task_id = ta2.task_id
-    WHERE ta2.assignee_id = target_user_id
-  ) THEN
-    RETURN TRUE;
-  END IF;
+      -- 3. Users who are assignees on tasks shared with my department mates
+      IF EXISTS (
+        SELECT 1
+        FROM task_assignments ta1
+        JOIN get_department_colleagues(user_uuid) colleagues ON ta1.assignee_id = colleagues.id
+        JOIN task_assignments ta2 ON ta1.task_id = ta2.task_id
+        WHERE ta2.assignee_id = target_user_id
+      ) THEN
+        RETURN TRUE;
+      END IF;
 
-  RETURN FALSE;
-END;
-$$;
-
+      RETURN FALSE;
+    END;
+    $$;
   `;
 
   // Security definer function to check if user can view a task

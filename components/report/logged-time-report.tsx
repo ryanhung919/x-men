@@ -25,15 +25,16 @@ interface LoggedTimeProps {
 }
 
 interface Metrics {
-  totalCompleted: number;
-  totalOverdue: number;
+  completedTasks: number;
+  overdueTasks: number;
+  blockedTasks: number;
   totalLoggedHours: number;
   avgLoggedHours: number;
-  wipHours: number;
+  incompleteHours: number;
   timeByTask: Record<string, number>;
-  onTimeRate: number;
-  totalLateness: number;
-  overdueLoggedTime: number;
+  onTimeCompletionRate: number;
+  totalDelayHours: number;
+  overdueHours: number;
 }
 
 // Standard rounding (2 decimal places)
@@ -43,8 +44,8 @@ const round = (value: number, decimals: number = 2): number => {
 
 // Chart configs using OKLCH colors from globals.css
 const timeBreakdownConfig = {
-  wip: {
-    label: 'WIP',
+  incomplete: {
+    label: 'Incomplete (non-overdue)',
     color: 'var(--chart-1)',
   },
   completed: {
@@ -54,6 +55,10 @@ const timeBreakdownConfig = {
   overdue: {
     label: 'Overdue',
     color: 'var(--destructive)',
+  },
+  blocked: {
+    label: 'Blocked',
+    color: 'var(--chart-3)',
   },
 } satisfies ChartConfig;
 
@@ -77,15 +82,19 @@ const taskStatusConfig = {
     label: 'Overdue',
     color: 'var(--destructive)',
   },
+  blocked: {
+    label: 'Blocked',
+    color: 'var(--chart-3)',
+  },
 } satisfies ChartConfig;
 
-const latenessConfig = {
-  lateness: {
-    label: 'Lateness',
+const delayConfig = {
+  delay: {
+    label: 'Delay Hours',
     color: 'var(--destructive)',
   },
-  overdueLogged: {
-    label: 'Overdue Logged',
+  overdueTime: {
+    label: 'Overdue Time Logged',
     color: 'var(--chart-4)',
   },
 } satisfies ChartConfig;
@@ -95,7 +104,7 @@ const DISPLAY_CARDS = [
   {
     key: 'timeBreakdown',
     title: 'Time Distribution',
-    description: 'Non-overdue WIP vs Completed vs Overdue WIP hours',
+    description: 'Incomplete (non-overdue) vs Completed vs Incomplete (overdue) hours',
     format: (m: Metrics) => `${round(m.totalLoggedHours, 2)}h total`,
     kpi: (m: Metrics): KPI => ({
       label: 'Total Logged Hours',
@@ -104,33 +113,33 @@ const DISPLAY_CARDS = [
     }),
     subMetrics: [
       {
-        label: 'WIP (non-overdue)',
-        format: (m: Metrics) => `${round(m.wipHours - m.overdueLoggedTime, 2)}h`,
+        label: 'Incomplete (non-overdue)',
+        format: (m: Metrics) => `${round(m.incompleteHours - m.overdueHours, 2)}h`,
       },
       {
         label: 'Completed',
-        format: (m: Metrics) => `${round(m.totalLoggedHours - m.wipHours, 2)}h`,
+        format: (m: Metrics) => `${round(m.totalLoggedHours - m.incompleteHours, 2)}h`,
       },
-      { label: 'Overdue WIP', format: (m: Metrics) => `${round(m.overdueLoggedTime, 2)}h` },
+      { label: 'Incomplete (overdue)', format: (m: Metrics) => `${round(m.overdueHours, 2)}h` },
     ],
     chart: (m: Metrics) => ({
       type: 'pie' as const,
       title: 'Time Distribution',
       data: [
-        { label: 'WIP', value: round(m.wipHours - m.overdueLoggedTime, 2) },
-        { label: 'Completed', value: round(m.totalLoggedHours - m.wipHours, 2) },
-        { label: 'Overdue', value: round(m.overdueLoggedTime, 2) },
+        { label: 'Incomplete', value: round(m.incompleteHours - m.overdueHours, 2) },
+        { label: 'Completed', value: round(m.totalLoggedHours - m.incompleteHours, 2) },
+        { label: 'Overdue', value: round(m.overdueHours, 2) },
       ],
     }),
     renderChart: (m: Metrics) => {
-      const completedTime = round(m.totalLoggedHours - m.wipHours, 2);
-      const nonOverdueWipTime = round(m.wipHours - m.overdueLoggedTime, 2);
+      const completedTime = round(m.totalLoggedHours - m.incompleteHours, 2);
+      const nonOverdueIncompleteTime = round(m.incompleteHours - m.overdueHours, 2);
       const chartData = [
-        { name: 'wip', value: nonOverdueWipTime, fill: timeBreakdownConfig.wip.color },
+        { name: 'incomplete', value: nonOverdueIncompleteTime, fill: timeBreakdownConfig.incomplete.color },
         { name: 'completed', value: completedTime, fill: timeBreakdownConfig.completed.color },
         {
           name: 'overdue',
-          value: round(m.overdueLoggedTime, 2),
+          value: round(m.overdueHours, 2),
           fill: timeBreakdownConfig.overdue.color,
         },
       ];
@@ -156,34 +165,34 @@ const DISPLAY_CARDS = [
     key: 'completionRate',
     title: 'On-Time Completion Rate',
     description: 'Tasks completed before deadline',
-    format: (m: Metrics) => `${round(m.onTimeRate * 100, 1)}%`,
+    format: (m: Metrics) => `${round(m.onTimeCompletionRate * 100, 1)}%`,
     kpi: (m: Metrics): KPI => ({
-      label: 'On-Time Rate',
-      value: round(m.onTimeRate * 100, 1),
+      label: 'On-Time Completion Rate',
+      value: round(m.onTimeCompletionRate * 100, 1),
       unit: '%',
     }),
     subMetrics: [
-      { label: 'On-Time', format: (m: Metrics) => `${round(m.onTimeRate * 100, 1)}%` },
-      { label: 'Late', format: (m: Metrics) => `${round((1 - m.onTimeRate) * 100, 1)}%` },
+      { label: 'On-Time', format: (m: Metrics) => `${round(m.onTimeCompletionRate * 100, 1)}%` },
+      { label: 'Late', format: (m: Metrics) => `${round((1 - m.onTimeCompletionRate) * 100, 1)}%` },
     ],
     chart: (m: Metrics) => ({
       type: 'pie' as const,
       title: 'On-Time vs Late',
       data: [
-        { label: 'On-Time', value: round(m.onTimeRate * 100, 1) },
-        { label: 'Late', value: round((1 - m.onTimeRate) * 100, 1) },
+        { label: 'On-Time', value: round(m.onTimeCompletionRate * 100, 1) },
+        { label: 'Late', value: round((1 - m.onTimeCompletionRate) * 100, 1) },
       ],
     }),
     renderChart: (m: Metrics) => {
       const chartData = [
         {
           name: 'onTime',
-          value: round(m.onTimeRate * 100, 1),
+          value: round(m.onTimeCompletionRate * 100, 1),
           fill: completionConfig.onTime.color,
         },
         {
           name: 'late',
-          value: round((1 - m.onTimeRate) * 100, 1),
+          value: round((1 - m.onTimeCompletionRate) * 100, 1),
           fill: completionConfig.late.color,
         },
       ];
@@ -207,30 +216,33 @@ const DISPLAY_CARDS = [
   },
   {
     key: 'taskStatus',
-    title: 'Task Completion Status',
-    description: 'Completed vs Overdue task count',
-    format: (m: Metrics) => `${m.totalCompleted + m.totalOverdue} total`,
+    title: 'Task Status Overview',
+    description: 'Completed vs Overdue vs Blocked task count',
+    format: (m: Metrics) => `${m.completedTasks + m.overdueTasks + m.blockedTasks} total`,
     kpi: (m: Metrics): KPI => ({
       label: 'Total Tasks',
-      value: m.totalCompleted + m.totalOverdue,
+      value: m.completedTasks + m.overdueTasks + m.blockedTasks,
       unit: 'tasks',
     }),
     subMetrics: [
-      { label: 'Completed', format: (m: Metrics) => `${m.totalCompleted} tasks` },
-      { label: 'Overdue', format: (m: Metrics) => `${m.totalOverdue} tasks` },
+      { label: 'Completed', format: (m: Metrics) => `${m.completedTasks} tasks` },
+      { label: 'Overdue', format: (m: Metrics) => `${m.overdueTasks} tasks` },
+      { label: 'Blocked', format: (m: Metrics) => `${m.blockedTasks} tasks` },
     ],
     chart: (m: Metrics) => ({
       type: 'bar' as const,
       title: 'Task Status',
       data: [
-        { label: 'Completed', value: m.totalCompleted },
-        { label: 'Overdue', value: m.totalOverdue },
+        { label: 'Completed', value: m.completedTasks },
+        { label: 'Overdue', value: m.overdueTasks },
+        { label: 'Blocked', value: m.blockedTasks },
       ],
     }),
     renderChart: (m: Metrics) => {
       const chartData = [
-        { name: 'Completed', value: m.totalCompleted, fill: taskStatusConfig.completed.color },
-        { name: 'Overdue', value: m.totalOverdue, fill: taskStatusConfig.overdue.color },
+        { name: 'Completed', value: m.completedTasks, fill: taskStatusConfig.completed.color },
+        { name: 'Overdue', value: m.overdueTasks, fill: taskStatusConfig.overdue.color },
+        { name: 'Blocked', value: m.blockedTasks, fill: taskStatusConfig.blocked.color },
       ];
       return (
         <ChartContainer config={taskStatusConfig} className="h-[140px] w-full">
@@ -245,38 +257,38 @@ const DISPLAY_CARDS = [
     },
   },
   {
-    key: 'latenessMetrics',
-    title: 'Lateness Analysis',
-    description: 'Total lateness vs overdue logged time',
-    format: (m: Metrics) => `${round(m.totalLateness, 2)}h late`,
+    key: 'delayMetrics',
+    title: 'Delay Analysis',
+    description: 'Total delay vs overdue time logged',
+    format: (m: Metrics) => `${round(m.totalDelayHours, 2)}h delay`,
     kpi: (m: Metrics): KPI => ({
-      label: 'Total Lateness',
-      value: round(m.totalLateness, 2),
+      label: 'Total Delay Hours',
+      value: round(m.totalDelayHours, 2),
       unit: 'h',
     }),
     subMetrics: [
-      { label: 'Lateness (completed)', format: (m: Metrics) => `${round(m.totalLateness, 2)}h` },
-      { label: 'Overdue logged', format: (m: Metrics) => `${round(m.overdueLoggedTime, 2)}h` },
+      { label: 'Delay (completed late)', format: (m: Metrics) => `${round(m.totalDelayHours, 2)}h` },
+      { label: 'Overdue time logged', format: (m: Metrics) => `${round(m.overdueHours, 2)}h` },
     ],
     chart: (m: Metrics) => ({
       type: 'bar' as const,
-      title: 'Lateness Metrics',
+      title: 'Delay Metrics',
       data: [
-        { label: 'Lateness', value: round(m.totalLateness, 2) },
-        { label: 'Overdue Logged', value: round(m.overdueLoggedTime, 2) },
+        { label: 'Delay Hours', value: round(m.totalDelayHours, 2) },
+        { label: 'Overdue Time Logged', value: round(m.overdueHours, 2) },
       ],
     }),
     renderChart: (m: Metrics) => {
       const chartData = [
-        { name: 'Lateness', value: round(m.totalLateness, 2), fill: latenessConfig.lateness.color },
+        { name: 'Delay', value: round(m.totalDelayHours, 2), fill: delayConfig.delay.color },
         {
-          name: 'Overdue Logged',
-          value: round(m.overdueLoggedTime, 2),
-          fill: latenessConfig.overdueLogged.color,
+          name: 'Overdue Time',
+          value: round(m.overdueHours, 2),
+          fill: delayConfig.overdueTime.color,
         },
       ];
       return (
-        <ChartContainer config={latenessConfig} className="h-[140px] w-full">
+        <ChartContainer config={delayConfig} className="h-[140px] w-full">
           <BarChart data={chartData}>
             <XAxis dataKey="name" tickLine={false} axisLine={false} className="text-xs" />
             <YAxis tickLine={false} axisLine={false} className="text-xs" />
@@ -290,7 +302,7 @@ const DISPLAY_CARDS = [
   {
     key: 'avgLoggedHours',
     title: 'Average Logged Time',
-    description: 'Average hours per task',
+    description: 'Average hours per completed task',
     format: (m: Metrics) => `${round(m.avgLoggedHours, 2)}h`,
     kpi: (m: Metrics): KPI => ({
       label: 'Avg Logged Hours',
@@ -335,15 +347,16 @@ export function LoggedTimeReport({
         const json = await res.json();
         if (json) {
           const newMetrics: Metrics = {
-            totalCompleted: json.completedCount,
-            totalOverdue: json.overdueCount,
+            completedTasks: json.completedTasks,
+            overdueTasks: json.overdueTasks,
+            blockedTasks: json.blockedTasks || 0,
             totalLoggedHours: json.totalTime || 0,
             avgLoggedHours: json.avgTime || 0,
-            wipHours: json.wipTime || 0,
+            incompleteHours: json.incompleteTime || 0,
             timeByTask: json.timeByTask || {},
-            onTimeRate: json.onTimeRate ?? 0,
-            totalLateness: json.totalLateness ?? 0,
-            overdueLoggedTime: json.overdueLoggedTime ?? 0,
+            onTimeCompletionRate: json.onTimeCompletionRate ?? 0,
+            totalDelayHours: json.totalDelayHours ?? 0,
+            overdueHours: json.overdueTime ?? 0,
           };
           prevMetricsRef.current = newMetrics;
           setMetrics(newMetrics);
@@ -358,12 +371,13 @@ export function LoggedTimeReport({
               kind: 'loggedTime',
               totalTime: round(newMetrics.totalLoggedHours, 2),
               avgTime: round(newMetrics.avgLoggedHours, 2),
-              completedCount: newMetrics.totalCompleted,
-              overdueCount: newMetrics.totalOverdue,
-              onTimeRate: round(newMetrics.onTimeRate, 2),
-              totalLateness: round(newMetrics.totalLateness, 2),
-              wipTime: round(newMetrics.wipHours, 2),
-              overdueLoggedTime: round(newMetrics.overdueLoggedTime, 2),
+              completedTasks: newMetrics.completedTasks,
+              overdueTasks: newMetrics.overdueTasks,
+              onTimeCompletionRate: round(newMetrics.onTimeCompletionRate, 2),
+              totalDelayHours: round(newMetrics.totalDelayHours, 2),
+              incompleteTime: round(newMetrics.incompleteHours, 2),
+              overdueTime: round(newMetrics.overdueHours, 2),
+              blockedTasks: newMetrics.blockedTasks,
               timeByTask: new Map(
                 Object.entries(newMetrics.timeByTask).map(([k, v]) => [Number(k), v])
               ),

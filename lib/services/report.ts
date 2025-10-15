@@ -1,8 +1,10 @@
 import { getTasks, getUsersByIds, UserInfo, getWeeklyTaskStatsByUser } from '@/lib/db/report';
+
 // Shared types
 export type ReportFormat = 'pdf' | 'xlsx';
 export interface ReportFilters {
   projectIds?: number[];
+  departmentIds?: number[];
   startDate?: Date;
   endDate?: Date;
 }
@@ -11,7 +13,7 @@ export interface ReportFilters {
 interface Task {
   id: number;
   title: string;
-  status: 'To Do' | 'In Progress' | 'Completed' | string;
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked' | string;
   project_id: number;
   parent_task_id?: number | null;
   logged_time: number; // seconds
@@ -21,52 +23,76 @@ interface Task {
   updated_at?: string | null;
 }
 
-// Utility: roll up child to parent
+// Utility: roll up child logged time to parent
 function rollupLoggedTime(tasks: Task[]): Map<number, number> {
   const taskMap = new Map<number, Task>();
   const timeMap = new Map<number, number>();
+
   tasks.forEach((t) => taskMap.set(t.id, t));
+
   tasks.forEach((t) => {
-    const total = t.logged_time;
+    // Start with task's own logged time
+    let total = t.logged_time;
+
+    // If this task has a parent, add this task's time to parent's total
     if (t.parent_task_id && taskMap.has(t.parent_task_id)) {
       const parentTotal = timeMap.get(t.parent_task_id) ?? 0;
       timeMap.set(t.parent_task_id, parentTotal + t.logged_time);
     }
+
+    // Set this task's total time
     timeMap.set(t.id, total);
   });
+
   return timeMap;
 }
 
 // Logged Time Report
 export interface LoggedTimeReport {
   kind: 'loggedTime';
-  totalTime: number; // hours
-  avgTime: number; // hours
-  completedCount: number;
-  overdueCount: number;
-  timeByTask: Map<number, number>; // seconds per task id (pre-division), or keep hours if preferred
-  wipTime: number; // hours
-  onTimeRate: number; // 0..1
-  totalLateness: number; // hours
-  overdueLoggedTime: number; // hours
+  totalTime: number; // hours - total across ALL tasks
+  avgTime: number; // hours - average per completed task
+  completedTasks: number; // count of completed tasks
+  overdueTasks: number; // count of overdue incomplete tasks (In Progress/Blocked/To Do)
+  blockedTasks: number; // count of blocked tasks
+  timeByTask: Map<number, number>; // seconds per task id (with rollup)
+  incompleteTime: number; // hours - logged time for incomplete tasks (In Progress + Blocked + To Do)
+  onTimeCompletionRate: number; // 0..1 - ratio of on-time completions
+  totalDelayHours: number; // hours - sum of hours late for completed tasks
+  overdueTime: number; // hours - logged time for overdue incomplete tasks
 }
 
+/**
+ * Generate logged time report
+ * Calculates time metrics, completion rates, and delay analysis
+ * 
+ * IMPORTANT: This fetches ALL tasks for selected projects/departments,
+ * bypassing RLS. Access control should be done at API layer.
+ */
 export async function generateLoggedTimeReport(filters: ReportFilters): Promise<LoggedTimeReport> {
-  const { projectIds, startDate, endDate } = filters;
-  const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
+  const { projectIds, departmentIds, startDate, endDate } = filters;
+  
+  // Fetch ALL tasks for the selected projects/departments (no RLS filtering)
+  const tasks: Task[] = await getTasks({ projectIds, departmentIds, startDate, endDate });
 
   const taskTimeMap = rollupLoggedTime(tasks);
+
+  // Categorize tasks by status
   const completedTasks = tasks.filter((t) => t.status === 'Completed');
-  const wipTasks = tasks.filter((t) => t.status !== 'Completed');
+  const blockedTasks = tasks.filter((t) => t.status === 'Blocked');
+  const incompleteTasks = tasks.filter((t) => t.status !== 'Completed'); // In Progress + Blocked + To Do
+
   const now = new Date();
 
+  // Calculate on-time completion rate
   const onTimeTasks = completedTasks.filter((t) => {
     if (!t.updated_at || !t.deadline) return false;
     return new Date(t.updated_at) <= new Date(t.deadline);
   });
-  const onTimeRate = completedTasks.length ? onTimeTasks.length / completedTasks.length : 0;
+  const onTimeCompletionRate = completedTasks.length ? onTimeTasks.length / completedTasks.length : 0;
 
-  const totalLateness = completedTasks.reduce((sum, t) => {
+  // Calculate total delay (lateness) for completed tasks
+  const totalDelayHours = completedTasks.reduce((sum, t) => {
     if (!t.updated_at || !t.deadline) return sum;
     const hoursLate = Math.max(
       0,
@@ -75,51 +101,60 @@ export async function generateLoggedTimeReport(filters: ReportFilters): Promise<
     return sum + hoursLate;
   }, 0);
 
-  const overdueLoggedTime =
-    wipTasks
-      .filter((t) => t.deadline && new Date(t.deadline) < now)
-      .reduce((sum, t) => sum + t.logged_time, 0) / 3600;
+  // Calculate overdue tasks (incomplete tasks past deadline)
+  const overdueTasks = incompleteTasks.filter(
+    (t) => t.deadline && new Date(t.deadline) < now
+  );
 
+  // Calculate logged time for overdue incomplete tasks
+  const overdueTime = overdueTasks.reduce((sum, t) => sum + t.logged_time, 0) / 3600;
+
+  // Calculate totals
   const totalLoggedSeconds = tasks.reduce((sum, t) => sum + t.logged_time, 0);
+
+  // Average is calculated only for completed tasks
   const avgLoggedSeconds = completedTasks.length
     ? completedTasks.reduce((sum, t) => sum + t.logged_time, 0) / completedTasks.length
     : 0;
 
-  const overdueTasks = wipTasks.filter((t) => t.deadline && new Date(t.deadline) < now);
+  // Incomplete time includes In Progress, To Do, and Blocked tasks
+  const incompleteLoggedSeconds = incompleteTasks.reduce((sum, t) => sum + t.logged_time, 0);
 
   return {
     kind: 'loggedTime',
 
-    // Total logged time (hours) across ALL tasks (completed + WIP + overdue)
+    // Total logged time (hours) across ALL tasks (Completed + In Progress + Blocked + To Do)
     totalTime: totalLoggedSeconds / 3600,
 
     // Average logged time (hours) per COMPLETED task only
     avgTime: avgLoggedSeconds / 3600,
 
     // Count of tasks with status='Completed'
-    completedCount: completedTasks.length,
+    completedTasks: completedTasks.length,
 
-    // Count of WIP tasks that are past their deadline
-    overdueCount: overdueTasks.length,
+    // Count of incomplete tasks (In Progress/Blocked/To Do) that are past their deadline
+    overdueTasks: overdueTasks.length,
+
+    // Count of tasks with status='Blocked'
+    blockedTasks: blockedTasks.length,
 
     // Map of task IDs to logged seconds (includes parent task rollup)
     timeByTask: taskTimeMap,
 
-    // Total logged time (hours) for ALL non-completed tasks (includes both overdue and non-overdue WIP)
-    wipTime: wipTasks.reduce((sum, t) => sum + t.logged_time, 0) / 3600,
+    // Total logged time (hours) for ALL incomplete tasks (In Progress + Blocked + To Do)
+    incompleteTime: incompleteLoggedSeconds / 3600,
 
     // Ratio (0-1) of completed tasks done on-time vs total completed (updated_at <= deadline)
-    onTimeRate,
+    onTimeCompletionRate,
 
     // Total hours that completed tasks were late (sum of hours past deadline for completed tasks)
-    totalLateness,
+    totalDelayHours,
 
-    // Total logged time (hours) for WIP tasks that are OVERDUE (subset of wipTime)
-    overdueLoggedTime,
+    // Total logged time (hours) for incomplete tasks that are OVERDUE (subset of incompleteTime)
+    overdueTime,
   };
 }
 
-// Team Summary Report (example shape — tailor to your needs)
 // Team Summary Report
 export interface WeeklyUserTaskBreakdown {
   week: string; // "2024-W01"
@@ -162,11 +197,22 @@ export interface TeamSummaryReport {
   >;
 }
 
+/**
+ * Generate team summary report
+ * Groups tasks by week and user with status breakdowns
+ * 
+ * IMPORTANT: Fetches ALL tasks for selected projects/departments (no RLS filtering)
+ */
 export async function generateTeamSummaryReport(
   filters: ReportFilters
 ): Promise<TeamSummaryReport> {
-  const { projectIds, startDate, endDate } = filters;
-  const weeklyStats = await getWeeklyTaskStatsByUser({ projectIds, startDate, endDate });
+  const { projectIds, departmentIds, startDate, endDate } = filters;
+  const weeklyStats = await getWeeklyTaskStatsByUser({
+    projectIds,
+    departmentIds,
+    startDate,
+    endDate,
+  });
 
   // Calculate user totals
   const userTotals = new Map<
@@ -244,18 +290,18 @@ export async function generateTeamSummaryReport(
     // Count of unique users who have tasks in the filtered date range
     totalUsers: uniqueUsers,
 
-    // Array of weekly task breakdowns per user (week, userId, userName, status counts)
+    // Array of weekly task breakdowns per user (week, userId, userName, status counts including blocked)
     weeklyBreakdown: weeklyStats,
-    
-    // Map of userId to aggregated task counts across all weeks (userName, todo, inProgress, completed, blocked, total)
+
+    // Map of userId to aggregated task counts across all weeks (includes blocked count)
     userTotals,
 
-    // Map of week identifier to aggregated task counts across all users (weekStart, todo, inProgress, completed, blocked, total)
+    // Map of week identifier to aggregated task counts across all users (includes blocked count)
     weekTotals,
   };
 }
 
-// Task Completions Report (example shape — tailor to your needs)
+// Task Completions Report
 export interface UserTaskStats {
   userId: string;
   userName: string;
@@ -279,16 +325,23 @@ export interface TaskCompletionReport {
   totalCompleted: number;
   totalInProgress: number;
   totalTodo: number;
+  totalBlocked: number;
   overallCompletionRate: number; // 0-1
   userStats: UserTaskStats[];
   completedByProject: Map<number, number>;
 }
 
+/**
+ * Generate task completion report
+ * Analyzes completion rates, timing, and per-user statistics
+ * 
+ * IMPORTANT: Fetches ALL tasks for selected projects/departments (no RLS filtering)
+ */
 export async function generateTaskCompletionReport(
   filters: ReportFilters
 ): Promise<TaskCompletionReport> {
-  const { projectIds, startDate, endDate } = filters;
-  const tasks: Task[] = await getTasks({ projectIds, startDate, endDate });
+  const { projectIds, departmentIds, startDate, endDate } = filters;
+  const tasks: Task[] = await getTasks({ projectIds, departmentIds, startDate, endDate });
 
   // Get user info for display names
   const uniqueUserIds = [...new Set(tasks.map((t) => t.creator_id))].filter(
@@ -323,7 +376,7 @@ export async function generateTaskCompletionReport(
       const completed = userTasks.filter((t) => t.status === 'Completed');
       const inProgress = userTasks.filter((t) => t.status === 'In Progress');
       const todo = userTasks.filter((t) => t.status === 'To Do');
-      const blocked = userTasks.filter(t => t.status === 'Blocked');
+      const blocked = userTasks.filter((t) => t.status === 'Blocked');
 
       // Calculate average completion time (created_at to updated_at for completed tasks)
       const avgCompletionTime =
@@ -403,10 +456,13 @@ export async function generateTaskCompletionReport(
     // Count of tasks with status='To Do'
     totalTodo,
 
+    // Count of tasks with status='Blocked'
+    totalBlocked,
+
     // Ratio (0-1) of completed tasks vs total tasks
     overallCompletionRate,
 
-    // Array of per-user statistics (sorted by totalTasks descending) including completion rates, timing, and logged hours
+    // Array of per-user statistics (sorted by totalTasks descending) including blocked count
     userStats,
 
     // Map of project_id to count of completed tasks in that project

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 interface GetTasksOpts {
+  departmentIds?: number[];
   projectIds?: number[];
   startDate?: Date;
   endDate?: Date;

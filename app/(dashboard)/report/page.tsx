@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { DepartmentSelector, Department } from '@/components/filters/department-selector';
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
 import { DateRangeFilter, DateRangeType } from '@/components/filters/date-range-selector';
-import { startOfDay, endOfDay, format } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils'
 
 import { LoggedTimeReport } from '@/components/report/logged-time-report';
@@ -216,7 +216,7 @@ export default function ReportsPage() {
       <div className="mt-4">
         {!selectedDepartments.length && !selectedProjects.length ? (
           <div className="text-muted-foreground">
-            Please select depuartment(s) and/or project(s).{' '}
+            Please select department(s) and/or project(s).{' '}
           </div>
         ) : selectedReport === 'loggedTime' ? (
           <LoggedTimeReport
