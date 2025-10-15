@@ -991,7 +991,7 @@ export const notifications = [
     user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     title: 'Task assigned',
     message: 'You have been assigned to "Implement task board drag/drop".',
-    type: 'task',
+    type: 'task_assigned',
     read: false,
     created_at: new Date('2025-09-19T10:22:05+08:00'),
     updated_at: new Date('2025-09-19T10:22:05+08:00'),
