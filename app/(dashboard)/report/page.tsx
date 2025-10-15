@@ -212,7 +212,7 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Report Display */}
+{/* Report Display */}
       <div className="mt-4">
         {!selectedDepartments.length && !selectedProjects.length ? (
           <div className="text-muted-foreground">
@@ -232,6 +232,7 @@ export default function ReportsPage() {
             projectIds={reportProjectIds}
             startDate={dateRange.startDate?.toISOString()}
             endDate={dateRange.endDate?.toISOString()}
+            onDataLoaded={handleReportDataLoaded}
           />
         ) : (
           <TeamSummaryChart
@@ -239,6 +240,7 @@ export default function ReportsPage() {
             projectIds={reportProjectIds}
             startDate={dateRange.startDate?.toISOString()}
             endDate={dateRange.endDate?.toISOString()}
+            onDataLoaded={handleReportDataLoaded}
           />
         )}
       </div>

@@ -48,7 +48,7 @@ export const auth_users = [
   },
   {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kesteryeo.2024@computing.smu.edu.sg',
+    email: 'kester.yeo.2024@computing.smu.edu.sg',
     password: 'password123',
   },
 ];
@@ -156,40 +156,40 @@ export const user_info = [
   // Personal accounts
   {
     id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
-    first_name: 'Ryan',
-    last_name: 'Hung',
+    first_name: 'Bryan',
+    last_name: 'Hong',
     mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Managers',
   },
   {
     id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
-    first_name: 'Joel',
-    last_name: 'Wang',
+    first_name: 'Noel',
+    last_name: 'Tang',
     mode: 'dark',
     default_view: 'tasks',
     department_name: 'Senior Engineers',
   },
   {
     id: 'aa344933-c44b-4097-b0ac-56987a10734b',
-    first_name: 'Mitch',
-    last_name: 'Shona',
+    first_name: 'Michelle',
+    last_name: 'Jhona',
     mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Executive',
   },
   {
     id: '235d62da-62cc-484b-8715-6683b2a3805a',
-    first_name: 'Garrison',
-    last_name: 'Koh',
+    first_name: 'Garry',
+    last_name: 'Toh',
     mode: 'light',
     default_view: 'tasks',
     department_name: 'System Solutioning Division Director',
   },
   {
     id: '9a3c4306-8beb-494a-aee9-ba71a444f19a',
-    first_name: 'Kester',
-    last_name: 'Yeo',
+    first_name: 'Chester',
+    last_name: 'Nut',
     mode: 'dark',
     default_view: 'tasks',
     department_name: 'Junior Engineers',
@@ -220,11 +220,11 @@ export const user_roles = [
   { user_id: '67393282-3a06-452b-a05a-9c93a95b597f', role: 'staff' }, // Kester (SMU)
 
   // Mirror roles on personal accounts for future tests:
-  { user_id: 'baa47e05-2dba-4f12-8321-71769a9a3702', role: 'staff' }, // Joel (personal)
-  { user_id: 'aa344933-c44b-4097-b0ac-56987a10734b', role: 'staff' }, // Mitch (personal)
-  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' }, // Ryan (personal)
-  { user_id: '235d62da-62cc-484b-8715-6683b2a3805a', role: 'staff' }, // Garrison (personal)
-  { user_id: '9a3c4306-8beb-494a-aee9-ba71a444f19a', role: 'staff' }, // Kester (personal)
+  { user_id: 'baa47e05-2dba-4f12-8321-71769a9a3702', role: 'staff' }, // Noel (personal)
+  { user_id: 'aa344933-c44b-4097-b0ac-56987a10734b', role: 'staff' }, // Mitchelle (personal)
+  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' }, // Bryan (personal)
+  { user_id: '235d62da-62cc-484b-8715-6683b2a3805a', role: 'staff' }, // Garry (personal)
+  { user_id: '9a3c4306-8beb-494a-aee9-ba71a444f19a', role: 'staff' }, // Chester (personal)
 ];
 
 /* ======================== PROJECTS & LINKS ======================== */

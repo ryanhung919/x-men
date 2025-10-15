@@ -34,11 +34,11 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
         try {
           const roles = await getRolesForUserClient(supabase, userId)
           if (roles.includes('manager')) {
-            router.push('/dashboard')
+            router.push('/tasks')
             return
           }
           else {
-            router.push('/report')
+            router.push('/tasks')
           }
         } catch (rolesErr) {
           console.warn('Failed to load roles, defaulting redirect', rolesErr)

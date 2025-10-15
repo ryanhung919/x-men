@@ -18,36 +18,57 @@ const adminClient = createClient(
 );
 
 // Test user credentials from sample-data.ts
+// All SMU accounts have admin role in the seeded data
 export const testUsers = {
   joel: {
     id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
     email: 'joel.wang.2023@scis.smu.edu.sg',
     password: 'password123',
     department: 'Engineering Operations Division Director',
+    roles: ['admin', 'manager', 'staff'], // SMU accounts have all roles
   },
   mitch: {
     id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
     email: 'mitch.shona.2023@scis.smu.edu.sg',
     password: 'password123',
     department: 'Finance Director',
+    roles: ['admin', 'manager', 'staff'],
   },
   garrison: {
     id: '32635261-038c-4405-b6ed-2d446738f94c',
     email: 'garrisonkoh.2023@scis.smu.edu.sg',
     password: 'password123',
     department: 'System Solutioning Division Director',
+    roles: ['admin', 'manager', 'staff'],
   },
   ryan: {
     id: '61ca6b82-6d42-4058-bb4c-9316e7079b24',
     email: 'ryan.hung.2023@scis.smu.edu.sg',
     password: 'password123',
     department: 'Finance Director',
+    roles: ['admin', 'manager', 'staff'],
   },
   kester: {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kesteryeo.2024@computing.smu.edu.sg',
+    email: 'kester.yeo.2024@computing.smu.edu.sg',
     password: 'password123',
     department: 'Engineering Operations Division Director',
+    roles: ['admin', 'manager', 'staff'],
+  },
+  // Personal accounts (staff only) - for testing non-admin access
+  joelPersonal: {
+    id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
+    email: 'joel.wang.03@gmail.com',
+    password: 'password123',
+    department: 'Senior Engineers',
+    roles: ['staff'],
+  },
+  mitchPersonal: {
+    id: 'aa344933-c44b-4097-b0ac-56987a10734b',
+    email: 'mitchshonaaa@gmail.com',
+    password: 'password123',
+    department: 'Finance Executive',
+    roles: ['staff'],
   },
 };
 
@@ -148,6 +169,35 @@ async function seedDatabase(): Promise<void> {
   }
 }
 
+/**
+ * Verify user roles are correctly seeded
+ */
+async function verifyUserRoles(): Promise<void> {
+  console.log('🔐 Verifying user roles...');
+  
+  for (const [key, userData] of Object.entries(testUsers)) {
+    const { data: roles, error } = await adminClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userData.id);
+
+    if (error) {
+      console.error(`Error fetching roles for ${key}:`, error);
+      continue;
+    }
+
+    const actualRoles = roles?.map(r => r.role) || [];
+    const expectedRoles = userData.roles;
+
+    const missingRoles = expectedRoles.filter(r => !actualRoles.includes(r));
+    if (missingRoles.length > 0) {
+      console.warn(`⚠️  User ${key} missing roles: ${missingRoles.join(', ')}`);
+    }
+  }
+  
+  console.log('✅ User roles verified');
+}
+
 // Run before all integration tests
 beforeAll(async () => {
   console.log('\n🔧 Setting up integration test environment...');
@@ -180,6 +230,9 @@ beforeAll(async () => {
   } else {
     console.log('✅ Database already seeded');
   }
+
+  // Verify user roles
+  await verifyUserRoles();
 
   console.log('✅ Integration test environment ready\n');
 }, 120000); // 2 minute timeout for setup

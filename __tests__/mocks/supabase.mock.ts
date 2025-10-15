@@ -108,10 +108,6 @@ export function createMockSupabaseClientWithData(responses: Record<string, any> 
 
   return mockClient;
 }
-
-/**
- * Setup default Supabase mocks for all tests
- */
 /**
  * Setup default Supabase mocks for all tests
  */

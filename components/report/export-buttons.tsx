@@ -37,18 +37,55 @@ export interface LoggedTimeReport {
 export interface TeamSummaryReport {
   kind: 'teamSummary';
   totalTasks: number;
-  tasksByCreator: Map<string, number>;
-  avgTasksPerMember?: number;
+  totalUsers: number;
+  weeklyBreakdown: Array<{
+    week: string;
+    weekStart: string;
+    userId: string;
+    userName: string;
+    todo: number;
+    inProgress: number;
+    completed: number;
+    blocked: number;
+    total: number;
+  }>;
+  userTotals: Map<string, {
+    userName: string;
+    todo: number;
+    inProgress: number;
+    completed: number;
+    blocked: number;
+    total: number;
+  }>;
   kpis: KPI[];
   charts?: ChartData[];
 }
 
 export interface TaskCompletionReport {
   kind: 'taskCompletions';
-  completionRate: number;
-  completedByProject: Map<string, number>;
-  totalCompleted?: number;
-  totalPending?: number;
+  totalTasks: number;
+  totalCompleted: number;
+  totalInProgress: number;
+  totalTodo: number;
+  totalBlocked: number;
+  overallCompletionRate: number;
+  userStats: Array<{
+    userId: string;
+    userName: string;
+    totalTasks: number;
+    completedTasks: number;
+    inProgressTasks: number;
+    todoTasks: number;
+    blockedTasks: number;
+    completionRate: number;
+    avgCompletionTime: number;
+    onTimeCompletions: number;
+    lateCompletions: number;
+    onTimeRate: number;
+    totalLoggedTime: number;
+    avgLoggedTimePerTask: number;
+  }>;
+  completedByProject: Map<number, number>;
   kpis: KPI[];
   charts?: ChartData[];
 }
@@ -71,6 +108,27 @@ function getMetricDescription(key: string, report: AnyReport): string {
     };
     return descriptions[key] || '';
   }
+  
+  if (report.kind === 'teamSummary') {
+    const descriptions: Record<string, string> = {
+      totalTasks: 'Total number of tasks across all team members in the selected time period',
+      totalUsers: 'Number of unique users with assigned tasks in the selected period',
+    };
+    return descriptions[key] || '';
+  }
+  
+  if (report.kind === 'taskCompletions') {
+    const descriptions: Record<string, string> = {
+      totalTasks: 'Total number of tasks across all users',
+      totalCompleted: 'Number of tasks marked as Completed',
+      totalInProgress: 'Number of tasks currently In Progress',
+      totalTodo: 'Number of tasks in To Do status',
+      totalBlocked: 'Number of tasks that are Blocked',
+      overallCompletionRate: 'Percentage of all tasks that have been completed',
+    };
+    return descriptions[key] || '';
+  }
+  
   return '';
 }
 
@@ -104,16 +162,90 @@ function getBreakdowns(
   report: AnyReport
 ): Array<{ title: string; data: Array<Record<string, any>> }> {
   const breakdowns: Array<{ title: string; data: Array<Record<string, any>> }> = [];
-  Object.entries(report).forEach(([key, value]) => {
-    if (!(value instanceof Map) || value.size === 0) return;
-    breakdowns.push({
-      title: toLabel(key),
-      data: Array.from(value.entries()).map(([k, v]) => ({
-        [toLabel(key.replace(/By|Per/i, ''))]: k,
-        Hours: typeof v === 'number' ? (v / 3600).toFixed(2) : v, // Convert seconds to hours
-      })),
+  
+  if (report.kind === 'loggedTime') {
+    Object.entries(report).forEach(([key, value]) => {
+      if (!(value instanceof Map) || value.size === 0) return;
+      breakdowns.push({
+        title: toLabel(key),
+        data: Array.from(value.entries()).map(([k, v]) => ({
+          [toLabel(key.replace(/By|Per/i, ''))]: k,
+          Hours: typeof v === 'number' ? (v / 3600).toFixed(2) : v,
+        })),
+      });
     });
-  });
+  }
+  
+  if (report.kind === 'teamSummary') {
+    // Weekly breakdown
+    if (report.weeklyBreakdown && report.weeklyBreakdown.length > 0) {
+      breakdowns.push({
+        title: 'Weekly Task Breakdown by User',
+        data: report.weeklyBreakdown.map(w => ({
+          Week: w.week,
+          'Week Start': new Date(w.weekStart).toLocaleDateString(),
+          User: w.userName,
+          'To Do': w.todo,
+          'In Progress': w.inProgress,
+          Completed: w.completed,
+          Blocked: w.blocked,
+          Total: w.total,
+        })),
+      });
+    }
+    
+    // User totals
+    if (report.userTotals && report.userTotals.size > 0) {
+      breakdowns.push({
+        title: 'User Task Totals',
+        data: Array.from(report.userTotals.entries()).map(([userId, data]) => ({
+          User: data.userName,
+          'To Do': data.todo,
+          'In Progress': data.inProgress,
+          Completed: data.completed,
+          Blocked: data.blocked,
+          Total: data.total,
+          'Completion Rate': `${((data.completed / data.total) * 100).toFixed(1)}%`,
+        })),
+      });
+    }
+  }
+  
+  if (report.kind === 'taskCompletions') {
+    // User stats breakdown
+    if (report.userStats && report.userStats.length > 0) {
+      breakdowns.push({
+        title: 'User Task Completion Statistics',
+        data: report.userStats.map(u => ({
+          User: u.userName,
+          'Total Tasks': u.totalTasks,
+          Completed: u.completedTasks,
+          'In Progress': u.inProgressTasks,
+          'To Do': u.todoTasks,
+          Blocked: u.blockedTasks,
+          'Completion Rate': `${(u.completionRate * 100).toFixed(1)}%`,
+          'Avg Completion Time (hrs)': u.avgCompletionTime.toFixed(1),
+          'On-Time': u.onTimeCompletions,
+          Late: u.lateCompletions,
+          'On-Time Rate': `${(u.onTimeRate * 100).toFixed(1)}%`,
+          'Total Logged Time (hrs)': u.totalLoggedTime.toFixed(1),
+          'Avg Time/Task (hrs)': u.avgLoggedTimePerTask.toFixed(1),
+        })),
+      });
+    }
+    
+    // Completed by project
+    if (report.completedByProject && report.completedByProject.size > 0) {
+      breakdowns.push({
+        title: 'Completed Tasks by Project',
+        data: Array.from(report.completedByProject.entries()).map(([projectId, count]) => ({
+          'Project ID': projectId,
+          'Completed Tasks': count,
+        })),
+      });
+    }
+  }
+  
   return breakdowns;
 }
 

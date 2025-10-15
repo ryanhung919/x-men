@@ -38,6 +38,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Only admins can access reports
+    if (['time', 'team', 'task'].includes(action)) {
+      const { data: roleRows, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (roleError) {
+        console.error('Error checking user roles:', roleError);
+        return NextResponse.json({ error: 'Failed to verify permissions' }, { status: 500 });
+      }
+
+      const roles = roleRows?.map((r: { role: string }) => r.role) || [];
+      const isAdmin = roles.includes('admin');
+
+      if (!isAdmin) {
+        return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+      }
+    }
+
     // Common filters
     const departmentIds = parseArrayParam(searchParams.get('departmentIds'));
     const projectIds = parseArrayParam(searchParams.get('projectIds'));

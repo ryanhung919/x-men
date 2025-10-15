@@ -42,6 +42,15 @@ describe('app/api/reports/route', () => {
     return new NextRequest(new URL(url, 'http://localhost:3000'));
   }
 
+  function mockUserRoles(userId: string, roles: string[]) {
+    mockSupabaseClient.from = vi.fn().mockReturnThis();
+    mockSupabaseClient.select = vi.fn().mockReturnThis();
+    mockSupabaseClient.eq = vi.fn().mockResolvedValue({
+      data: roles.map((role) => ({ role })),
+      error: null,
+    });
+  }
+
   describe('GET /api/reports', () => {
     describe('action=departments', () => {
       it('should return departments for authenticated user', async () => {
@@ -181,6 +190,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
@@ -228,6 +238,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
@@ -271,6 +282,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
@@ -346,6 +358,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -387,6 +400,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -420,6 +434,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -473,6 +488,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -602,6 +618,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -635,6 +652,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockRejectedValue(
           new Error('Database connection failed')
@@ -689,6 +707,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
 
@@ -741,6 +760,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
 
@@ -777,6 +797,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
 
@@ -887,6 +908,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue({
           kind: 'loggedTime' as const,
@@ -922,6 +944,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue({
           kind: 'loggedTime',

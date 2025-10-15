@@ -11,12 +11,19 @@ import {
 } from '@/components/ui/chart';
 import { Pie, PieChart } from 'recharts';
 import { User } from 'lucide-react';
+import type {
+  TaskCompletionReport as TaskCompletionReportType,
+  KPI,
+  ChartData,
+} from '@/components/report/export-buttons';
+
 
 interface Props {
   departmentIds?: number[];
   projectIds?: number[];
   startDate?: string;
   endDate?: string;
+  onDataLoaded?: (data: TaskCompletionReportType) => void;
 }
 
 interface UserStats {
@@ -63,6 +70,7 @@ export function TaskCompletionsChart({
   projectIds = [],
   startDate,
   endDate,
+  onDataLoaded,
 }: Props) {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -104,6 +112,70 @@ export function TaskCompletionsChart({
 
           prevDataRef.current = newData;
           setData(newData);
+
+          // Generate export data
+          if (onDataLoaded) {
+            const kpis: KPI[] = [
+              { label: 'Total Tasks', value: newData.totalTasks, unit: 'tasks' },
+              { label: 'Completed', value: newData.totalCompleted, unit: 'tasks' },
+              { label: 'In Progress', value: newData.totalInProgress, unit: 'tasks' },
+              { label: 'To Do', value: newData.totalTodo, unit: 'tasks' },
+              { label: 'Blocked', value: newData.totalBlocked, unit: 'tasks' },
+              {
+                label: 'Overall Completion Rate',
+                value: round(newData.overallCompletionRate * 100, 1),
+                unit: '%',
+              },
+            ];
+
+            const charts: ChartData[] = [
+              {
+                type: 'pie',
+                title: 'Task Status Distribution',
+                data: [
+                  { label: 'Completed', value: newData.totalCompleted },
+                  { label: 'In Progress', value: newData.totalInProgress },
+                  { label: 'To Do', value: newData.totalTodo },
+                  { label: 'Blocked', value: newData.totalBlocked },
+                ],
+              },
+              {
+                type: 'bar',
+                title: 'Top 10 Users by Total Tasks',
+                data: newData.userStats.slice(0, 10).map((u) => ({
+                  label: u.userName,
+                  value: u.totalTasks,
+                })),
+              },
+              {
+                type: 'bar',
+                title: 'Top 10 Users by Completion Rate',
+                data: newData.userStats
+                  .filter((u) => u.totalTasks > 0)
+                  .sort((a, b) => b.completionRate - a.completionRate)
+                  .slice(0, 10)
+                  .map((u) => ({
+                    label: u.userName,
+                    value: round(u.completionRate * 100, 1),
+                  })),
+              },
+            ];
+
+            const exportData: TaskCompletionReportType = {
+              kind: 'taskCompletions',
+              totalTasks: newData.totalTasks,
+              totalCompleted: newData.totalCompleted,
+              totalInProgress: newData.totalInProgress,
+              totalTodo: newData.totalTodo,
+              totalBlocked: newData.totalBlocked,
+              overallCompletionRate: newData.overallCompletionRate,
+              userStats: newData.userStats,
+              completedByProject: new Map(),
+              kpis,
+              charts,
+            };
+            onDataLoaded(exportData);
+          }
         }
       } catch (err) {
         console.error(err);
