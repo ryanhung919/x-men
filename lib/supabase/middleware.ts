@@ -38,16 +38,45 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/api') &&
-    request.nextUrl.pathname !== '/' &&
-    request.nextUrl.pathname !== '/seed'
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  // Check if user is trying to access protected routes
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api')
+  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/seed'
+  const isReportRoute = request.nextUrl.pathname.startsWith('/report')
+
+  // Redirect to login if not authenticated (except for API, public routes)
+  if (!user && !isApiRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  // Check admin role for /report routes
+  if (user && isReportRoute) {
+    const userId = user.sub as string
+    
+    // Fetch user roles
+    const { data: roleRows, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+
+    if (error) {
+      console.error('Error checking user roles:', error)
+      // Redirect to tasks page if we can't verify role
+      const url = request.nextUrl.clone()
+      url.pathname = '/tasks'
+      return NextResponse.redirect(url)
+    }
+
+    const roles = roleRows?.map((r: { role: string }) => r.role) || []
+    const isAdmin = roles.includes('admin')
+
+    // Redirect non-admins away from report routes
+    if (!isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/unauthorized'
+      return NextResponse.redirect(url)
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.

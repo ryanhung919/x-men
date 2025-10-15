@@ -11,12 +11,18 @@ import {
 } from '@/components/ui/chart';
 import { Bar, BarChart, XAxis, YAxis, Legend } from 'recharts';
 import { Users, TrendingUp, Calendar } from 'lucide-react';
+import type {
+  TeamSummaryReport as TeamSummaryReportType,
+  KPI,
+  ChartData,
+} from '@/components/report/export-buttons';
 
 interface Props {
   departmentIds?: number[];
   projectIds?: number[];
   startDate?: string;
   endDate?: string;
+  onDataLoaded?: (data: TeamSummaryReportType) => void;
 }
 
 interface WeeklyData {
@@ -100,6 +106,7 @@ export function TeamSummaryChart({
   projectIds = [],
   startDate,
   endDate,
+  onDataLoaded,
 }: Props) {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -147,6 +154,15 @@ export function TeamSummaryChart({
 
           // Transform user data
           const userTotals: UserData[] = [];
+          const userTotalsMap = new Map<string, {
+            userName: string;
+            todo: number;
+            inProgress: number;
+            completed: number;
+            blocked: number;
+            total: number;
+          }>();
+
           if (json.userTotals) {
             Object.entries(json.userTotals).forEach(([userId, data]: [string, any]) => {
               const total = data.total || 1;
@@ -159,6 +175,15 @@ export function TeamSummaryChart({
                 blocked: data.blocked,
                 total: data.total,
                 completionRate: (data.completed / total) * 100,
+              });
+
+              userTotalsMap.set(userId, {
+                userName: data.userName,
+                todo: data.todo,
+                inProgress: data.inProgress,
+                completed: data.completed,
+                blocked: data.blocked,
+                total: data.total,
               });
             });
           }
@@ -176,6 +201,71 @@ export function TeamSummaryChart({
 
           prevDataRef.current = newData;
           setData(newData);
+
+          // Generate export data
+          if (onDataLoaded) {
+            const kpis: KPI[] = [
+              { label: 'Total Tasks', value: newData.totalTasks, unit: 'tasks' },
+              { label: 'Active Users', value: newData.totalUsers, unit: 'users' },
+              { label: 'Weeks Tracked', value: weeklyTotals.length, unit: 'weeks' },
+              {
+                label: 'Avg Tasks per User',
+                value: newData.totalUsers > 0 ? round(newData.totalTasks / newData.totalUsers, 1) : 0,
+                unit: 'tasks/user',
+              },
+            ];
+
+            const charts: ChartData[] = [];
+
+            // Weekly trend chart (total tasks per week)
+            if (weeklyTotals.length > 0) {
+              charts.push({
+                type: 'bar',
+                title: 'Total Tasks by Week',
+                data: weeklyTotals.map((w) => ({
+                  label: w.week,
+                  value: w.total,
+                })),
+              });
+
+              // Status breakdown for latest week
+              const latestWeek = weeklyTotals[weeklyTotals.length - 1];
+              charts.push({
+                type: 'pie',
+                title: `Status Distribution (${latestWeek.week})`,
+                data: [
+                  { label: 'Completed', value: latestWeek.completed },
+                  { label: 'In Progress', value: latestWeek.inProgress },
+                  { label: 'To Do', value: latestWeek.todo },
+                  { label: 'Blocked', value: latestWeek.blocked },
+                ],
+              });
+            }
+
+            // Top users by total tasks
+            charts.push({
+              type: 'bar',
+              title: 'Top 10 Users by Total Tasks',
+              data: userTotals.slice(0, 10).map((u) => ({
+                label: u.userName,
+                value: u.total,
+              })),
+            });
+
+            // Weekly breakdown data for export
+            const weeklyBreakdown = json.weeklyBreakdown || [];
+
+            const exportData: TeamSummaryReportType = {
+              kind: 'teamSummary',
+              totalTasks: newData.totalTasks,
+              totalUsers: newData.totalUsers,
+              weeklyBreakdown,
+              userTotals: userTotalsMap,
+              kpis,
+              charts,
+            };
+            onDataLoaded(exportData);
+          }
         }
       } catch (err) {
         console.error(err);

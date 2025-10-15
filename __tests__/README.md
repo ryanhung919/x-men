@@ -6,21 +6,26 @@ This project uses a comprehensive testing strategy with unit and integration tes
 
 ```
 __tests__/
-├── unit/                    # Unit tests (mocked dependencies)
+├── fixtures/               # Test data fixtures
+│   └── database.fixtures.ts
+├── helpers/                # helper functions
+├── integration/            # Integration tests (real database)
+│   ├── app/
+    │   └── api/
+│   └── lib/
+├── unit/                   # Unit tests (mocked dependencies)
+│   ├── app/
+    │   └── api/
 │   ├── lib/
 │   │   ├── db/             # Database layer tests
 │   │   └── services/       # Service layer tests
 │   └── components/         # Component tests
-├── integration/            # Integration tests (real database)
-│   └── lib/
-│       └── filter.integration.test.ts
 ├── setup/                  # Test setup files
 │   ├── vitest.setup.ts    # Unit test setup
 │   └── integration.setup.ts # Integration test setup
 ├── mocks/                  # Mock utilities
 │   └── supabase.mock.ts
-└── fixtures/               # Test data fixtures
-    └── database.fixtures.ts
+
 ```
 
 ## Running Tests

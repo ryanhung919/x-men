@@ -42,6 +42,15 @@ describe('app/api/reports/route', () => {
     return new NextRequest(new URL(url, 'http://localhost:3000'));
   }
 
+  function mockUserRoles(userId: string, roles: string[]) {
+    mockSupabaseClient.from = vi.fn().mockReturnThis();
+    mockSupabaseClient.select = vi.fn().mockReturnThis();
+    mockSupabaseClient.eq = vi.fn().mockResolvedValue({
+      data: roles.map((role) => ({ role })),
+      error: null,
+    });
+  }
+
   describe('GET /api/reports', () => {
     describe('action=departments', () => {
       it('should return departments for authenticated user', async () => {
@@ -88,7 +97,7 @@ describe('app/api/reports/route', () => {
         expect(filterDepartments).toHaveBeenCalledWith(authUsersFixtures.alice.id, projectIds);
       });
 
-      it('should return empty array for unauthenticated user', async () => {
+      it('should return 401 for unauthenticated user', async () => {
         mockSupabaseClient.auth = {
           getUser: vi.fn().mockResolvedValue({
             data: { user: null },
@@ -100,8 +109,8 @@ describe('app/api/reports/route', () => {
         const response = await GET(request);
         const data = await response.json();
 
-        expect(response.status).toBe(200);
-        expect(data).toEqual([]);
+        expect(response.status).toBe(401);
+        expect(data.error).toBe('Unauthorized');
       });
     });
 
@@ -165,13 +174,14 @@ describe('app/api/reports/route', () => {
           kind: 'loggedTime' as const,
           totalTime: 10,
           avgTime: 5,
-          completedCount: 3,
-          overdueCount: 1,
+          completedTasks: 3,
+          overdueTasks: 1,
+          blockedTasks: 0,
           timeByTask: new Map(),
-          wipTime: 2,
-          onTimeRate: 0.8,
-          totalLateness: 1.5,
-          overdueLoggedTime: 0.5,
+          incompleteTime: 2,
+          onTimeCompletionRate: 0.8,
+          totalDelayHours: 1.5,
+          overdueTime: 0.5,
         };
 
         mockSupabaseClient.auth = {
@@ -180,6 +190,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
@@ -192,10 +203,12 @@ describe('app/api/reports/route', () => {
           kind: 'loggedTime',
           totalTime: 10,
           avgTime: 5,
-          completedCount: 3,
+          completedTasks: 3,
+          overdueTasks: 1,
+          blockedTasks: 0,
         });
         expect(generateLoggedTimeReport).toHaveBeenCalledWith({
-          projectIds: [],
+          projectIds: undefined,
           startDate: undefined,
           endDate: undefined,
         });
@@ -209,13 +222,14 @@ describe('app/api/reports/route', () => {
           kind: 'loggedTime' as const,
           totalTime: 10,
           avgTime: 5,
-          completedCount: 3,
-          overdueCount: 0,
+          completedTasks: 3,
+          overdueTasks: 0,
+          blockedTasks: 0,
           timeByTask: new Map(),
-          wipTime: 0,
-          onTimeRate: 1,
-          totalLateness: 0,
-          overdueLoggedTime: 0,
+          incompleteTime: 0,
+          onTimeCompletionRate: 1,
+          totalDelayHours: 0,
+          overdueTime: 0,
         };
 
         mockSupabaseClient.auth = {
@@ -224,6 +238,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
@@ -251,13 +266,14 @@ describe('app/api/reports/route', () => {
           kind: 'loggedTime' as const,
           totalTime: 0,
           avgTime: 0,
-          completedCount: 0,
-          overdueCount: 0,
+          completedTasks: 0,
+          overdueTasks: 0,
+          blockedTasks: 0,
           timeByTask: new Map(),
-          wipTime: 0,
-          onTimeRate: 0,
-          totalLateness: 0,
-          overdueLoggedTime: 0,
+          incompleteTime: 0,
+          onTimeCompletionRate: 0,
+          totalDelayHours: 0,
+          overdueTime: 0,
         };
 
         mockSupabaseClient.auth = {
@@ -266,6 +282,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue(mockReportData);
 
@@ -341,6 +358,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -357,7 +375,7 @@ describe('app/api/reports/route', () => {
         expect(data.weeklyBreakdown).toBeDefined();
         expect(data.weeklyBreakdown).toHaveLength(1);
         expect(generateTeamSummaryReport).toHaveBeenCalledWith({
-          projectIds: [],
+          projectIds: undefined,
           startDate: undefined,
           endDate: undefined,
         });
@@ -382,6 +400,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -415,6 +434,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -468,6 +488,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -597,6 +618,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockResolvedValue(mockReportData);
 
@@ -630,6 +652,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTeamSummaryReport).mockRejectedValue(
           new Error('Database connection failed')
@@ -684,6 +707,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
 
@@ -708,7 +732,7 @@ describe('app/api/reports/route', () => {
           completionRate: 0.6,
         });
         expect(generateTaskCompletionReport).toHaveBeenCalledWith({
-          projectIds: [],
+          projectIds: undefined,
           startDate: undefined,
           endDate: undefined,
         });
@@ -736,6 +760,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
 
@@ -772,6 +797,7 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateTaskCompletionReport).mockResolvedValue(mockReportData);
 
@@ -882,18 +908,20 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue({
           kind: 'loggedTime' as const,
           totalTime: 0,
           avgTime: 0,
-          completedCount: 0,
-          overdueCount: 0,
+          completedTasks: 0,
+          overdueTasks: 0,
+          blockedTasks: 0,
           timeByTask: new Map(),
-          wipTime: 0,
-          onTimeRate: 0,
-          totalLateness: 0,
-          overdueLoggedTime: 0,
+          incompleteTime: 0,
+          onTimeCompletionRate: 0,
+          totalDelayHours: 0,
+          overdueTime: 0,
         });
 
         const request = createMockRequest(
@@ -916,25 +944,27 @@ describe('app/api/reports/route', () => {
             error: null,
           }),
         } as any;
+        mockUserRoles(authUsersFixtures.alice.id, ['admin']);
 
         vi.mocked(generateLoggedTimeReport).mockResolvedValue({
           kind: 'loggedTime',
           totalTime: 0,
           avgTime: 0,
-          completedCount: 0,
-          overdueCount: 0,
+          completedTasks: 0,
+          overdueTasks: 0,
+          blockedTasks: 0,
           timeByTask: new Map(),
-          wipTime: 0,
-          onTimeRate: 0,
-          totalLateness: 0,
-          overdueLoggedTime: 0,
+          incompleteTime: 0,
+          onTimeCompletionRate: 0,
+          totalDelayHours: 0,
+          overdueTime: 0,
         });
 
         const request = createMockRequest('/api/reports?action=time&startDate=invalid-date');
         await GET(request);
 
         expect(generateLoggedTimeReport).toHaveBeenCalledWith({
-          projectIds: [],
+          projectIds: undefined,
           startDate: undefined, // Invalid date becomes undefined
           endDate: undefined,
         });

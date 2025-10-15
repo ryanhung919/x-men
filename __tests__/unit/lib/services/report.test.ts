@@ -54,17 +54,17 @@ describe('lib/services/report', () => {
       expect(result).toHaveProperty('kind', 'loggedTime');
       expect(result).toHaveProperty('totalTime');
       expect(result).toHaveProperty('avgTime');
-      expect(result).toHaveProperty('completedCount', 2);
-      expect(result).toHaveProperty('overdueCount', 1);
-      expect(result).toHaveProperty('onTimeRate');
-      expect(result).toHaveProperty('totalLateness');
-      expect(result).toHaveProperty('wipTime');
-      expect(result).toHaveProperty('overdueLoggedTime');
+      expect(result).toHaveProperty('completedTasks', 2);
+      expect(result).toHaveProperty('overdueTasks', 1);
+      expect(result).toHaveProperty('onTimeCompletionRate');
+      expect(result).toHaveProperty('totalDelayHours');
+      expect(result).toHaveProperty('incompleteTime');
+      expect(result).toHaveProperty('overdueTime');
 
       // Verify calculations
-      expect(result.completedCount).toBe(2);
-      expect(result.overdueCount).toBe(1);
-      expect(result.onTimeRate).toBe(0.5); // 1 out of 2 on time
+      expect(result.completedTasks).toBe(2);
+      expect(result.overdueTasks).toBe(1);
+      expect(result.onTimeCompletionRate).toBe(0.5); // 1 out of 2 on time
     });
 
     it('should calculate total time correctly', async () => {
@@ -104,7 +104,7 @@ describe('lib/services/report', () => {
 
       const result = await generateLoggedTimeReport({});
 
-      expect(result.onTimeRate).toBe(0); // No deadlines to compare
+      expect(result.onTimeCompletionRate).toBe(0); // No deadlines to compare
     });
 
     it('should handle empty task list', async () => {
@@ -114,8 +114,8 @@ describe('lib/services/report', () => {
 
       expect(result.totalTime).toBe(0);
       expect(result.avgTime).toBe(0);
-      expect(result.completedCount).toBe(0);
-      expect(result.overdueCount).toBe(0);
+      expect(result.completedTasks).toBe(0);
+      expect(result.overdueTasks).toBe(0);
     });
 
     it('should rollup logged time for subtasks to parent', async () => {
@@ -145,7 +145,7 @@ describe('lib/services/report', () => {
       expect(result.timeByTask.get(2)).toBe(1800);
     });
 
-    it('should calculate overdue logged time correctly', async () => {
+    it('should calculate overdue time correctly', async () => {
       const now = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -162,10 +162,10 @@ describe('lib/services/report', () => {
 
       const result = await generateLoggedTimeReport({});
 
-      expect(result.overdueLoggedTime).toBe(2);
+      expect(result.overdueTime).toBe(2);
     });
 
-    it('should calculate lateness in hours', async () => {
+    it('should calculate delay in hours', async () => {
       const mockTasks = [
         {
           ...tasks[0],
@@ -180,7 +180,7 @@ describe('lib/services/report', () => {
 
       const result = await generateLoggedTimeReport({});
 
-      expect(result.totalLateness).toBeGreaterThan(0);
+      expect(result.totalDelayHours).toBeGreaterThan(0);
     });
 
     it('should pass filters to getTasks', async () => {
@@ -201,6 +201,117 @@ describe('lib/services/report', () => {
         startDate,
         endDate,
       });
+    });
+
+    it('should calculate incomplete time correctly', async () => {
+      const mockTasks = [
+        { ...tasks[0], logged_time: 3600, status: 'Completed' },
+        { ...tasks[1], logged_time: 7200, status: 'In Progress' },
+        { ...tasks[2], logged_time: 1800, status: 'Blocked' },
+        { ...tasks[3], logged_time: 900, status: 'To Do' },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateLoggedTimeReport({});
+
+      // Incomplete time: (7200 + 1800 + 900) / 3600 = 2.75 hours
+      expect(result.incompleteTime).toBe(2.75);
+    });
+
+    it('should count blocked tasks separately', async () => {
+      const mockTasks = [
+        { ...tasks[0], status: 'Completed', logged_time: 3600 },
+        { ...tasks[1], status: 'Blocked', logged_time: 1800 },
+        { ...tasks[2], status: 'Blocked', logged_time: 900 },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateLoggedTimeReport({});
+
+      expect(result.blockedTasks).toBe(2);
+    });
+
+    it('should handle all incomplete statuses in incompleteTime', async () => {
+      const mockTasks = [
+        { ...tasks[0], logged_time: 3600, status: 'In Progress' },
+        { ...tasks[1], logged_time: 1800, status: 'Blocked' },
+        { ...tasks[2], logged_time: 900, status: 'To Do' },
+        { ...tasks[3], logged_time: 7200, status: 'Completed' },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateLoggedTimeReport({});
+
+      // Should include In Progress, Blocked, and To Do (not Completed)
+      expect(result.incompleteTime).toBe((3600 + 1800 + 900) / 3600);
+      expect(result.totalTime).toBe((3600 + 1800 + 900 + 7200) / 3600);
+    });
+
+    it('should calculate onTimeCompletionRate as ratio of on-time to total completed', async () => {
+      const mockTasks = [
+        {
+          ...tasks[0],
+          status: 'Completed',
+          logged_time: 3600,
+          deadline: '2024-01-15T00:00:00Z',
+          updated_at: '2024-01-14T00:00:00Z', // On time
+        },
+        {
+          ...tasks[1],
+          status: 'Completed',
+          logged_time: 3600,
+          deadline: '2024-01-15T00:00:00Z',
+          updated_at: '2024-01-14T00:00:00Z', // On time
+        },
+        {
+          ...tasks[2],
+          status: 'Completed',
+          logged_time: 3600,
+          deadline: '2024-01-15T00:00:00Z',
+          updated_at: '2024-01-20T00:00:00Z', // Late
+        },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateLoggedTimeReport({});
+
+      expect(result.onTimeCompletionRate).toBeCloseTo(2 / 3, 2); // 2 out of 3 on time
+    });
+
+    it('should only count overdue tasks that are incomplete', async () => {
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      const mockTasks = [
+        {
+          ...tasks[0],
+          status: 'In Progress',
+          logged_time: 3600,
+          deadline: yesterday.toISOString(), // Overdue
+        },
+        {
+          ...tasks[1],
+          status: 'Blocked',
+          logged_time: 1800,
+          deadline: yesterday.toISOString(), // Overdue
+        },
+        {
+          ...tasks[2],
+          status: 'Completed',
+          logged_time: 900,
+          deadline: yesterday.toISOString(), // Completed (not counted as overdue)
+        },
+      ];
+
+      vi.mocked(getTasks).mockResolvedValue(mockTasks as any);
+
+      const result = await generateLoggedTimeReport({});
+
+      expect(result.overdueTasks).toBe(2); // Only In Progress and Blocked
     });
   });
 

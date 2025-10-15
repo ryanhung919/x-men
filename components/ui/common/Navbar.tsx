@@ -7,8 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/theme-toggle'
-
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +19,7 @@ export function Navbar() {
   const router = useRouter();
   const supabase = createClient();
   const [user, setUser] = useState<{ email: string | undefined } | null>(null);
+  const [roles, setRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -32,12 +32,29 @@ export function Navbar() {
         if (error) {
           console.error('Error fetching user:', error.message);
           setUser(null);
+          setRoles([]);
         } else {
           setUser(user ? { email: user.email } : null);
+
+          // Fetch user roles
+          if (user) {
+            const { data: roleRows, error: roleError } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', user.id);
+            
+            if (roleError) {
+              console.error('Error fetching roles:', roleError.message);
+              setRoles([]);
+            } else {
+              setRoles(roleRows.map((r) => r.role));
+            }
+          }
         }
       } catch (error) {
         console.error('Unexpected error:', error);
         setUser(null);
+        setRoles([]);
       } finally {
         setIsLoading(false);
       }
@@ -54,11 +71,13 @@ export function Navbar() {
     router.push('/auth/login');
   };
 
+  const isAdmin = roles.includes('admin');
+
   if (isLoading) {
     return (
       <header className="flex h-16 shrink-0 items-center gap-4 border-b px-6 bg-background">
         <Link
-          href="/dashboard"
+          href="/tasks"
           className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
         >
           TaskFlow
@@ -73,7 +92,7 @@ export function Navbar() {
     return (
       <header className="flex h-16 shrink-0 items-center gap-4 border-b px-6 bg-background">
         <Link
-          href="/dashboard"
+          href="/"
           className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
         >
           TaskFlow
@@ -93,20 +112,12 @@ export function Navbar() {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b px-6 bg-background">
       <Link
-        href="/dashboard"
+        href="/tasks"
         className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
       >
         TaskFlow
       </Link>
       <nav className="hidden md:flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          asChild
-          className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
-        >
-          <Link href="/dashboard">Dashboard</Link>
-        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -123,14 +134,16 @@ export function Navbar() {
         >
           <Link href="/schedule">Schedule</Link>
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          asChild
-          className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
-        >
-          <Link href="/report">Report</Link>
-        </Button>
+        {isAdmin && (
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
+          >
+            <Link href="/report">Report</Link>
+          </Button>
+        )}
       </nav>
       <div className="flex-1" />
       <div className="flex items-center gap-2">
@@ -146,7 +159,9 @@ export function Navbar() {
               </div>
               <div className="hidden md:flex flex-col items-start">
                 <span className="text-sm font-medium">{user.email}</span>
-                <span className="text-xs text-muted-foreground">User</span>
+                <span className="text-xs text-muted-foreground">
+                  {isAdmin ? 'Admin' : 'User'}
+                </span>
               </div>
             </Button>
           </DropdownMenuTrigger>
