@@ -45,7 +45,7 @@ export const testUsers = {
   },
   kester: {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kesteryeo.2024@computing.smu.edu.sg',
+    email: 'kester.yeo.2024@computing.smu.edu.sg',
     password: 'password123',
     department: 'Engineering Operations Division Director',
   },
