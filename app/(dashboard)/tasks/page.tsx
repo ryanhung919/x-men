@@ -2,11 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import TasksList from '@/components/tasks/task-list';
 import { getUserTasks } from '@/lib/db/tasks';
-
-type UserRole = {
-  role: string;
-  user_id: string;
-};
+import { formatTasks } from '@/lib/services/tasks';
 
 export default async function TasksPage() {
   const supabase = await createClient();
@@ -18,8 +14,11 @@ export default async function TasksPage() {
     redirect('/');
   }
 
-  // Fetch tasks based on role
-  const tasks = await getUserTasks(user.id);
+  // Fetch raw tasks data
+  const rawData = await getUserTasks(user.id);
+
+  // Format the raw data into Task[]
+  const tasks = formatTasks(rawData);
 
   return (
     <div className="container mx-auto p-6">

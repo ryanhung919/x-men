@@ -14,7 +14,15 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { type Task, calculateNextDueDate } from '@/lib/services/tasks';
-import { Calendar, Paperclip, CheckSquare, AlertCircle, ArrowUpDown, X } from 'lucide-react';
+import {
+  Calendar,
+  Paperclip,
+  CheckSquare,
+  AlertCircle,
+  ArrowUpDown,
+  X,
+  Repeat,
+} from 'lucide-react';
 import { PrioritySelector } from '@/components/filters/priority-selector';
 import { StatusSelector } from '@/components/filters/status-selector';
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
@@ -280,6 +288,15 @@ export default function TasksList({ tasks }: TasksListProps) {
                     <Link href={`/tasks/${task.id}`}>
                       <div className="flex items-center gap-2">
                         {task.isOverdue && <AlertCircle className="h-4 w-4 text-destructive" />}
+                        {task.recurrence_interval > 0 && (
+                          <span
+                            title={`Recurring every ${task.recurrence_interval} day${
+                              task.recurrence_interval > 1 ? 's' : ''
+                            }`}
+                          >
+                            <Repeat className="h-4 w-4 text-blue-500" />
+                          </span>
+                        )}
                         {task.title}
                       </div>
                     </Link>

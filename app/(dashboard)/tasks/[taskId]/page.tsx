@@ -5,216 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import Link from 'next/link';
 import { SubtaskLink } from '@/components/tasks/subtask-link';
 import { enUS } from 'date-fns/locale';
-
-type UserInfo = {
-  id: string;
-  first_name: string;
-  last_name: string;
-};
-
-type DetailedTask = {
-  id: number;
-  title: string;
-  description: string | null;
-  priority: number;
-  status: string;
-  deadline: string | null;
-  notes: string | null;
-  project: { id: number; name: string } | null;
-  assignees: { assignee_id: string; user_info: UserInfo }[];
-  tags: string[];
-  subtasks: { id: number; title: string; status: string; deadline: string | null }[];
-  attachments: { id: number; storage_path: string; public_url?: string }[];
-  comments: {
-    id: number;
-    content: string;
-    created_at: string;
-    user_id: string;
-    user_info: UserInfo;
-  }[];
-};
-
-interface TaskAttachment {
-  id: number;
-  storage_path: string;
-}
+import { getTaskById } from '@/lib/db/tasks';
+import { formatTaskDetails, DetailedTask } from '@/lib/services/tasks';
 
 function isImageFile(storagePath: string): boolean {
   const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
   return imageExtensions.some((ext) => storagePath.toLowerCase().endsWith(ext));
 }
 
-async function fetchTaskDetails(taskId: number): Promise<DetailedTask | null> {
-  const supabase = await createClient();
-
-  // Fetch task data
-  const { data: taskData, error: taskError } = await supabase
-    .from('tasks')
-    .select(
-      `
-      id,
-      title,
-      description,
-      priority_bucket,
-      status,
-      deadline,
-      notes,
-      project:projects(id, name),
-      parent_task_id,
-      recurrence_interval,
-      recurrence_date,
-      task_assignments(assignee_id),
-      tags:task_tags(tags(name))
-      `
-    )
-    .eq('id', taskId)
-    .neq('is_archived', true)
-    .single();
-
-  if (taskError || !taskData) {
-    console.error('Error fetching task details:', taskError);
-    return null;
-  }
-
-  // Fetch subtasks
-  const { data: subtasksData, error: subtasksError } = await supabase
-    .from('tasks')
-    .select('id, title, status, deadline')
-    .eq('parent_task_id', taskId)
-    .neq('is_archived', true);
-
-  if (subtasksError) {
-    console.error('Error fetching subtasks:', subtasksError);
-  }
-
-  // Fetch attachments and generate public URLs
-  let attachments: { id: number; storage_path: string; public_url?: string }[] = [];
-  const { data: attachmentsData, error: attachmentsError } = (await supabase
-    .from('task_attachments')
-    .select('id, storage_path')
-    .eq('task_id', taskId)) as { data: TaskAttachment[] | null; error: any };
-
-  if (attachmentsError) {
-    console.error('Error fetching attachments:', attachmentsError);
-  } else if (attachmentsData?.length) {
-    attachments = attachmentsData.map((attachment) => {
-      const { data } = supabase.storage
-        .from('task-attachments')
-        .getPublicUrl(attachment.storage_path);
-      console.log(`Storage path: ${attachment.storage_path}`);
-      console.log(`Generated Public URL: ${data.publicUrl}`);
-      return {
-        id: attachment.id,
-        storage_path: attachment.storage_path,
-        public_url: data.publicUrl,
-      };
-    });
-  }
-
-  // Fetch comments
-  const { data: commentsData, error: commentsError } = await supabase
-    .from('task_comments')
-    .select('id, content, created_at, user_id')
-    .eq('task_id', taskId)
-    .neq('is_archived', true);
-
-  if (commentsError) {
-    console.error('Error fetching comments:', commentsError);
-  }
-
-  // Fetch user info for assignees and commenters
-  let assignees: DetailedTask['assignees'] = [];
-  let userInfoMap = new Map<string, UserInfo>();
-  const userIds = [
-    ...new Set([
-      ...(taskData.task_assignments || []).map((a: { assignee_id: string }) => a.assignee_id),
-      ...(commentsData || []).map((c: { user_id: string }) => c.user_id),
-    ]),
-  ];
-
-  if (userIds.length > 0) {
-    const { data: assigneeInfoData, error: assigneeInfoError } = await supabase.rpc(
-      'get_task_assignees_info',
-      { task_ids: [taskId] }
-    );
-
-    if (assigneeInfoError) {
-      console.error('Error fetching assignee user info:', assigneeInfoError);
-    } else {
-      userInfoMap = new Map(
-        (assigneeInfoData || []).map((user: UserInfo) => [
-          user.id,
-          { id: user.id, first_name: user.first_name, last_name: user.last_name },
-        ])
-      );
-      assignees = taskData.task_assignments
-        .map((a: { assignee_id: string }) => {
-          const user = userInfoMap.get(a.assignee_id);
-          return user ? { assignee_id: a.assignee_id, user_info: user } : null;
-        })
-        .filter(
-          (
-            a: { assignee_id: string; user_info: UserInfo } | null
-          ): a is { assignee_id: string; user_info: UserInfo } => a !== null
-        );
-    }
-
-    const missingUserIds = userIds.filter((id) => !userInfoMap.has(id));
-    if (missingUserIds.length > 0) {
-      const { data: additionalUserInfo, error: userInfoError } = await supabase
-        .from('user_info')
-        .select('id, first_name, last_name')
-        .in('id', missingUserIds);
-
-      if (userInfoError) {
-        console.error('Error fetching additional user info:', userInfoError);
-      } else {
-        additionalUserInfo.forEach((user: UserInfo) => {
-          userInfoMap.set(user.id, {
-            id: user.id,
-            first_name: user.first_name,
-            last_name: user.last_name,
-          });
-        });
-      }
-    }
-  }
-
-  return {
-    id: taskData.id,
-    title: taskData.title,
-    description: taskData.description,
-    priority: taskData.priority_bucket,
-    status: taskData.status,
-    deadline: taskData.deadline,
-    notes: taskData.notes,
-    project: taskData.project,
-    assignees,
-    tags: taskData.tags ? taskData.tags.map((t: { tags: { name: string } }) => t.tags.name) : [],
-    subtasks: subtasksData || [],
-    attachments,
-    comments: commentsData
-      ? commentsData.map(
-          (c: { id: number; content: string; created_at: string; user_id: string }) => ({
-            id: c.id,
-            content: c.content,
-            created_at: c.created_at,
-            user_id: c.user_id,
-            user_info: userInfoMap.get(c.user_id) || {
-              id: c.user_id,
-              first_name: 'Unknown',
-              last_name: '',
-            },
-          })
-        )
-      : [],
-  };
-}
-
-export default async function TaskDetailsPage({ params }: { params: { taskId: string } }) {
+export default async function TaskDetailsPage({ params }: { params: Promise<{ taskId: string }> }) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -224,14 +25,18 @@ export default async function TaskDetailsPage({ params }: { params: { taskId: st
     redirect('/');
   }
 
-  // Await params to resolve the Promise and access taskId
-  const resolvedParam = await params;
-  const taskId = parseInt(resolvedParam.taskId, 10);
+  const resolvedParams = await params;
+  const taskId = parseInt(resolvedParams.taskId, 10);
   if (isNaN(taskId)) {
     notFound();
   }
 
-  const task = await fetchTaskDetails(taskId);
+  const rawData = await getTaskById(taskId);
+  if (!rawData) {
+    notFound();
+  }
+
+  const task = formatTaskDetails(rawData);
   if (!task) {
     notFound();
   }
@@ -267,6 +72,19 @@ export default async function TaskDetailsPage({ params }: { params: { taskId: st
               <strong>Due Date:</strong>{' '}
               {task.deadline ? format(new Date(task.deadline), 'PPP') : 'None'}
             </p>
+            {task.recurrence_interval > 0 && (
+              <p>
+                <strong>Recurring:</strong>{' '}
+                <Badge variant="secondary" className="mr-1">
+                  Every {task.recurrence_interval} day{task.recurrence_interval > 1 ? 's' : ''}
+                </Badge>
+                {task.recurrence_date && (
+                  <span className="text-sm text-muted-foreground ml-2">
+                    (Started: {format(new Date(task.recurrence_date), 'PPP')})
+                  </span>
+                )}
+              </p>
+            )}
             <p>
               <strong>Tags:</strong>{' '}
               {task.tags.length > 0
