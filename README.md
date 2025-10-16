@@ -1,30 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a Smart Task Management System created by XMEN for our client All-In-One.
+
+It’s a Next.js application backed by Supabase (Postgres + Auth), styled with Tailwind, and deployed on Vercel.
+
+View our deployed website using Vercel -here-
+
+## Prerequisites
+
+- Node.js 18+ (LTS recommended)
+- pnpm 10+ (repo is pinned to pnpm and uses a lockfile)
+- A Supabase project with the following environment variables configured locally:
+	- NEXT_PUBLIC_SUPABASE_URL
+	- NEXT_PUBLIC_SUPABASE_ANON_KEY
+	- SUPABASE_SERVICE_ROLE_KEY (server-only)
+	- POSTGRES_URL (direct connection string for seeding)
+	- NEXT_PUBLIC_APP_URL
+
+Create a `.env` (or `.env.local`) in the project root with values like:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=...        # from Supabase project settings
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...   # from Supabase project settings
+SUPABASE_SERVICE_ROLE_KEY=...       # service role (keep secret)
+POSTGRES_URL=...                    # e.g. postgres://user:pass@host:5432/postgres
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
 ## Getting Started
 
-First, run the development server:
+First, install dependencies:
+
+```bash
+pnpm i
+```
+
+Then run the development server:
 
 ```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Install the VS Code extension: Tailwind CSS IntelliSense.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open [http://localhost:3000](http://localhost:3000) in your browser to see the app.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Seeding the Database
 
-## Learn More
+We ship a full seed endpoint at `/seed` that (re)creates schema, policies, triggers, and sample data.
 
-To learn more about Next.js, take a look at the following resources:
+With the dev server running, run:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm db:seed
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Running Tests
 
-## Deploy on Vercel
+- Unit tests:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+pnpm test:unit
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Integration tests (require dev server running on port 3000 for seeding):
+
+```bash
+# in one terminal
+pnpm dev
+
+# in another terminal
+pnpm test:integration
+```
+
+- CI convenience (unit then integration):
+
+```bash
+pnpm ci:test
+```
+
+## Auth & Roles (at a glance)
+
+- Users log in with email + password (Supabase Auth).
+- Roles are stored in `user_roles` (staff, manager, admin) and enforced via RLS policies.
+- After login, managers are redirected to `/schedule`; others go to `/report`.
+- Passwords are never stored in plain text; Supabase handles hashing.
+
+Contact the administrators for admin access to view `/report`.
+
+## Tech Stack
+
+- Next.js 15 (App Router, React 19)
+- Supabase (Auth, Postgres, RLS)
+- Tailwind CSS + shadcn/ui
+- Vitest (unit + integration)
+
+## Collaborators
+
+- [Ryan Hung](https://github.com/ryanhung919)
+- [Joel Wang](https://github.com/joelwangg)
+- [Mitch Shona](https://github.com/mitchshona)
+- [Garrison Koh](https://github.com/garrikyx)
+- [Kester Yeo](https://github.com/echokes)

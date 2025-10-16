@@ -35,7 +35,15 @@ export function DepartmentSelector({
   return (
     <div className="relative">
       <Select value="" onValueChange={() => {}}>
-        <SelectTrigger className="w-52 bg-background">
+        <SelectTrigger
+          className={cn(
+            'w-52 border border-input bg-background text-foreground',
+            'hover:bg-accent hover:text-accent-foreground',
+            'focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            '[&>span]:text-foreground [&>span]:font-medium'
+          )}
+        >
+          {' '}
           <SelectValue
             placeholder={
               selectedDepartments.length
@@ -46,7 +54,14 @@ export function DepartmentSelector({
             }
           />
         </SelectTrigger>
-        <SelectContent className="bg-white dark:bg-slate-950 border border-border shadow-md">
+        <SelectContent
+          className="bg-popover text-popover-foreground border border-border shadow-md "
+          style={{
+            backgroundColor: 'hsl(var(--popover))',
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
+          }}
+        >
           <div className="max-h-[300px] overflow-y-auto">
             {departments.length === 0 ? (
               <div className="px-2 py-6 text-center text-sm text-muted-foreground">

@@ -48,7 +48,7 @@ export const auth_users = [
   },
   {
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kesteryeo.2024@computing.smu.edu.sg',
+    email: 'kester.yeo.2024@computing.smu.edu.sg',
     password: 'password123',
   },
 ];
@@ -83,7 +83,9 @@ export const departments = [
   { name: 'Senior Engineers', parent_department_name: 'Engineering Operations Division Director' },
   { name: 'Junior Engineers', parent_department_name: 'Engineering Operations Division Director' },
   { name: 'Call Centre', parent_department_name: 'Engineering Operations Division Director' },
-  { name: 'Operation Planning Team', parent_department_name: 'Engineering Operations Division Director',
+  {
+    name: 'Operation Planning Team',
+    parent_department_name: 'Engineering Operations Division Director',
   },
 
   // HR and Admin Branch
@@ -116,7 +118,6 @@ export const user_info = [
     id: '61ca6b82-6d42-4058-bb4c-9316e7079b24',
     first_name: 'Ryan',
     last_name: 'Hung',
-    mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Director',
   },
@@ -124,7 +125,6 @@ export const user_info = [
     id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
     first_name: 'Joel',
     last_name: 'Wang',
-    mode: 'dark',
     default_view: 'calendar',
     department_name: 'Engineering Operations Division Director',
   },
@@ -132,7 +132,6 @@ export const user_info = [
     id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
     first_name: 'Mitch',
     last_name: 'Shona',
-    mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Director',
   },
@@ -140,7 +139,6 @@ export const user_info = [
     id: '32635261-038c-4405-b6ed-2d446738f94c',
     first_name: 'Garrison',
     last_name: 'Koh',
-    mode: 'light',
     default_view: 'calendar',
     department_name: 'System Solutioning Division Director',
   },
@@ -148,7 +146,6 @@ export const user_info = [
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
     first_name: 'Kester',
     last_name: 'Yeo',
-    mode: 'dark',
     default_view: 'tasks',
     department_name: 'Engineering Operations Division Director',
   },
@@ -156,41 +153,36 @@ export const user_info = [
   // Personal accounts
   {
     id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
-    first_name: 'Ryan',
-    last_name: 'Hung',
-    mode: 'light',
+    first_name: 'Bryan',
+    last_name: 'Hong',
     default_view: 'tasks',
     department_name: 'Finance Managers',
   },
   {
     id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
-    first_name: 'Joel',
-    last_name: 'Wang',
-    mode: 'dark',
+    first_name: 'Noel',
+    last_name: 'Tang',
     default_view: 'tasks',
     department_name: 'Senior Engineers',
   },
   {
     id: 'aa344933-c44b-4097-b0ac-56987a10734b',
-    first_name: 'Mitch',
-    last_name: 'Shona',
-    mode: 'light',
+    first_name: 'Michelle',
+    last_name: 'Jhona',
     default_view: 'tasks',
     department_name: 'Finance Executive',
   },
   {
     id: '235d62da-62cc-484b-8715-6683b2a3805a',
-    first_name: 'Garrison',
-    last_name: 'Koh',
-    mode: 'light',
+    first_name: 'Garry',
+    last_name: 'Toh',
     default_view: 'tasks',
     department_name: 'System Solutioning Division Director',
   },
   {
     id: '9a3c4306-8beb-494a-aee9-ba71a444f19a',
-    first_name: 'Kester',
-    last_name: 'Yeo',
-    mode: 'dark',
+    first_name: 'Chester',
+    last_name: 'Nut',
     default_view: 'tasks',
     department_name: 'Junior Engineers',
   },
@@ -220,11 +212,11 @@ export const user_roles = [
   { user_id: '67393282-3a06-452b-a05a-9c93a95b597f', role: 'staff' }, // Kester (SMU)
 
   // Mirror roles on personal accounts for future tests:
-  { user_id: 'baa47e05-2dba-4f12-8321-71769a9a3702', role: 'staff' }, // Joel (personal)
-  { user_id: 'aa344933-c44b-4097-b0ac-56987a10734b', role: 'staff' }, // Mitch (personal)
-  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' }, // Ryan (personal)
-  { user_id: '235d62da-62cc-484b-8715-6683b2a3805a', role: 'staff' }, // Garrison (personal)
-  { user_id: '9a3c4306-8beb-494a-aee9-ba71a444f19a', role: 'staff' }, // Kester (personal)
+  { user_id: 'baa47e05-2dba-4f12-8321-71769a9a3702', role: 'staff' }, // Noel (personal)
+  { user_id: 'aa344933-c44b-4097-b0ac-56987a10734b', role: 'staff' }, // Mitchelle (personal)
+  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' }, // Bryan (personal)
+  { user_id: '235d62da-62cc-484b-8715-6683b2a3805a', role: 'staff' }, // Garry (personal)
+  { user_id: '9a3c4306-8beb-494a-aee9-ba71a444f19a', role: 'staff' }, // Chester (personal)
 ];
 
 /* ======================== PROJECTS & LINKS ======================== */
@@ -512,9 +504,12 @@ export const tasks = [
     creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
     project_name: 'Workflow Automation Pilot',
     deadline: new Date('2025-10-25T17:00:00+08:00'),
+    deadline: new Date('2025-10-25T17:00:00+08:00'),
     notes: 'Ensure refresh token handling.',
     parent_task_external_key: null,
     is_archived: false,
+    created_at: new Date('2025-09-25T10:00:00+08:00'),
+    updated_at: new Date('2025-09-25T10:00:00+08:00'),
     created_at: new Date('2025-09-25T10:00:00+08:00'),
     updated_at: new Date('2025-09-25T10:00:00+08:00'),
     recurrence_interval: 0,
@@ -526,12 +521,16 @@ export const tasks = [
     description: 'Automate deployments for staging & prod.',
     priority_bucket: 7,
     status: 'Completed',
+    status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Website Redesign',
+    deadline: new Date('2025-10-28T17:00:00+08:00'),
     deadline: new Date('2025-10-28T17:00:00+08:00'),
     notes: 'Use GitHub Actions.',
     parent_task_external_key: null,
     is_archived: false,
+    created_at: new Date('2025-09-25T12:00:00+08:00'),
+    updated_at: new Date('2025-09-25T12:00:00+08:00'),
     created_at: new Date('2025-09-25T12:00:00+08:00'),
     updated_at: new Date('2025-09-25T12:00:00+08:00'),
     recurrence_interval: 0,
@@ -546,9 +545,12 @@ export const tasks = [
     creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
     project_name: 'Client Onboarding Portal',
     deadline: new Date('2025-10-27T17:00:00+08:00'),
+    deadline: new Date('2025-10-27T17:00:00+08:00'),
     notes: 'Include captions for APAC regions.',
     parent_task_external_key: null,
     is_archived: false,
+    created_at: new Date('2025-09-26T09:00:00+08:00'),
+    updated_at: new Date('2025-09-26T09:00:00+08:00'),
     created_at: new Date('2025-09-26T09:00:00+08:00'),
     updated_at: new Date('2025-09-26T09:00:00+08:00'),
     recurrence_interval: 0,
@@ -580,9 +582,12 @@ export const tasks = [
     creator_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // Ryan
     project_name: 'Internal Analytics Dashboard',
     deadline: new Date('2025-11-01T17:00:00+08:00'),
+    deadline: new Date('2025-11-01T17:00:00+08:00'),
     notes: 'Follow RESTful best practices.',
     parent_task_external_key: null,
     is_archived: false,
+    created_at: new Date('2025-09-27T10:00:00+08:00'),
+    updated_at: new Date('2025-09-27T10:00:00+08:00'),
     created_at: new Date('2025-09-27T10:00:00+08:00'),
     updated_at: new Date('2025-09-27T10:00:00+08:00'),
     recurrence_interval: 0,
@@ -991,7 +996,7 @@ export const notifications = [
     user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     title: 'Task assigned',
     message: 'You have been assigned to "Implement task board drag/drop".',
-    type: 'task',
+    type: 'task_assigned',
     read: false,
     created_at: new Date('2025-09-19T10:22:05+08:00'),
     updated_at: new Date('2025-09-19T10:22:05+08:00'),

@@ -24,14 +24,46 @@ const supabase = createClient(
 );
 
 async function teardownSchema(sql: postgres.Sql) {
-  console.log('⚠️ Dropping all app tables...');
+  console.log('⚠️ Dropping all app tables, functions, and triggers...');
+
+  // Drop triggers first (wrapped in try-catch since tables might not exist)
+  const triggersToDrop = [
+    'DROP TRIGGER IF EXISTS trg_notify_new_comment ON task_comments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_assignment ON task_assignments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_update_project_departments ON task_assignments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_validate_task_assignee_count ON tasks CASCADE',
+  ];
+
+  for (const triggerSql of triggersToDrop) {
+    try {
+      await sql.unsafe(triggerSql);
+    } catch (e) {
+      // Ignore errors if table doesn't exist
+      console.log(`Skipping trigger drop: ${triggerSql.substring(0, 50)}... (table may not exist)`);
+    }
+  }
+
+  // Drop functions
+  await sql`DROP FUNCTION IF EXISTS notify_new_comment() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_assignment() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS update_project_departments() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS validate_task_assignee_count() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS get_department_hierarchy(BIGINT) CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS get_department_colleagues(uuid) CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS can_view_user(uuid, uuid) CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS is_task_visible_to_user(bigint, uuid) CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS get_task_assignees_info(bigint[]) CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS user_has_role(uuid, text) CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS is_admin(uuid) CASCADE`;
 
   // Order matters: drop dependent tables first
   await sql`DROP TABLE IF EXISTS task_comments CASCADE`;
   await sql`DROP TABLE IF EXISTS task_assignments CASCADE`;
   await sql`DROP TABLE IF EXISTS task_tags CASCADE`;
   await sql`DROP TABLE IF EXISTS tasks CASCADE`;
+  await sql`DROP TABLE IF EXISTS project_departments CASCADE`;
   await sql`DROP TABLE IF EXISTS projects CASCADE`;
+  await sql`DROP TABLE IF EXISTS task_attachments CASCADE`;
   await sql`DROP TABLE IF EXISTS notifications CASCADE`;
   await sql`DROP TABLE IF EXISTS tags CASCADE`;
   await sql`DROP TABLE IF EXISTS user_roles CASCADE`;
@@ -51,7 +83,6 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
       first_name VARCHAR(255) NOT NULL,
       last_name  VARCHAR(255) NOT NULL,
-      mode       VARCHAR(10) NOT NULL DEFAULT 'light',
       default_view VARCHAR(20) NOT NULL DEFAULT 'tasks',
       department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT
     );
@@ -64,14 +95,13 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       if (!depId) throw new Error(`Unknown department: ${ui.department_name}`);
 
       return sql`
-        INSERT INTO user_info (id, first_name, last_name, mode, default_view, department_id)
-        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${ui.mode}, ${
+        INSERT INTO user_info (id, first_name, last_name, default_view, department_id)
+        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${
         ui.default_view ?? 'tasks'
       }, ${depId})
         ON CONFLICT (id) DO UPDATE
           SET first_name = EXCLUDED.first_name,
               last_name  = EXCLUDED.last_name,
-              mode       = EXCLUDED.mode,
               default_view = EXCLUDED.default_view,
               department_id = EXCLUDED.department_id
       `;
@@ -548,46 +578,45 @@ async function enableRLS(sql: postgres.Sql) {
   // Security definer function that returns all colleagues in the same department:
   await sql`
     CREATE OR REPLACE FUNCTION can_view_user(target_user_id uuid, user_uuid uuid)
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  my_dept_id BIGINT;
-  target_dept_id BIGINT;
-BEGIN
-  -- Get the current user's department
-  SELECT department_id INTO my_dept_id FROM user_info WHERE id = user_uuid;
-  -- Get the target user's department
-  SELECT department_id INTO target_dept_id FROM user_info WHERE id = target_user_id;
+    RETURNS boolean
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    AS $$
+    DECLARE
+      my_dept_id BIGINT;
+      target_dept_id BIGINT;
+    BEGIN
+      -- Get the current user's department
+      SELECT department_id INTO my_dept_id FROM user_info WHERE id = user_uuid;
+      -- Get the target user's department
+      SELECT department_id INTO target_dept_id FROM user_info WHERE id = target_user_id;
 
-  -- 1. Colleagues in their department
-  IF target_dept_id = my_dept_id THEN
-    RETURN TRUE;
-  END IF;
+      -- 1. Colleagues in their department
+      IF target_dept_id = my_dept_id THEN
+        RETURN TRUE;
+      END IF;
 
-  -- 2. Users in descendant departments
-  IF EXISTS (
-    SELECT 1 FROM get_department_hierarchy(my_dept_id) d WHERE d.id = target_dept_id
-  ) THEN
-    RETURN TRUE;
-  END IF;
+      -- 2. Users in descendant departments
+      IF EXISTS (
+        SELECT 1 FROM get_department_hierarchy(my_dept_id) d WHERE d.id = target_dept_id
+      ) THEN
+        RETURN TRUE;
+      END IF;
 
-  -- 3. Users who are assignees on tasks shared with my department mates
-  IF EXISTS (
-    SELECT 1
-    FROM task_assignments ta1
-    JOIN get_department_colleagues(user_uuid) colleagues ON ta1.assignee_id = colleagues.id
-    JOIN task_assignments ta2 ON ta1.task_id = ta2.task_id
-    WHERE ta2.assignee_id = target_user_id
-  ) THEN
-    RETURN TRUE;
-  END IF;
+      -- 3. Users who are assignees on tasks shared with my department mates
+      IF EXISTS (
+        SELECT 1
+        FROM task_assignments ta1
+        JOIN get_department_colleagues(user_uuid) colleagues ON ta1.assignee_id = colleagues.id
+        JOIN task_assignments ta2 ON ta1.task_id = ta2.task_id
+        WHERE ta2.assignee_id = target_user_id
+      ) THEN
+        RETURN TRUE;
+      END IF;
 
-  RETURN FALSE;
-END;
-$$;
-
+      RETURN FALSE;
+    END;
+    $$;
   `;
 
   // Security definer function to check if user can view a task
@@ -809,6 +838,12 @@ USING (
 
   /* ---------------- NOTIFICATIONS ---------------- */
 
+  // Drop any existing notification policies to avoid duplicates when reseeding
+  await sql`DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;`;
+  await sql`DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;`;
+  await sql`DROP POLICY IF EXISTS "Users can delete own notifications" ON notifications;`;
+  await sql`DROP POLICY IF EXISTS "System can create notifications" ON notifications;`;
+
   // Notifications: Users can only see their own notifications
   await sql`
     CREATE POLICY "Users can view own notifications" ON notifications
@@ -858,6 +893,28 @@ USING (
         WHERE NOT d.id = ANY(dt.path)
       )
       SELECT dept_tree.id, dept_tree.name, dept_tree.parent_department_id FROM dept_tree;
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+  `;
+
+  // Security definer function to get all colleagues in the same department hierarchy
+  await sql`
+    CREATE OR REPLACE FUNCTION get_department_colleagues(user_uuid uuid)
+    RETURNS TABLE(id uuid) AS $$
+    DECLARE
+      user_dept_id BIGINT;
+    BEGIN
+      -- Get the user's department ID first
+      SELECT department_id INTO user_dept_id FROM user_info WHERE user_info.id = user_uuid;
+
+      -- Return all users in the same department hierarchy
+      RETURN QUERY
+      SELECT ui.id
+      FROM user_info ui
+      WHERE ui.department_id IN (
+        SELECT dept.id
+        FROM get_department_hierarchy(user_dept_id) dept
+      );
     END;
     $$ LANGUAGE plpgsql SECURITY DEFINER;
   `;

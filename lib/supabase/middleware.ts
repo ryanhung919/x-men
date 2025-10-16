@@ -2,17 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
-  // Development mode bypass - set BYPASS_AUTH=true in your .env.local
-  const bypassAuth = process.env.BYPASS_AUTH === 'true'
-  
   let supabaseResponse = NextResponse.next({
     request,
   })
-
-  if (bypassAuth) {
-    console.log('🚧 Development mode: Bypassing authentication')
-    return supabaseResponse
-  }
 
   // With Fluid compute, don't put this client in a global environment
   // variable. Always create a new one on each request.
@@ -46,18 +38,45 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth') &&
-    !request.nextUrl.pathname.startsWith('/api') &&
-    request.nextUrl.pathname !== '/' &&
-    request.nextUrl.pathname !== '/seed'
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  // Check if user is trying to access protected routes
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api')
+  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/seed'
+  const isReportRoute = request.nextUrl.pathname.startsWith('/report')
+
+  // Redirect to login if not authenticated (except for API, public routes)
+  if (!user && !isApiRoute && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  // Check admin role for /report routes
+  if (user && isReportRoute) {
+    const userId = user.sub as string
+    
+    // Fetch user roles
+    const { data: roleRows, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+
+    if (error) {
+      console.error('Error checking user roles:', error)
+      // Redirect to tasks page if we can't verify role
+      const url = request.nextUrl.clone()
+      url.pathname = '/tasks'
+      return NextResponse.redirect(url)
+    }
+
+    const roles = roleRows?.map((r: { role: string }) => r.role) || []
+    const isAdmin = roles.includes('admin')
+
+    // Redirect non-admins away from report routes
+    if (!isAdmin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/unauthorized'
+      return NextResponse.redirect(url)
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
