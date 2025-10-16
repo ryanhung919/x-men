@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { notifyNewTaskAssignment, notifyNewComment, NotificationType } from '@/lib/services/notifs';
+import {
+  notifyNewTaskAssignment,
+  notifyNewComment,
+  notifyTaskUpdate,
+  NotificationType
+} from '@/lib/services/notifs';
 import { createNotification } from '@/lib/db/notifs';
 import { createMockSupabaseClient } from '@/__tests__/mocks/supabase.mock';
 import { authUsersFixtures } from '@/__tests__/fixtures/database.fixtures';
@@ -368,10 +373,242 @@ describe('lib/services/notifs', () => {
     });
   });
 
+  // Task updates: test notification creation for field changes
+  describe('notifyTaskUpdate', () => {
+    const updaterId = authUsersFixtures.alice.id;
+    const taskId = 1;
+    const taskTitle = 'Design Homepage';
+    const currentTask = {
+      title: 'Design Homepage',
+      status: 'To Do',
+      priority_bucket: 5,
+      description: 'Initial design work',
+      deadline: '2024-12-01T00:00:00Z',
+      notes: 'Important task',
+      recurrence_date: null,
+      is_archived: false,
+    };
+
+    beforeEach(() => {
+      mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    first_name: 'Alice',
+                    last_name: 'Smith',
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === 'task_assignments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [
+                  { assignee_id: authUsersFixtures.bob.id },
+                  { assignee_id: authUsersFixtures.carol.id },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          }),
+        };
+      });
+    });
+
+    describe('Single Field Updates', () => {
+      it('should create notification for title update with proper message format', async () => {
+        const updates = { title: 'New Homepage Design' };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledTimes(2); // Bob and Carol
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the title of task "Design Homepage" to "New Homepage Design"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should create notification for status update with from/to values', async () => {
+        const updates = { status: 'In Progress' };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith changed the status of task "Design Homepage" from "To Do" to "In Progress"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should create notification for priority update with numeric values', async () => {
+        const updates = { priority_bucket: 8 };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith changed the priority of task "Design Homepage" from 5 to 8',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should create notification for deadline update with formatted dates', async () => {
+        const updates = { deadline: '2024-12-15T00:00:00Z' };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith changed the deadline of task "Design Homepage" from 12/1/2024 to 12/15/2024',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should create notification for description update with empty string handling', async () => {
+        const updates = { description: 'Updated design requirements' };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith changed the description of task "Design Homepage" from "Initial design work" to "Updated design requirements"',
+          type: NotificationType.TASK_UPDATED,
+        });
+
+        // Test empty string handling
+        const emptyUpdates = { description: '' };
+        const emptyCurrentTask = { ...currentTask, description: null };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, emptyUpdates, emptyCurrentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith changed the description of task "Design Homepage" from "(empty)" to "(empty)"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+    });
+
+    describe('Multi-Field Updates', () => {
+      it('should create compact notification for multiple field updates', async () => {
+        const updates = {
+          title: 'New Homepage Design',
+          status: 'In Progress',
+          priority_bucket: 8,
+        };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the following fields in task "Design Homepage": title, status, priority',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should include all changed field names in multi-field message', async () => {
+        const updates = {
+          title: 'New Title',
+          description: 'New description',
+          notes: 'New notes',
+          deadline: '2024-12-20T00:00:00Z',
+        };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the following fields in task "Design Homepage": title, description, notes, deadline',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should use user-friendly field names in multi-field messages', async () => {
+        const updates = {
+          priority_bucket: 8,
+          recurrence_date: '2024-12-01T00:00:00Z',
+          is_archived: true,
+        };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the following fields in task "Design Homepage": priority, recurrence date, archive status',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+    });
+
+    describe('No-Change Scenarios', () => {
+      it('should not create notification when no fields actually changed', async () => {
+        const updates = {
+          title: 'Design Homepage', // Same as current
+          status: 'To Do', // Same as current
+        };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).not.toHaveBeenCalled();
+      });
+
+      it('should handle empty updates object gracefully', async () => {
+        const updates = {};
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).not.toHaveBeenCalled();
+      });
+
+      it('should skip unchanged fields in multi-field updates', async () => {
+        const updates = {
+          title: 'Design Homepage', // Same - should be skipped
+          status: 'In Progress', // Different - should be included
+          priority_bucket: 5, // Same - should be skipped
+        };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith changed the status of task "Design Homepage" from "To Do" to "In Progress"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+    });
+  });
+
   describe('NotificationType', () => {
     it('should have correct notification type values', () => {
       expect(NotificationType.TASK_ASSIGNED).toBe('task_assigned');
       expect(NotificationType.COMMENT_ADDED).toBe('comment_added');
+      expect(NotificationType.TASK_UPDATED).toBe('task_updated');
     });
   });
 });

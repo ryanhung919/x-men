@@ -13,16 +13,22 @@ import {
   notificationsFixtures,
 } from "@/__tests__/fixtures/database.fixtures";
 
-// Mock the Supabase client module
+// Mock the Supabase client modules
 let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
+let mockAdminClient: ReturnType<typeof createMockSupabaseClient>;
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => mockSupabaseClient),
 }));
 
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => mockAdminClient),
+}));
+
 describe("lib/db/notifs", () => {
   beforeEach(() => {
     mockSupabaseClient = createMockSupabaseClient();
+    mockAdminClient = createMockSupabaseClient();
   });
 
   describe("createNotification", () => {
@@ -42,8 +48,8 @@ describe("lib/db/notifs", () => {
         updated_at: new Date().toISOString(),
       };
 
-      // Mock the insert chain
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
+      // Mock the insert chain for admin client
+      mockAdminClient.from = vi.fn().mockReturnValue({
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
@@ -56,7 +62,7 @@ describe("lib/db/notifs", () => {
 
       const result = await createNotification(newNotification);
 
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith("notifications");
+      expect(mockAdminClient.from).toHaveBeenCalledWith("notifications");
       expect(result).toEqual(expectedResult);
       expect(result?.read).toBe(false);
     });
@@ -71,7 +77,7 @@ describe("lib/db/notifs", () => {
 
       const mockError = { message: "Database error", code: "23505" };
 
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
+      mockAdminClient.from = vi.fn().mockReturnValue({
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
