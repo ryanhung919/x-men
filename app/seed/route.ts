@@ -478,6 +478,21 @@ async function seedNotifications(sql: postgres.Sql) {
   `;
   await sql`TRUNCATE TABLE notifications RESTART IDENTITY CASCADE;`;
 
+  // Enable realtime for notifications table
+  try {
+    await sql`
+      ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+    `;
+    console.log('Enabled realtime for notifications table');
+  } catch (error: any) {
+    // If table is already in publication, ignore the error
+    if (error.message?.includes('already exists')) {
+      console.log('Notifications table already in realtime publication');
+    } else {
+      console.warn('Could not enable realtime for notifications:', error.message);
+    }
+  }
+
   if (!notifications.length) return;
 
   await Promise.all(
@@ -769,12 +784,29 @@ USING (
     WITH CHECK (auth.uid() = creator_id);
   `;
 
-  // Users can update their own tasks (details, status, priority_bucket, recurrence_interval)
+  // Drop users can update task policy
+  await sql`DROP POLICY IF EXISTS "Users can update their own tasks" ON tasks;`;
+
+  // Task creators and assignees can update tasks (details, status, priority_bucket, recurrence_interval)
   await sql`
-    CREATE POLICY "Users can update their own tasks" ON tasks
+    CREATE POLICY "Task creators and assignees can update tasks" ON tasks
     FOR UPDATE
-    USING (auth.uid() = creator_id)
-    WITH CHECK (auth.uid() = creator_id)
+    USING (
+      auth.uid() = creator_id
+      OR EXISTS (
+        SELECT 1 FROM task_assignments
+        WHERE task_id = tasks.id
+        AND assignee_id = auth.uid()
+      )
+    )
+    WITH CHECK (
+      auth.uid() = creator_id
+      OR EXISTS (
+        SELECT 1 FROM task_assignments
+        WHERE task_id = tasks.id
+        AND assignee_id = auth.uid()
+      )
+    )
   `;
 
   // Tasks: Users can see tasks in their department
