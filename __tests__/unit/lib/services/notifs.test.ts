@@ -602,6 +602,424 @@ describe('lib/services/notifs', () => {
         });
       });
     });
+
+    describe('User Information Tests', () => {
+      it('should include updater name when user info exists', async () => {
+        const updates = { title: 'New Title' };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the title of task "Design Homepage" to "New Title"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should fallback to "Someone" when updater info not found', async () => {
+        const updates = { title: 'New Title' };
+
+        // Mock user info not found
+        mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+          if (table === 'user_info') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { message: 'Not found' },
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'task_assignments') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ assignee_id: authUsersFixtures.bob.id }],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        });
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Someone updated the title of task "Design Homepage" to "New Title"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should handle database errors when fetching updater info', async () => {
+        const updates = { title: 'New Title' };
+
+        // Mock database error
+        mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+          if (table === 'user_info') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { message: 'Database connection failed' },
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'task_assignments') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ assignee_id: authUsersFixtures.bob.id }],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        });
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Someone updated the title of task "Design Homepage" to "New Title"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+    });
+
+    describe('Assignee Notification Tests', () => {
+      it('should create notifications for all assignees except updater', async () => {
+        const updates = { title: 'New Title' };
+
+        // Mock assignees including the updater
+        mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+          if (table === 'user_info') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { first_name: 'Alice', last_name: 'Smith' },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'task_assignments') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [
+                    { assignee_id: authUsersFixtures.alice.id }, // Updater - should be skipped
+                    { assignee_id: authUsersFixtures.bob.id },   // Should receive notification
+                    { assignee_id: authUsersFixtures.carol.id }, // Should receive notification
+                  ],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        });
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        // Should only notify Bob and Carol, not Alice (the updater)
+        expect(createNotification).toHaveBeenCalledTimes(2);
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the title of task "Design Homepage" to "New Title"',
+          type: NotificationType.TASK_UPDATED,
+        });
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.carol.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the title of task "Design Homepage" to "New Title"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should not notify updater when they are also an assignee', async () => {
+        const updates = { title: 'New Title' };
+
+        // Mock single assignee who is also the updater
+        mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+          if (table === 'user_info') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { first_name: 'Alice', last_name: 'Smith' },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'task_assignments') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ assignee_id: authUsersFixtures.alice.id }], // Only the updater
+                  error: null,
+                }),
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        });
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        // Should not create any notifications (updater is the only assignee)
+        expect(createNotification).not.toHaveBeenCalled();
+      });
+
+      it('should handle no assignees scenario gracefully', async () => {
+        const updates = { title: 'New Title' };
+
+        // Mock no assignees
+        mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+          if (table === 'user_info') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { first_name: 'Alice', last_name: 'Smith' },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'task_assignments') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [], // No assignees
+                  error: null,
+                }),
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        });
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        // Should not create any notifications (no assignees)
+        expect(createNotification).not.toHaveBeenCalled();
+      });
+
+      it('should handle database errors when fetching assignees', async () => {
+        const updates = { title: 'New Title' };
+
+        // Mock database error for assignees
+        mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+          if (table === 'user_info') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { first_name: 'Alice', last_name: 'Smith' },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'task_assignments') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: null,
+                  error: { message: 'Database connection failed' },
+                }),
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        });
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        // Should not create any notifications due to database error
+        expect(createNotification).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Error Handling & Edge Cases', () => {
+      it('should handle null/undefined values in old and new data', async () => {
+        const updates = { deadline: null };
+
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith changed the deadline of task "Design Homepage" from 12/1/2024 to (none)',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should handle special characters in task titles', async () => {
+        const specialTitle = 'Task with "quotes" & symbols @#$%';
+        const updates = { title: 'New Title' };
+
+        await notifyTaskUpdate(updaterId, taskId, specialTitle, updates, { ...currentTask, title: specialTitle });
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith updated the title of task "Task with \"quotes\" & symbols @#$%" to "New Title"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should handle recurrence_date changes (set/remove/update)', async () => {
+        // Test setting recurrence date
+        const updates1 = { recurrence_date: '2024-12-01T00:00:00Z' };
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates1, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith set a recurrence date for task "Design Homepage"',
+          type: NotificationType.TASK_UPDATED,
+        });
+
+        vi.clearAllMocks();
+
+        // Test removing recurrence date
+        const currentWithRecurrence = { ...currentTask, recurrence_date: '2024-12-01T00:00:00Z' };
+        const updates2 = { recurrence_date: null };
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates2, currentWithRecurrence);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith removed the recurrence date from task "Design Homepage"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should handle archive status changes', async () => {
+        // Test archiving
+        const updates1 = { is_archived: true };
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates1, currentTask);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith archived task "Design Homepage"',
+          type: NotificationType.TASK_UPDATED,
+        });
+
+        vi.clearAllMocks();
+
+        // Test unarchiving
+        const currentArchived = { ...currentTask, is_archived: true };
+        const updates2 = { is_archived: false };
+        await notifyTaskUpdate(updaterId, taskId, taskTitle, updates2, currentArchived);
+
+        expect(createNotification).toHaveBeenCalledWith({
+          user_id: authUsersFixtures.bob.id,
+          title: 'Task Updated',
+          message: 'Alice Smith unarchived task "Design Homepage"',
+          type: NotificationType.TASK_UPDATED,
+        });
+      });
+
+      it('should handle database errors when creating notifications', async () => {
+        const updates = { title: 'New Title' };
+
+        // Mock successful data fetch but error in notification creation
+        mockSupabaseClient.from = vi.fn().mockImplementation((table) => {
+          if (table === 'user_info') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { first_name: 'Alice', last_name: 'Smith' },
+                    error: null,
+                  }),
+                }),
+              }),
+            };
+          }
+          if (table === 'task_assignments') {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ assignee_id: authUsersFixtures.bob.id }],
+                  error: null,
+                }),
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        });
+
+        // Mock createNotification to throw an error
+        vi.mocked(createNotification).mockRejectedValue(new Error('Database write failed'));
+
+        await expect(notifyTaskUpdate(updaterId, taskId, taskTitle, updates, currentTask)).rejects.toThrow('Database write failed');
+      });
+    });
   });
 
   describe('NotificationType', () => {
