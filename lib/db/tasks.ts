@@ -123,13 +123,13 @@ export async function getTaskById(taskId: number): Promise<{
     console.error('Error fetching attachments:', attachmentsError);
   } else if (attachmentsData?.length) {
     attachments = attachmentsData.map((attachment) => {
-      const { publicUrl } = supabase.storage
-        .from('task-attachments')
-        .getPublicUrl(attachment.storage_path) as { publicUrl: string | undefined };
+  const { data } = supabase.storage
+    .from('task-attachments')
+    .getPublicUrl(attachment.storage_path);
       return {
         id: attachment.id,
         storage_path: attachment.storage_path,
-        public_url: publicUrl,
+        public_url: data?.publicUrl,
       };
     });
   }

@@ -953,7 +953,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Design budget dashboard layout',
-    storage_path: 'task-attachments/1/wireframe.png',
+    storage_path: 'wireframe.png',
     uploaded_by: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
     uploaded_at: new Date('2025-09-19T11:10:00+08:00'),
   },
@@ -965,7 +965,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Roll out collaboration tools to SG office',
-    storage_path: 'task-attachments/4/collab_tools_guide.pdf',
+    storage_path: 'TEST FILE.pdf',
     uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c',
     uploaded_at: new Date('2025-09-21T09:15:00+08:00'),
   },

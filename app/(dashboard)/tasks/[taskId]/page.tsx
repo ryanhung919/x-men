@@ -9,11 +9,7 @@ import { SubtaskLink } from '@/components/tasks/subtask-link';
 import { enUS } from 'date-fns/locale';
 import { getTaskById } from '@/lib/db/tasks';
 import { formatTaskDetails, DetailedTask } from '@/lib/services/tasks';
-
-function isImageFile(storagePath: string): boolean {
-  const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
-  return imageExtensions.some((ext) => storagePath.toLowerCase().endsWith(ext));
-}
+import { AttachmentItem } from '@/components/tasks/attachment-item';
 
 export default async function TaskDetailsPage({ params }: { params: Promise<{ taskId: string }> }) {
   const supabase = await createClient();
@@ -138,28 +134,12 @@ export default async function TaskDetailsPage({ params }: { params: Promise<{ ta
             {task.attachments.length > 0 ? (
               <ul className="list-disc pl-4 space-y-2">
                 {task.attachments.map((att) => (
-                  <li key={att.id}>
-                    {att.public_url ? (
-                      isImageFile(att.storage_path) ? (
-                        <img
-                          src={att.public_url}
-                          alt={att.storage_path}
-                          className="max-w-xs h-auto mt-2"
-                        />
-                      ) : (
-                        <a
-                          href={att.public_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {att.storage_path}
-                        </a>
-                      )
-                    ) : (
-                      <span className="text-gray-500">{att.storage_path} (Access unavailable)</span>
-                    )}
-                  </li>
+                  <AttachmentItem
+                    key={att.id}
+                    id={att.id}
+                    storage_path={att.storage_path}
+                    public_url={att.public_url}
+                  />
                 ))}
               </ul>
             ) : (
