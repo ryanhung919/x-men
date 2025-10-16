@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import TasksList from '@/components/tasks/task-list';
 import { getUserTasks } from '@/lib/db/tasks';
+
 import { formatTasks } from '@/lib/services/tasks';
 
 export default async function TasksPage() {

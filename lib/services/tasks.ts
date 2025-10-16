@@ -72,6 +72,22 @@ export type DetailedTask = Omit<Task, 'attachments'> & {
   comments: TaskComment[];
 };
 
+/**
+ * Maps a RawTask from the database to the Task type used in the application.
+ *
+ * This function transforms the raw database task format into a more usable format:
+ * - Renames priority_bucket to priority
+ * - Converts nested tag structure to simple string array
+ * - Calculates if the task is overdue based on deadline and status
+ *
+ * @param task - The raw task object from the database
+ * @returns A partial Task object without subtasks, assignees, and attachments arrays
+ *
+ * @example
+ * const rawTask = await fetchTaskFromDB();
+ * const mappedTask = mapTaskAttributes(rawTask);
+ * console.log(`Priority: ${mappedTask.priority}, Overdue: ${mappedTask.isOverdue}`);
+ */
 export function mapTaskAttributes(task: RawTask): Omit<Task, 'subtasks' | 'assignees' | 'attachments'> {
   const isOverdue = task.deadline ? new Date(task.deadline) < new Date() && task.status !== 'Completed' : false;
 
@@ -91,23 +107,74 @@ export function mapTaskAttributes(task: RawTask): Omit<Task, 'subtasks' | 'assig
   };
 }
 
+/**
+ * Calculates the next due date for recurring tasks based on the recurrence interval.
+ *
+ * For recurring tasks (recurrence_interval > 0), this function calculates the next due date
+ * by adding the interval to the previous deadline, regardless of when the task was completed.
+ * This ensures consistent scheduling based on the original due date.
+ *
+ * Implementation follows the requirement: "the due date is based on the calculation from the
+ * previous due date"
+ *
+ * @param task - The task to calculate the next due date for
+ * @returns A new Task object with updated deadline and isOverdue status if recurring,
+ *          or the original task if not recurring
+ *
+ * @example
+ * // Task due Sep 29, completed Oct 1, interval 1 day → next due is Sep 30
+ * const recurringTask = { ...task, recurrence_interval: 1, deadline: '2024-09-29' };
+ * const updated = calculateNextDueDate(recurringTask);
+ * console.log(updated.deadline); // '2024-09-30T00:00:00.000Z'
+ *
+ * @example
+ * // Non-recurring task remains unchanged
+ * const normalTask = { ...task, recurrence_interval: 0 };
+ * const result = calculateNextDueDate(normalTask);
+ * // result === normalTask
+ */
 export function calculateNextDueDate(task: Task): Task {
-  if (task.recurrence_interval > 0 && task.recurrence_date) {
-    const anchor = new Date(task.recurrence_date);
-    const now = new Date();
+  // For recurring tasks, calculate next due date based on previous deadline + interval
+  // This follows the requirement: "the due date is based on the calculation from the previous due date"
+  // Example: Task due Sep 29, completed Oct 1, interval 1 day → next due is Sep 30
+  if (task.recurrence_interval > 0 && task.deadline) {
+    const previousDeadline = new Date(task.deadline);
     const intervalMs = task.recurrence_interval * 24 * 60 * 60 * 1000;
-    const timeDiff = now.getTime() - anchor.getTime();
-    const periodsPassed = Math.floor(timeDiff / intervalMs);
-    const nextDue = new Date(anchor.getTime() + (periodsPassed + 1) * intervalMs);
+    const nextDue = new Date(previousDeadline.getTime() + intervalMs);
     return {
       ...task,
       deadline: nextDue.toISOString(),
-      isOverdue: new Date(nextDue) < new Date() && task.status !== 'Completed',
+      isOverdue: nextDue < new Date() && task.status !== 'Completed',
     };
   }
   return task;
 }
 
+/**
+ * Formats raw task data from the database into a structured Task array.
+ *
+ * This function combines multiple related data sources into a cohesive Task structure:
+ * - Maps each task with its attributes using mapTaskAttributes()
+ * - Associates subtasks with their parent tasks
+ * - Links attachments to tasks by task_id
+ * - Joins assignee user information with task assignments
+ * - Provides default "Unknown User" for missing assignee information
+ *
+ * @param rawData - An object containing:
+ *   - tasks: Array of RawTask objects from database
+ *   - subtasks: Array of RawSubtask objects
+ *   - attachments: Array of RawAttachment objects with task_id references
+ *   - assignees: Array of RawAssignee objects with user information
+ *
+ * @returns Array of fully formatted Task objects with all related data included
+ *
+ * @example
+ * const rawData = await getUserTasks('user-123');
+ * const formattedTasks = formatTasks(rawData);
+ * formattedTasks.forEach(task => {
+ *   console.log(`${task.title}: ${task.subtasks.length} subtasks, ${task.assignees.length} assignees`);
+ * });
+ */
 export function formatTasks(
   rawData: {
     tasks: RawTask[];
@@ -174,6 +241,36 @@ export function formatTasks(
   });
 }
 
+/**
+ * Formats detailed task data for a single task including comments and attachment URLs.
+ *
+ * Similar to formatTasks() but specialized for a single task with additional detail:
+ * - Includes task comments with user information
+ * - Attachments include public URLs (not just storage paths)
+ * - Returns null if the task doesn't exist
+ * - Maps all assignee and commenter user information
+ * - Provides "Unknown User" fallback for missing user data
+ *
+ * This function is typically used for task detail pages where comprehensive
+ * information is needed.
+ *
+ * @param rawData - An object containing:
+ *   - task: A single RawTask object or null if not found
+ *   - subtasks: Array of RawSubtask objects for this task
+ *   - attachments: Array with id, storage_path, and public_url
+ *   - comments: Array of RawComment objects
+ *   - assignees: Array of RawAssignee objects with full user information
+ *
+ * @returns A DetailedTask object with all related data, or null if task doesn't exist
+ *
+ * @example
+ * const rawTaskData = await getTaskById(42);
+ * const detailedTask = formatTaskDetails(rawTaskData);
+ * if (detailedTask) {
+ *   console.log(`${detailedTask.title} has ${detailedTask.comments.length} comments`);
+ *   detailedTask.attachments.forEach(att => console.log(att.public_url));
+ * }
+ */
 export function formatTaskDetails(
   rawData: {
     task: RawTask | null;

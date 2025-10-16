@@ -23,7 +23,6 @@ import {
   X,
   Repeat,
 } from 'lucide-react';
-import { PrioritySelector } from '@/components/filters/priority-selector';
 import { StatusSelector } from '@/components/filters/status-selector';
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
 import { TagSelector } from '@/components/filters/tag-selector';
@@ -41,7 +40,6 @@ type SortConfig = {
 export default function TasksList({ tasks }: TasksListProps) {
   const [showCompleted, setShowCompleted] = useState(false);
   const [filters, setFilters] = useState({
-    priorities: [] as string[],
     projects: [] as number[],
     statuses: [] as string[],
     tags: [] as string[],
@@ -49,7 +47,6 @@ export default function TasksList({ tasks }: TasksListProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   // Unique values for filters
-  const priorities = Array.from({ length: 10 }, (_, i) => (i + 1).toString());
   const statuses = ['To Do', 'In Progress', 'Completed', 'Blocked'] as const;
   const projects: Project[] = Array.from(
     new Set(
@@ -76,8 +73,6 @@ export default function TasksList({ tasks }: TasksListProps) {
     )
     .filter(
       (task) =>
-        (filters.priorities.length === 0 ||
-          filters.priorities.includes(task.priority.toString())) &&
         (filters.projects.length === 0 ||
           (task.project?.id && filters.projects.includes(task.project.id))) &&
         (filters.statuses.length === 0 || filters.statuses.includes(task.status)) &&
@@ -132,7 +127,7 @@ export default function TasksList({ tasks }: TasksListProps) {
 
   // Clear filters
   const clearFilters = () => {
-    setFilters({ priorities: [], projects: [], statuses: [], tags: [] });
+    setFilters({ projects: [], statuses: [], tags: [] });
   };
 
   // Get status badge variant
@@ -169,11 +164,6 @@ export default function TasksList({ tasks }: TasksListProps) {
           {showCompleted ? 'Hide Completed' : 'Show Completed'}
         </Button>
         <div className="flex flex-wrap items-center gap-2">
-          <PrioritySelector
-            priorities={priorities}
-            selectedPriorities={filters.priorities}
-            onChange={(priorities) => setFilters({ ...filters, priorities })}
-          />
           <StatusSelector
             statuses={statuses}
             selectedStatuses={filters.statuses}
@@ -189,8 +179,7 @@ export default function TasksList({ tasks }: TasksListProps) {
             selectedTags={filters.tags}
             onChange={(tags) => setFilters({ ...filters, tags })}
           />
-          {(filters.priorities.length > 0 ||
-            filters.projects.length > 0 ||
+          {(filters.projects.length > 0 ||
             filters.statuses.length > 0 ||
             filters.tags.length > 0) && (
             <Button variant="ghost" onClick={clearFilters} className="flex items-center gap-2">
