@@ -4,58 +4,54 @@ import { createClient } from '@/lib/supabase/server';
 /**
  * Test Notifications API Endpoint
  *
- * PURPOSE:
- * Test in-app notification system for task assignments, comments, updates, attachments, and more.
+ * PURPOSE: Test in-app notification system for task operations with automatic database triggers.
  *
  * SETUP:
- * 1. Log in as Kester (kester.yeo.2024@computing.smu.edu.sg) - RUNS THE TESTS (Admin)
- * 2. Log in as Ryan (ryan.hung.2023@scis.smu.edu.sg) - RECEIVES NOTIFICATIONS (current assignee)
- * 3. Log in as Joel (joel.wang.03@gmail.com) - RECEIVES NOTIFICATIONS (new assignee)
- *
- * SCENARIO:
- * - Task ID 2: Should have Kester and Ryan as initial assignees
- * - Flow: Kester (logged in) performs all actions, Ryan and Joel receive notifications
- *
- * EXPECTED NOTIFICATIONS:
- * 1. Task Assignment: Kester assigns Joel → Ryan gets "new team member" notif, Joel gets "assigned to task" notif
- * 2. Multiple Single Updates: Recurrence interval, priority, notes, deadline, etc. → Each creates separate notification
- * 3. Batch Update: Multiple fields at once → Single notification listing all changes
- * 4. Team Member Removal: Remove Joel → Joel gets "removed from task", Ryan gets "team member removed"
- * 5. File Attachment: Add file → Ryan gets "file attached" notification
- * 6. Re-assignment: Add Joel back → Ryan gets "new team member", Joel gets "assigned to task"
- * 7. File Removal: Remove file → Ryan gets "file removed" notification
- * 8. Tag Addition: Add tag to task → Ryan gets "tag added" notification
- * 9. Tag Removal: Remove tag from task → Ryan gets "tag removed" notification
- * 10. Subtask Creation: Create new task as subtask of task 2 (COMMENTED OUT for now)
+ * - Log in as Kester (admin) to run tests
+ * - Ryan and Joel receive notifications
+ * - Task ID 2 is used for all test operations
  *
  * USAGE:
  * - Run all tests: GET /api/test-notifications
- * - Individual tests: GET /api/test-notifications?action={assignJoel|singleUpdates|batchUpdate|removeJoel|addAttachment|reassignJoel|removeAttachment|addTag|removeTag}
+ * - Individual tests: GET /api/test-notifications?action={testName}
+ * - POST tests: POST /api/test-notifications with JSON body
  *
- * NEW INDIVIDUAL TESTS:
- * - assignJoel: Assign Joel to task 2 (Ryan gets "new team member", Joel gets "assigned to task")
- * - singleUpdates: Run all 5 single field updates in sequence
- * - batchUpdate: Reset all fields back to original state
- * - removeJoel: Remove Joel from task (Joel gets "removed from task", Ryan gets "team member removed")
- * - addAttachment: Add test-document.pdf (Ryan gets "file attached")
- * - reassignJoel: Assign Joel back to task (Ryan gets "new team member", Joel gets "assigned to task")
- * - removeAttachment: Remove test-document.pdf (Ryan gets "file removed")
- * - addTag: Add tag ID 5 to task (Ryan gets "tag added" notification)
- * - removeTag: Remove tag ID 5 from task (Ryan gets "tag removed" notification)
- * - makeSubtask: Create new subtask (TODO: Waiting for teammate to finalize process)
+ * AVAILABLE TESTS:
+ * - assignJoel: Assign Joel to task 2
+ * - removeJoel: Remove Joel from task 2
+ * - reassignJoel: Assign Joel back to task 2
+ * - singleUpdate: Update single task field
+ * - batchUpdate: Reset task to original state
+ * - singleUpdates: Run all 5 single field updates
+ * - comment: Add comment to task
+ * - addAttachment: Add file attachment
+ * - removeAttachment: Remove file attachment
+ * - addTag: Add tag to task
+ * - removeTag: Remove tag from task
+ * - makeSubtask: Create subtask with parent task
  */
 
-// Constants
+// ==============================
+// CONSTANTS & CONFIGURATION
+// ==============================
+
+/** Test users for notification system testing */
 const TEST_USERS = {
+  /** Kester - Admin user who runs tests and triggers notifications */
   KESTER: { id: '67393282-3a06-452b-a05a-9c93a95b597f', name: 'Kester' },
+  /** Ryan - Regular user who receives notifications */
   RYAN: { id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', name: 'Ryan' },
+  /** Joel - Regular user who receives notifications */
   JOEL: { id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', name: 'Joel' },
 } as const;
 
+/** Task ID used for all test operations */
 const TEST_TASK_ID = 2;
+
+/** Test attachment file name */
 const TEST_ATTACHMENT_NAME = 'test-document.pdf';
 
-// Original values from sample-data.ts for task ID 2
+/** Original task state for reset purposes */
 const TASK_ORIGINAL_STATE = {
   recurrence_interval: 0,
   priority_bucket: '5',
@@ -64,25 +60,29 @@ const TASK_ORIGINAL_STATE = {
   description: 'Kanban by status with optimistic updates + Realtime.',
 } as const;
 
+/** Sequential updates to test individual field change notifications */
 const SINGLE_UPDATES = [
-  { field: 'recurrence_interval', value: 7, description: 'Set recurrence to 7 days' },
-  { field: 'priority_bucket', value: 8, description: 'Changed priority to 8' },
-  { field: 'notes', value: 'Updated notes for testing purposes', description: 'Added notes' },
-  {
-    field: 'deadline',
-    value: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Set deadline to 30 days from now',
-  },
-  { field: 'description', value: 'Updated description for testing', description: 'Changed description' },
+  { field: 'recurrence_interval', value: 7 },
+  { field: 'priority_bucket', value: 8 },
+  { field: 'notes', value: 'Updated notes for testing purposes' },
+  { field: 'deadline', value: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+  { field: 'description', value: 'Updated description for testing' },
 ] as const;
 
-// Helper function for consistent error handling
+// ==============================
+// HELPER FUNCTIONS
+// ==============================
+
+/**
+ * Wraps operations with consistent error handling and response formatting
+ */
 async function handleAction(fn: () => Promise<any>) {
   try {
     const result = await fn();
+    console.log('Action completed successfully:', result);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
-    console.error('Action error:', error);
+    console.error('Action failed:', error);
     return NextResponse.json(
       {
         success: false,
@@ -93,411 +93,521 @@ async function handleAction(fn: () => Promise<any>) {
   }
 }
 
-// GET endpoint - supports query parameters, runs all if none provided
+/**
+ * Gets authenticated user from Supabase session
+ */
+async function getAuthenticatedUser(supabase: any) {
+  console.log('Authenticating user...');
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    console.error('Authentication failed:', authError);
+    throw new Error('Unauthorized - Please login first');
+  }
+
+  console.log(`User authenticated: ${user.email} (${user.id})`);
+  return user;
+}
+
+// ==============================
+// TASK OPERATIONS
+// ==============================
+
+/**
+ * Assigns a user to the test task, triggering assignment notifications
+ */
+async function assignUserToTask(userId: string, userName: string, supabase: any) {
+  console.log(`Assigning ${userName} to task ${TEST_TASK_ID}...`);
+  const user = await getAuthenticatedUser(supabase);
+
+  if (userId === user.id) {
+    console.log('Self-assignment detected, skipping notifications');
+    return { message: 'Self-assignment - no notification needed' };
+  }
+
+  const { data: assignment, error } = await supabase
+    .from('task_assignments')
+    .insert({
+      task_id: TEST_TASK_ID,
+      assignee_id: userId,
+      assignor_id: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Assignment failed:', error);
+    throw error;
+  }
+
+  console.log(`Successfully assigned ${userName} to task ${TEST_TASK_ID}`);
+  return {
+    success: true,
+    message: `Successfully assigned ${userName} to task ID ${TEST_TASK_ID}`,
+    assignment,
+  };
+}
+
+/**
+ * Removes a user from the test task, triggering removal notifications
+ */
+async function removeUserFromTask(userId: string, userName: string, supabase: any) {
+  console.log(`Removing ${userName} from task ${TEST_TASK_ID}...`);
+  const user = await getAuthenticatedUser(supabase);
+
+  if (userId === user.id) {
+    console.log('Cannot remove self from task');
+    return { message: 'Cannot remove yourself from task' };
+  }
+
+  const { data: assignment, error } = await supabase
+    .from('task_assignments')
+    .delete()
+    .eq('task_id', TEST_TASK_ID)
+    .eq('assignee_id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Removal failed:', error);
+    throw error;
+  }
+
+  if (!assignment) {
+    console.log(`${userName} was not assigned to this task`);
+    return { message: `${userName} is not assigned to this task` };
+  }
+
+  console.log(`Successfully removed ${userName} from task ${TEST_TASK_ID}`);
+  return {
+    success: true,
+    message: `Successfully removed ${userName} from task ID ${TEST_TASK_ID}`,
+    assignment,
+  };
+}
+
+/**
+ * Updates task fields, triggering update notifications for changed fields
+ */
+async function updateTask(updates: any, supabase: any) {
+  console.log(`Updating task ${TEST_TASK_ID} with:`, updates);
+  await getAuthenticatedUser(supabase);
+
+  const { data: updatedTask, error } = await supabase
+    .from('tasks')
+    .update(updates)
+    .eq('id', TEST_TASK_ID)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Task update failed:', error);
+    throw error;
+  }
+
+  console.log(`Task ${TEST_TASK_ID} updated successfully`);
+  return {
+    success: true,
+    message: `Task ID ${TEST_TASK_ID} updated`,
+    updatedTask,
+  };
+}
+
+/**
+ * Adds a comment to the test task, triggering comment notifications
+ */
+async function addComment(content: string, supabase: any) {
+  console.log(`Adding comment to task ${TEST_TASK_ID}...`);
+  const user = await getAuthenticatedUser(supabase);
+
+  const { data: comment, error } = await supabase
+    .from('task_comments')
+    .insert({
+      task_id: TEST_TASK_ID,
+      user_id: user.id,
+      content,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Comment creation failed:', error);
+    throw error;
+  }
+
+  console.log(`Comment added to task ${TEST_TASK_ID}`);
+  return {
+    success: true,
+    message: `Comment added to task ID ${TEST_TASK_ID}`,
+    comment,
+  };
+}
+
+/**
+ * Adds a file attachment to the test task, triggering attachment notifications
+ */
+async function addAttachment(fileName: string, supabase: any) {
+  console.log(`Adding attachment "${fileName}" to task ${TEST_TASK_ID}...`);
+  const user = await getAuthenticatedUser(supabase);
+
+  const storagePath = `task-attachments/${fileName}`;
+
+  const { data: attachment, error } = await supabase
+    .from('task_attachments')
+    .insert({
+      task_id: TEST_TASK_ID,
+      storage_path: storagePath,
+      uploaded_by: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Attachment creation failed:', error);
+    throw error;
+  }
+
+  console.log(`Attachment "${fileName}" added to task ${TEST_TASK_ID}`);
+  return {
+    success: true,
+    message: `File "${fileName}" added to task ID ${TEST_TASK_ID}`,
+    attachment,
+  };
+}
+
+/**
+ * Removes a file attachment from the test task, triggering removal notifications
+ */
+async function removeAttachment(fileName: string, supabase: any) {
+  console.log(`Removing attachment "${fileName}" from task ${TEST_TASK_ID}...`);
+  await getAuthenticatedUser(supabase);
+
+  const storagePath = `task-attachments/${fileName}`;
+
+  const { data: attachment, error } = await supabase
+    .from('task_attachments')
+    .delete()
+    .eq('task_id', TEST_TASK_ID)
+    .eq('storage_path', storagePath)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Attachment removal failed:', error);
+    throw error;
+  }
+
+  if (!attachment) {
+    console.log(`Attachment "${fileName}" not found on task ${TEST_TASK_ID}`);
+    return { message: `File "${fileName}" not found on task ID ${TEST_TASK_ID}` };
+  }
+
+  console.log(`Attachment "${fileName}" removed from task ${TEST_TASK_ID}`);
+  return {
+    success: true,
+    message: `File "${fileName}" removed from task ID ${TEST_TASK_ID}`,
+    attachment,
+  };
+}
+
+/**
+ * Adds a tag to the test task, triggering tag addition notifications
+ */
+async function addTag(tagId: number, supabase: any) {
+  console.log(`Adding tag ${tagId} to task ${TEST_TASK_ID}...`);
+  await getAuthenticatedUser(supabase);
+
+  const { data: taskTag, error } = await supabase
+    .from('task_tags')
+    .insert({
+      task_id: TEST_TASK_ID,
+      tag_id: tagId,
+    })
+    .select('*, tags!inner(name)')
+    .single();
+
+  if (error) {
+    console.error('Tag addition failed:', error);
+    throw error;
+  }
+
+  console.log(`Tag "${taskTag.tags.name}" added to task ${TEST_TASK_ID}`);
+  return {
+    success: true,
+    message: `Tag "${taskTag.tags.name}" added to task ID ${TEST_TASK_ID}`,
+    tagId,
+    tagName: taskTag.tags.name,
+  };
+}
+
+/**
+ * Removes a tag from the test task, triggering tag removal notifications
+ */
+async function removeTag(tagId: number, supabase: any) {
+  console.log(`Removing tag ${tagId} from task ${TEST_TASK_ID}...`);
+
+  const { data: removedTag, error } = await supabase
+    .from('task_tags')
+    .delete()
+    .eq('task_id', TEST_TASK_ID)
+    .eq('tag_id', tagId)
+    .select('*, tags!inner(name)')
+    .single();
+
+  if (error) {
+    console.error('Tag removal failed:', error);
+    throw error;
+  }
+
+  if (!removedTag) {
+    console.log(`Tag ${tagId} was not associated with task ${TEST_TASK_ID}`);
+    return { message: `Tag ID ${tagId} is not associated with task ID ${TEST_TASK_ID}` };
+  }
+
+  console.log(`Tag "${removedTag.tags.name}" removed from task ${TEST_TASK_ID}`);
+  return {
+    success: true,
+    message: `Tag "${removedTag.tags.name}" removed from task ID ${TEST_TASK_ID}`,
+    tagId,
+    tagName: removedTag.tags.name,
+  };
+}
+
+/**
+ * Creates a subtask linked to a parent task, triggering subtask creation notifications
+ * Uses RPC approach to bypass RLS and validation triggers
+ */
+async function createSubtask(
+  parentTaskId: number,
+  title: string,
+  description: string,
+  supabase: any
+) {
+  console.log(`Creating subtask "${title}" under parent task ${parentTaskId}...`);
+  const user = await getAuthenticatedUser(supabase);
+
+  // Get parent task info
+  const { data: parentTask, error: parentError } = await supabase
+    .from('tasks')
+    .select('project_id')
+    .eq('id', parentTaskId)
+    .single();
+
+  if (parentError) {
+    console.error('Parent task query failed:', parentError);
+    throw parentError;
+  }
+
+  console.log(`Found parent task: project_id=${parentTask.project_id}`);
+
+  // Create subtask using RPC function (bypasses RLS and validation trigger)
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('create_task_with_assignment', {
+    p_task_title: title,
+    p_creator_id: user.id,
+    p_project_id: parentTask.project_id,
+    p_assignee_id: user.id,
+    p_task_description: description,
+    p_priority_bucket: 5,
+    p_assignor_id: user.id,
+  });
+
+  if (rpcError) {
+    console.error('RPC subtask creation failed:', rpcError);
+    throw rpcError;
+  }
+
+  console.log(`Subtask created via RPC with ID: ${rpcResult[0].task_id}`);
+
+  // Update subtask to have parent_task_id (this triggers the notification)
+  const { data: subtask, error: updateError } = await supabase
+    .from('tasks')
+    .update({ parent_task_id: parentTaskId })
+    .eq('id', rpcResult[0].task_id)
+    .select()
+    .single();
+
+  if (updateError) {
+    console.error('Subtask parent update failed:', updateError);
+    throw updateError;
+  }
+
+  console.log(`Subtask "${title}" successfully linked to parent task ${parentTaskId}`);
+  return {
+    success: true,
+    message: `Subtask "${title}" created and linked to parent task ID ${parentTaskId}`,
+    subtask,
+  };
+}
+
+// ==============================
+// TEST SETUP FUNCTIONS
+// ==============================
+
+/**
+ * Ensures the test task has the correct initial state (Kester and Ryan assigned, Joel removed)
+ */
+async function ensureInitialTaskState(supabase: any) {
+  console.log('Setting up initial task state...');
+
+  // Remove Joel if assigned
+  console.log('Removing Joel from task if assigned...');
+  await supabase
+    .from('task_assignments')
+    .delete()
+    .eq('task_id', TEST_TASK_ID)
+    .eq('assignee_id', TEST_USERS.JOEL.id);
+
+  // Ensure Kester and Ryan are assigned
+  for (const user of [TEST_USERS.KESTER, TEST_USERS.RYAN]) {
+    console.log(`Checking if ${user.name} is assigned to task...`);
+    const { data: assignment } = await supabase
+      .from('task_assignments')
+      .select('*')
+      .eq('task_id', TEST_TASK_ID)
+      .eq('assignee_id', user.id)
+      .maybeSingle();
+
+    if (!assignment) {
+      console.log(`Assigning ${user.name} to task...`);
+      await supabase.from('task_assignments').insert({
+        task_id: TEST_TASK_ID,
+        assignee_id: user.id,
+        assignor_id: TEST_USERS.KESTER.id,
+      });
+    } else {
+      console.log(`${user.name} is already assigned to task`);
+    }
+  }
+
+  console.log('Initial task state setup complete');
+}
+
+/**
+ * Creates test actions with the provided Supabase client
+ */
+function getTestActions(supabase: any) {
+  return {
+    /** Assign Joel to the test task */
+    assignJoel: () => assignUserToTask(TEST_USERS.JOEL.id, TEST_USERS.JOEL.name, supabase),
+
+    /** Remove Joel from the test task */
+    removeJoel: () => removeUserFromTask(TEST_USERS.JOEL.id, TEST_USERS.JOEL.name, supabase),
+
+    /** Reassign Joel to the test task */
+    reassignJoel: () => assignUserToTask(TEST_USERS.JOEL.id, TEST_USERS.JOEL.name, supabase),
+
+    /** Update single task field */
+    singleUpdate: () => updateTask({ status: 'In Progress' }, supabase),
+
+    /** Reset task to original state */
+    batchUpdate: () => updateTask(TASK_ORIGINAL_STATE, supabase),
+
+    /** Run all single field updates sequentially */
+    singleUpdates: async () => {
+      console.log('Running sequential single field updates...');
+      const results = [];
+      for (const update of SINGLE_UPDATES) {
+        console.log(`Updating field: ${update.field}`);
+        const result = await updateTask({ [update.field]: update.value }, supabase);
+        results.push({ field: update.field, ...result });
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      console.log('Single field updates completed');
+      return { action: 'singleUpdates', results };
+    },
+
+    /** Add comment to task */
+    comment: (content?: string) => addComment(content || 'Test comment', supabase),
+
+    /** Add file attachment to task */
+    addAttachment: (fileName?: string) => addAttachment(fileName || TEST_ATTACHMENT_NAME, supabase),
+
+    /** Remove file attachment from task */
+    removeAttachment: (fileName?: string) =>
+      removeAttachment(fileName || TEST_ATTACHMENT_NAME, supabase),
+
+    /** Add tag to task */
+    addTag: () => addTag(5, supabase),
+
+    /** Remove tag from task */
+    removeTag: () => removeTag(5, supabase),
+
+    /** Create subtask with default or custom parameters */
+    makeSubtask: (params?: any) =>
+      createSubtask(
+        params?.parentTaskId || 2,
+        params?.title || 'Test Subtask',
+        params?.description || 'Test subtask description',
+        supabase
+      ),
+  };
+}
+
+// GET endpoint - run tests via query parameters
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const user = await getAuthenticatedUser(supabase);
+    const testActions = getTestActions(supabase);
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized - Please login first' }, { status: 401 });
-    }
-
-    // Parse query parameters
     const { searchParams } = new URL(req.url || '');
     const action = searchParams.get('action');
     const content = searchParams.get('content');
 
-    const results = [];
-
     // If no action specified, run all tests in sequence
     if (!action) {
-      // First, ensure task 2 has the correct initial state (Kester and Ryan as assignees)
       await ensureInitialTaskState(supabase);
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Test 1: Kester assigns Joel to task 2
-      // Expected: Ryan gets "new team member" notification, Joel gets "assigned to task" notification
-      try {
-        const result = await handleTaskAssignment(TEST_USERS.JOEL, supabase);
-        results.push({
-          action: 'assignJoel',
-          success: true,
-          result,
-          note: 'Ryan gets "new team member" notif, Joel gets "assigned to task" notif',
-        });
-      } catch (error) {
-        results.push({
-          action: 'assignJoel',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
+      const testSequence = [
+        { name: 'assignJoel', action: () => testActions.assignJoel() },
+        { name: 'singleUpdates', action: () => testActions.singleUpdates() },
+        { name: 'addTag', action: () => testActions.addTag() },
+        { name: 'removeTag', action: () => testActions.removeTag() },
+        { name: 'batchUpdate', action: () => testActions.batchUpdate() },
+        { name: 'removeJoel', action: () => testActions.removeJoel() },
+        { name: 'addAttachment', action: () => testActions.addAttachment() },
+        { name: 'reassignJoel', action: () => testActions.reassignJoel() },
+        { name: 'removeAttachment', action: () => testActions.removeAttachment() },
+        { name: 'makeSubtask', action: () => testActions.makeSubtask() },
+      ];
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const results = [];
 
-      // Test 2: Multiple single field updates
-      // Each update should create a separate notification
-      for (let i = 0; i < SINGLE_UPDATES.length; i++) {
-        const update = SINGLE_UPDATES[i];
+      for (const test of testSequence) {
         try {
-          const result = await handleTaskUpdate(
-            {
-              taskId: TEST_TASK_ID,
-              updates: { [update.field]: update.value },
-            },
-            supabase
-          );
-          results.push({
-            action: `singleUpdate${i + 1}`,
-            success: true,
-            result,
-            description: update.description,
-          });
+          const result = await test.action();
+          results.push({ action: test.name, success: true, ...result });
         } catch (error) {
           results.push({
-            action: `singleUpdate${i + 1}`,
+            action: test.name,
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
-            description: update.description,
           });
         }
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-
-      // Test 8: Add tag to task (before batch update)
-      // Expected: Ryan gets "tag added" notification
-      try {
-        const result = await handleTagAddition({ tagId: 5 }, supabase);
-        results.push({
-          action: 'addTag',
-          success: true,
-          result,
-          note: 'Ryan gets "tag added" notification',
-        });
-      } catch (error) {
-        results.push({
-          action: 'addTag',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Test 9: Remove tag from task (before batch update)
-      // Expected: Ryan gets "tag removed" notification
-      try {
-        const result = await handleTagRemoval({ tagId: 5 }, supabase);
-        results.push({
-          action: 'removeTag',
-          success: true,
-          result,
-          note: 'Ryan gets "tag removed" notification',
-        });
-      } catch (error) {
-        results.push({
-          action: 'removeTag',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Test 3: Batch update back to original state
-      // Should create a single notification listing all changed fields
-      try {
-        const result = await handleTaskUpdate(
-          {
-            taskId: TEST_TASK_ID,
-            updates: TASK_ORIGINAL_STATE,
-          },
-          supabase
-        );
-        results.push({
-          action: 'batchUpdate',
-          success: true,
-          result,
-          note: 'Single notification listing all changed fields',
-        });
-      } catch (error) {
-        results.push({
-          action: 'batchUpdate',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Test 4: Remove Joel from task
-      // Expected: Joel gets "removed from task" notification, Ryan gets "team member removed" notification
-      try {
-        const result = await handleTaskAssignmentRemoval(TEST_USERS.JOEL, supabase);
-        results.push({
-          action: 'removeJoel',
-          success: true,
-          result,
-          note: 'Joel gets "removed from task" notif, Ryan gets "team member removed" notif',
-        });
-      } catch (error) {
-        results.push({
-          action: 'removeJoel',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Test 5: Add file attachment
-      // Expected: Ryan gets "file attached" notification
-      try {
-        const result = await handleTaskAttachment({ fileName: TEST_ATTACHMENT_NAME }, supabase);
-        results.push({
-          action: 'addAttachment',
-          success: true,
-          result,
-          note: 'Ryan gets "file attached" notification',
-        });
-      } catch (error) {
-        results.push({
-          action: 'addAttachment',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Test 6: Assign Joel back to task
-      // Expected: Ryan gets "new team member" notification, Joel gets "assigned to task" notification again
-      try {
-        const result = await handleTaskAssignment(TEST_USERS.JOEL, supabase);
-        results.push({
-          action: 'reassignJoel',
-          success: true,
-          result,
-          note: 'Ryan gets "new team member" notif, Joel gets "assigned to task" notif again',
-        });
-      } catch (error) {
-        results.push({
-          action: 'reassignJoel',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Test 7: Remove file attachment
-      // Expected: Ryan gets "file removed" notification
-      try {
-        const result = await handleTaskAttachmentRemoval({ fileName: TEST_ATTACHMENT_NAME }, supabase);
-        results.push({
-          action: 'removeAttachment',
-          success: true,
-          result,
-          note: 'Ryan gets "file removed" notification',
-        });
-      } catch (error) {
-        results.push({
-          action: 'removeAttachment',
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Test 8: Create subtask (COMMENTED OUT AS REQUESTED)
-      // Expected: Parent task assignees get notification about new subtask
-      /*
-      try {
-        const result = await handleCreateSubtask({
-          parentTaskId: 2,
-          title: 'Test Subtask for Notification Testing',
-          description: 'This is a subtask created to test notifications'
-        }, supabase);
-        results.push({ action: 'makeSubtask', success: true, result, note: 'Parent task assignees get subtask notification' });
-      } catch (error) {
-        results.push({ action: 'makeSubtask', success: false, error: error instanceof Error ? error.message : 'Unknown error' });
-      }
-      */
 
       return NextResponse.json({
         success: true,
-        message:
-          'All notification tests completed in sequence! Check Ryan and Joel screens for notifications. Flow: 1) Assign Joel → 2) Multiple single updates → 3) Add tag → 4) Remove tag → 5) Batch update → 6) Remove Joel → 7) Add attachment → 8) Re-assign Joel → 9) Remove attachment (subtask creation pending teammate)',
+        message: 'All notification tests completed!',
         user: user.email,
         results,
-        testFlow: [
-          '1. Task Assignment: Kester assigns Joel → Ryan & Joel get notifications',
-          '2. Single Updates: 5 separate field changes → 5 separate notifications',
-          '3. Tag Addition: Tag ID 5 added → Ryan gets "tag added" notification',
-          '4. Tag Removal: Tag ID 5 removed → Ryan gets "tag removed" notification',
-          '5. Batch Update: Multiple fields reset → 1 notification listing all changes',
-          '6. Team Removal: Joel removed → Joel & Ryan get removal notifications',
-          '7. File Attachment: File added → Ryan gets attachment notification',
-          '8. Re-assignment: Joel added back → Ryan & Joel get notifications again',
-          '9. File Removal: File removed → Ryan gets removal notification',
-          '10. Subtask Creation: (Pending teammate) Will create subtask notification when ready',
-        ],
       });
     }
 
-    // If action is specified, run that specific test
-    switch (action) {
-      case 'assignJoel':
-        return handleAction(async () => {
-          console.log('Attempting to assign Joel to task...');
-          const result = await handleTaskAssignment(TEST_USERS.JOEL, supabase);
-          console.log('Assignment result:', result);
-          return { action: 'assignJoel', result, message: 'Joel assigned successfully!' };
-        });
-
-      case 'comment':
-        return handleAction(async () => {
-          const result = await handleComment(
-            { taskId: TEST_TASK_ID, content: content || 'Test comment from query parameter' },
-            supabase
-          );
-          return { action: 'comment', result, message: 'Comment added successfully!' };
-        });
-
-      case 'singleUpdate':
-        return handleAction(async () => {
-          const result = await handleTaskUpdate(
-            { taskId: TEST_TASK_ID, updates: { status: 'In Progress' } },
-            supabase
-          );
-          return { action: 'singleUpdate', result, message: 'Single field update completed!' };
-        });
-
-      case 'batchUpdate':
-        return handleAction(async () => {
-          const result = await handleTaskUpdate(
-            { taskId: TEST_TASK_ID, updates: TASK_ORIGINAL_STATE },
-            supabase
-          );
-          return {
-            action: 'batchUpdate',
-            result,
-            message: 'Batch update completed - all fields reset to original state!',
-          };
-        });
-
-      case 'removeAssignment':
-        return handleAction(async () => {
-          const result = await handleTaskAssignmentRemoval(TEST_USERS.RYAN, supabase);
-          return { action: 'removeAssignment', result, message: 'Assignment removal completed!' };
-        });
-
-      case 'addAttachment':
-        return handleAction(async () => {
-          const result = await handleTaskAttachment(
-            { fileName: content || TEST_ATTACHMENT_NAME },
-            supabase
-          );
-          return { action: 'addAttachment', result, message: 'File attachment added!' };
-        });
-
-      case 'removeAttachment':
-        return handleAction(async () => {
-          const result = await handleTaskAttachmentRemoval(
-            { fileName: content || TEST_ATTACHMENT_NAME },
-            supabase
-          );
-          return { action: 'removeAttachment', result, message: 'File attachment removed!' };
-        });
-
-      case 'singleUpdates':
-        return handleAction(async () => {
-          const results = [];
-          for (let i = 0; i < SINGLE_UPDATES.length; i++) {
-            const update = SINGLE_UPDATES[i];
-            try {
-              const result = await handleTaskUpdate(
-                { taskId: TEST_TASK_ID, updates: { [update.field]: update.value } },
-                supabase
-              );
-              results.push({ update: update.description, success: true, result });
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            } catch (error) {
-              results.push({
-                update: update.description,
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
-              });
-            }
-          }
-          return { action: 'singleUpdates', results, message: 'All single field updates completed!' };
-        });
-
-      case 'removeJoel':
-        return handleAction(async () => {
-          const result = await handleTaskAssignmentRemoval(TEST_USERS.JOEL, supabase);
-          return { action: 'removeJoel', result, message: 'Joel removed from task - check for notifications!' };
-        });
-
-      case 'reassignJoel':
-        return handleAction(async () => {
-          const result = await handleTaskAssignment(TEST_USERS.JOEL, supabase);
-          return {
-            action: 'reassignJoel',
-            result,
-            message: 'Joel reassigned to task - check for notifications!',
-          };
-        });
-
-      case 'addTag':
-        return handleAction(async () => {
-          const result = await handleTagAddition({ tagId: 5 }, supabase);
-          return { action: 'addTag', result, message: 'Tag added successfully!' };
-        });
-
-      case 'removeTag':
-        return handleAction(async () => {
-          const result = await handleTagRemoval({ tagId: 5 }, supabase);
-          return { action: 'removeTag', result, message: 'Tag removed successfully!' };
-        });
-
-      // Subtask creation commented out for now
-      /*
-      case 'makeSubtask':
-        try {
-          const result = await handleCreateSubtask({
-            parentTaskId: 2,
-            title: 'Test Subtask for Notification Testing',
-            description: 'This is a subtask created to test notifications'
-          }, supabase);
-          return NextResponse.json({
-            success: true,
-            action: 'makeSubtask',
-            result,
-            message: 'New subtask created - parent task assignees should get notifications!'
-          });
-        } catch (error) {
-          return NextResponse.json({
-            success: false,
-            action: 'makeSubtask',
-            error: error instanceof Error ? error.message : 'Unknown error'
-          }, { status: 500 });
-        }
-      */
-
-      default:
-        return NextResponse.json(
-          {
-            error: `Unknown action: ${action}. Available actions: assignJoel, comment, singleUpdate, batchUpdate, removeAssignment, addAttachment, removeAttachment, singleUpdates, batchUpdate, removeJoel, reassignJoel, addTag, removeTag`,
-          },
-          { status: 400 }
-        );
+    // Handle specific actions
+    if (action in testActions) {
+      return handleAction(async () => {
+        const result = await (testActions as any)[action](content);
+        return { action, result, message: `${action} completed!` };
+      });
     }
+
+    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
     console.error('GET test notifications error:', error);
     return NextResponse.json(
@@ -509,592 +619,17 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// POST endpoint - run tests via JSON body
 export async function POST(req: NextRequest) {
   const { action, ...params } = await req.json();
   const supabase = await createClient();
+  const testActions = getTestActions(supabase);
 
   return handleAction(async () => {
-    let result;
-
-    switch (action) {
-      case 'assignJoel':
-        result = await handleTaskAssignment(TEST_USERS.JOEL, supabase);
-        break;
-
-      case 'comment':
-        result = await handleComment(
-          { taskId: TEST_TASK_ID, content: params.content || 'Test comment from Kester' },
-          supabase
-        );
-        break;
-
-      case 'singleUpdate':
-        result = await handleTaskUpdate(
-          { taskId: TEST_TASK_ID, updates: params.updates || { status: 'In Progress' } },
-          supabase
-        );
-        break;
-
-      case 'batchUpdate':
-        result = await handleTaskUpdate({ taskId: TEST_TASK_ID, updates: TASK_ORIGINAL_STATE }, supabase);
-        break;
-
-      case 'removeAssignment':
-        result = await handleTaskAssignmentRemoval(
-          {
-            id: params.assigneeId || TEST_USERS.RYAN.id,
-            name: params.assigneeName || TEST_USERS.RYAN.name,
-          },
-          supabase
-        );
-        break;
-
-      case 'addAttachment':
-        result = await handleTaskAttachment(
-          { fileName: params.fileName || TEST_ATTACHMENT_NAME },
-          supabase
-        );
-        break;
-
-      case 'removeAttachment':
-        result = await handleTaskAttachmentRemoval(
-          { fileName: params.fileName || TEST_ATTACHMENT_NAME },
-          supabase
-        );
-        break;
-
-      case 'addTag':
-        result = await handleTagAddition({ tagId: params.tagId || 5 }, supabase);
-        break;
-
-      case 'removeTag':
-        result = await handleTagRemoval({ tagId: params.tagId || 5 }, supabase);
-        break;
-
-      case 'taskAssignment':
-      case 'bulkTaskUpdate':
-        result = await handleBulkTaskUpdate(params, supabase);
-        break;
-
-      default:
-        throw new Error(`Unknown action: ${action}`);
+    if (action in testActions) {
+      const result = await (testActions as any)[action](params);
+      return { action, result, message: `${action} completed!` };
     }
-
-    return { action, result, message: `${action} completed - check notifications!` };
+    throw new Error(`Unknown action: ${action}`);
   });
-}
-
-// Handle task assignment notification (assign new user to existing task)
-async function handleTaskAssignment({ id, name }: { id: string; name: string }, supabase: any) {
-  console.log('handleTaskAssignment called with:', { id, name });
-
-  // Get current user (Kester) as assignor
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  console.log('Auth result:', { user: user?.id, email: user?.email, authError });
-
-  if (authError || !user) {
-    console.error('Auth error:', authError);
-    throw new Error('Unauthorized');
-  }
-
-  const assignorId = user.id;
-  console.log('Assignor ID:', assignorId);
-
-  // No notifications for self-assignment
-  if (id === assignorId) {
-    console.log('Self-assignment detected');
-    return { message: 'Self-assignment - no notification needed' };
-  }
-
-  console.log('Checking if already assigned...');
-
-  // Check if already assigned to prevent duplicates
-  const { data: existingAssignment, error: checkError } = await supabase
-    .from('task_assignments')
-    .select('*')
-    .eq('task_id', TEST_TASK_ID)
-    .eq('assignee_id', id)
-    .single();
-
-  if (checkError && checkError.code !== 'PGRST116') {
-    console.error('Error checking existing assignment:', checkError);
-    throw checkError;
-  }
-
-  if (existingAssignment) {
-    console.log('User already assigned to this task');
-    return { message: `${name} is already assigned to this task` };
-  }
-
-  console.log('Creating assignment...');
-
-  // Create the assignment first (Database trigger will create notification)
-  const { data: assignment, error: assignError } = await supabase
-    .from('task_assignments')
-    .insert({
-      task_id: TEST_TASK_ID,
-      assignee_id: id,
-      assignor_id: assignorId,
-    })
-    .select()
-    .single();
-
-  console.log('Assignment result:', { assignment, assignError });
-
-  if (assignError) {
-    console.error('Assignment error:', assignError);
-    if (assignError.code === '23505') {
-      return { message: `${name} is already assigned to this task` };
-    }
-    throw assignError;
-  }
-
-  return {
-    success: true,
-    message: `Successfully assigned ${name} to task ID ${TEST_TASK_ID}`,
-    assignment,
-    note: 'Database trigger created notification automatically',
-  };
-}
-
-// Handle comment notification
-async function handleComment({ taskId, content }: any, supabase: any) {
-  // Get current user as commenter
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('Unauthorized');
-  }
-
-  const commenterId = user.id;
-
-  // Create the comment (Database trigger will create notifications)
-  const { data: comment, error: commentError } = await supabase
-    .from('task_comments')
-    .insert({
-      task_id: taskId,
-      user_id: commenterId,
-      content: content || 'Test comment from API',
-    })
-    .select()
-    .single();
-
-  if (commentError) throw commentError;
-  if (!comment) throw new Error('Comment creation failed');
-
-  return {
-    success: true,
-    message: `Comment added to task ID ${taskId}`,
-    comment,
-    note: 'Database trigger created notifications for all assignees',
-  };
-}
-
-// Handle task update notification
-async function handleTaskUpdate({ taskId, updates }: any, supabase: any) {
-  // Get current user as updater
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('Unauthorized');
-  }
-
-  console.log('Task update attempt:', { userId: user.id, email: user.email, taskId, updates });
-
-  // Get task state before update for comparison
-  const { data: taskBeforeUpdate } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('id', taskId)
-    .single();
-
-  if (!taskBeforeUpdate) {
-    throw new Error('Task not found');
-  }
-
-  // Filter updates to only include fields that actually changed
-  const actualChanges: any = {};
-  const changedFields: string[] = [];
-
-  for (const [field, newValue] of Object.entries(updates)) {
-    const oldValue = taskBeforeUpdate[field];
-
-    // Handle type conversion for comparison (e.g., string vs number)
-    const normalizedOld = oldValue?.toString();
-    const normalizedNew = newValue?.toString();
-
-    if (normalizedOld !== normalizedNew) {
-      actualChanges[field] = newValue;
-      changedFields.push(field);
-      console.log(`Field "${field}" changed: "${oldValue}" → "${newValue}"`);
-    } else {
-      console.log(`Field "${field}" unchanged: "${oldValue}"`);
-    }
-  }
-
-  if (changedFields.length === 0) {
-    console.log('No actual changes detected - skipping update and notifications');
-    return {
-      success: true,
-      message: `Task ID ${taskId} - no changes needed`,
-      updatedTask: taskBeforeUpdate,
-      notificationsCreated: 0,
-      note: 'No actual changes detected',
-    };
-  }
-
-  console.log('Actual changes to update:', actualChanges);
-
-  // Update only the changed fields
-  const { data: updatedTask, error: updateError } = await supabase
-    .from('tasks')
-    .update(actualChanges)
-    .eq('id', taskId)
-    .select()
-    .single();
-
-  console.log('Task update result:', { updatedTask, updateError });
-
-  if (updateError) {
-    console.error('Task update failed:', updateError);
-    throw updateError;
-  }
-  if (!updatedTask) throw new Error('Task update failed');
-
-  // Database trigger will handle notifications automatically
-  console.log('DB: Database trigger will handle notifications automatically');
-
-  // Get final notification count
-  const { data: finalNotifications } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('type', 'task_updated')
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  // Return detailed debugging info
-  return {
-    success: true,
-    message: `Task ID ${taskId} updated with ${changedFields.length} changes`,
-    updatedTask,
-    notificationsCreated: finalNotifications?.length || 0,
-    recentNotifications: finalNotifications,
-    debugInfo: {
-      updaterId: user.id,
-      taskId: taskId,
-      changedFields,
-      actualChanges,
-      oldTaskTitle: taskBeforeUpdate?.title,
-      newTaskTitle: updatedTask?.title,
-    },
-    note: `Updated ${changedFields.length} field(s): ${changedFields.join(', ')}`,
-  };
-}
-
-// Handle bulk task updates (multiple scenarios)
-async function handleBulkTaskUpdate({ scenarios }: any, supabase: any) {
-  const results = [];
-
-  for (const scenario of scenarios) {
-    try {
-      const result = await handleTaskUpdate(scenario, supabase);
-      results.push({ scenario: scenario.name, success: true, result });
-    } catch (error) {
-      results.push({
-        scenario: scenario.name,
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  }
-
-  return { results, totalScenarios: scenarios.length };
-}
-
-// Handle task assignment removal notification (remove user from task)
-async function handleTaskAssignmentRemoval({ id, name }: { id: string; name: string }, supabase: any) {
-  console.log('handleTaskAssignmentRemoval called with:', { id, name });
-
-  // Get current user (Kester) as remover
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('Unauthorized');
-  }
-
-  const removerId = user.id;
-
-  // Don't remove yourself
-  if (id === removerId) {
-    return { message: 'Cannot remove yourself from task' };
-  }
-
-  // Find and remove the assignment
-  const { data: assignment, error: removeError } = await supabase
-    .from('task_assignments')
-    .delete()
-    .eq('task_id', TEST_TASK_ID)
-    .eq('assignee_id', id)
-    .select()
-    .single();
-
-  if (removeError) throw removeError;
-  if (!assignment) {
-    return { message: `${name} is not assigned to this task` };
-  }
-
-  return {
-    success: true,
-    message: `Successfully removed ${name} from task ID ${TEST_TASK_ID}`,
-    assignment,
-    note: 'Database trigger created removal notifications automatically',
-  };
-}
-
-// Handle task attachment notification (add file to task)
-async function handleTaskAttachment({ fileName }: any, supabase: any) {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('Unauthorized');
-  }
-
-  const storagePath = `task-attachments/${fileName}`;
-
-  // Create the attachment (Database trigger will create notifications)
-  const { data: attachment, error: attachError } = await supabase
-    .from('task_attachments')
-    .insert({
-      task_id: TEST_TASK_ID,
-      storage_path: storagePath,
-      uploaded_by: user.id,
-    })
-    .select()
-    .single();
-
-  if (attachError) throw attachError;
-  if (!attachment) throw new Error('Attachment creation failed');
-
-  return {
-    success: true,
-    message: `File "${fileName}" added to task ID ${TEST_TASK_ID}`,
-    attachment,
-    note: 'Database trigger created notifications for all assignees',
-  };
-}
-
-// Handle task attachment removal notification (remove file from task)
-async function handleTaskAttachmentRemoval({ fileName }: any, supabase: any) {
-  const storagePath = `task-attachments/${fileName}`;
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('Unauthorized');
-  }
-
-  // Find and remove the attachment
-  const { data: attachment, error: removeError } = await supabase
-    .from('task_attachments')
-    .delete()
-    .eq('task_id', TEST_TASK_ID)
-    .eq('storage_path', storagePath)
-    .select()
-    .single();
-
-  if (removeError) throw removeError;
-  if (!attachment) {
-    return { message: `File "${fileName}" not found on task ID ${TEST_TASK_ID}` };
-  }
-
-  return {
-    success: true,
-    message: `File "${fileName}" removed from task ID ${TEST_TASK_ID}`,
-    attachment,
-    note: 'Database trigger created removal notifications automatically',
-  };
-}
-
-// Subtask functionality will be added when teammate finalizes the process
-// TODO: Add handleMakeSubtask function for making existing tasks into subtasks
-
-// Helper function to ensure task 2 has correct initial state (Kester and Ryan as assignees)
-async function ensureInitialTaskState(supabase: any) {
-  console.log('Ensuring task 2 has correct initial state...');
-
-  // Remove Joel if he's already assigned
-  await supabase
-    .from('task_assignments')
-    .delete()
-    .eq('task_id', TEST_TASK_ID)
-    .eq('assignee_id', TEST_USERS.JOEL.id);
-
-  // Ensure Kester is assigned
-  const { data: kesterAssignment } = await supabase
-    .from('task_assignments')
-    .select('*')
-    .eq('task_id', TEST_TASK_ID)
-    .eq('assignee_id', TEST_USERS.KESTER.id)
-    .single();
-
-  if (!kesterAssignment) {
-    console.log('Assigning Kester to task 2...');
-    await supabase.from('task_assignments').insert({
-      task_id: TEST_TASK_ID,
-      assignee_id: TEST_USERS.KESTER.id,
-      assignor_id: TEST_USERS.KESTER.id, // Self-assignment for initial setup
-    });
-  } else {
-    console.log('Kester already assigned to task 2');
-  }
-
-  // Ensure Ryan is assigned
-  const { data: ryanAssignment } = await supabase
-    .from('task_assignments')
-    .select('*')
-    .eq('task_id', TEST_TASK_ID)
-    .eq('assignee_id', TEST_USERS.RYAN.id)
-    .single();
-
-  if (!ryanAssignment) {
-    console.log('Assigning Ryan to task 2...');
-    await supabase.from('task_assignments').insert({
-      task_id: TEST_TASK_ID,
-      assignee_id: TEST_USERS.RYAN.id,
-      assignor_id: TEST_USERS.KESTER.id,
-    });
-  } else {
-    console.log('Ryan already assigned to task 2');
-  }
-
-  // Check final assignment state
-  const { data: finalAssignments } = await supabase
-    .from('task_assignments')
-    .select('assignee_id, user_info!inner(first_name, last_name, email)')
-    .eq('task_id', TEST_TASK_ID);
-
-  console.log('Final task 2 assignments:', finalAssignments);
-
-  console.log('Task 2 initial state ensured: Kester and Ryan as assignees, Joel removed');
-}
-
-// Subtask functionality will be added when teammate finalizes the process
-// TODO: Add handleCreateSubtask and makeSubtask actions when ready
-
-// Handle tag addition notification
-async function handleTagAddition({ tagId }: { tagId: number }, supabase: any) {
-  console.log('handleTagAddition called with:', { tagId });
-
-  // Get current user (Kester) as tag adder
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('Unauthorized');
-  }
-
-  // Check if tag is already associated with this task
-  const { data: existingTag } = await supabase
-    .from('task_tags')
-    .select('*')
-    .eq('task_id', TEST_TASK_ID)
-    .eq('tag_id', tagId)
-    .maybeSingle();
-
-  if (existingTag) {
-    console.log('Tag already associated with task');
-    return { message: `Tag ID ${tagId} is already associated with task ID ${TEST_TASK_ID}` };
-  }
-
-  // Add tag to task (Database trigger will create notification)
-  const { data: taskTag, error: addError } = await supabase
-    .from('task_tags')
-    .insert({
-      task_id: TEST_TASK_ID,
-      tag_id: tagId,
-    })
-    .select(`
-      *,
-      tags!inner(name)
-    `)
-    .single();
-
-  if (addError) throw addError;
-  if (!taskTag) throw new Error('Tag addition failed');
-
-  return {
-    success: true,
-    message: `Tag "${taskTag.tags.name}" (ID: ${tagId}) added to task ID ${TEST_TASK_ID}`,
-    tagId,
-    tagName: taskTag.tags.name,
-    taskTag,
-    note: 'Database trigger created notification automatically',
-  };
-}
-
-// Handle tag removal notification
-async function handleTagRemoval({ tagId }: { tagId: number }, supabase: any) {
-  console.log('handleTagRemoval called with:', { tagId });
-
-  // Get current user (Kester) as tag remover
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('Unauthorized');
-  }
-
-  // Get tag info before removal
-  const { data: tagInfo } = await supabase
-    .from('task_tags')
-    .select(`
-      *,
-      tags!inner(name)
-    `)
-    .eq('task_id', TEST_TASK_ID)
-    .eq('tag_id', tagId)
-    .single();
-
-  if (!tagInfo) {
-    return { message: `Tag ID ${tagId} is not associated with task ID ${TEST_TASK_ID}` };
-  }
-
-  // Remove tag from task (Database trigger will create notification)
-  const { data: removedTag, error: removeError } = await supabase
-    .from('task_tags')
-    .delete()
-    .eq('task_id', TEST_TASK_ID)
-    .eq('tag_id', tagId)
-    .select(`
-      *,
-      tags!inner(name)
-    `)
-    .single();
-
-  if (removeError) throw removeError;
-  if (!removedTag) throw new Error('Tag removal failed');
-
-  return {
-    success: true,
-    message: `Tag "${tagInfo.tags.name}" (ID: ${tagId}) removed from task ID ${TEST_TASK_ID}`,
-    tagId,
-    tagName: tagInfo.tags.name,
-    removedTag,
-    note: 'Database trigger created removal notification automatically',
-  };
 }

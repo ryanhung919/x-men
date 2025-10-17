@@ -33,6 +33,7 @@ async function teardownSchema(sql: postgres.Sql) {
     'DROP TRIGGER IF EXISTS trg_notify_task_assignment ON task_assignments CASCADE',
     'DROP TRIGGER IF EXISTS trg_notify_task_assignment_removal ON task_assignments CASCADE',
     'DROP TRIGGER IF EXISTS trg_notify_task_update ON tasks CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_creation ON tasks CASCADE',
     'DROP TRIGGER IF EXISTS trg_update_project_departments ON task_assignments CASCADE',
     'DROP TRIGGER IF EXISTS trg_validate_task_assignee_count ON tasks CASCADE',
     'DROP TRIGGER IF EXISTS trg_notify_task_attachment ON task_attachments CASCADE',
@@ -56,6 +57,7 @@ async function teardownSchema(sql: postgres.Sql) {
   await sql`DROP FUNCTION IF EXISTS notify_task_assignment() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS notify_task_assignment_removal() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS notify_task_update() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_creation() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS update_project_departments() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS validate_task_assignee_count() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS notify_task_attachment() CASCADE`;
@@ -2139,6 +2141,146 @@ async function createTriggers(sql: postgres.Sql) {
     AFTER DELETE ON task_tags
     FOR EACH ROW
     EXECUTE FUNCTION notify_task_tag_remove();
+  `;
+
+  // Trigger function for task creation notifications (including subtasks)
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_task_creation()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        creator_first_name TEXT;
+        creator_last_name TEXT;
+        creator_full_name TEXT;
+        parent_task_title TEXT;
+        parent_task_exists BOOLEAN;
+        assignee_record RECORD;
+    BEGIN
+        -- Check if we should create notifications:
+        -- 1. On INSERT when parent_task_id is not null
+        -- 2. On UPDATE when parent_task_id changes from null to not null
+        -- 3. On UPDATE when parent_task_id changes from one value to another
+
+        IF TG_OP = 'INSERT' AND NEW.parent_task_id IS NOT NULL THEN
+            -- INSERT case: creating a task as a subtask
+            NULL; -- Continue with notification creation
+        ELSIF TG_OP = 'UPDATE' AND OLD.parent_task_id IS NULL AND NEW.parent_task_id IS NOT NULL THEN
+            -- UPDATE case: task becomes a subtask
+            NULL; -- Continue with notification creation
+        ELSIF TG_OP = 'UPDATE' AND OLD.parent_task_id IS NOT NULL AND NEW.parent_task_id IS NOT NULL AND OLD.parent_task_id != NEW.parent_task_id THEN
+            -- UPDATE case: parent task changes
+            NULL; -- Continue with notification creation
+        ELSE
+            -- No notification needed
+            RETURN NEW;
+        END IF;
+
+        -- Get creator name (bypass RLS)
+        SELECT first_name, last_name INTO creator_first_name, creator_last_name
+        FROM user_info
+        WHERE id = NEW.creator_id;
+
+        IF creator_first_name IS NOT NULL AND creator_last_name IS NOT NULL THEN
+            creator_full_name := creator_first_name || ' ' || creator_last_name;
+        ELSE
+            creator_full_name := 'Someone';
+        END IF;
+
+        -- Check if this is a subtask (has parent_task_id) AND parent task exists
+        IF NEW.parent_task_id IS NOT NULL THEN
+            -- Verify that the parent task actually exists
+            SELECT EXISTS(SELECT 1 FROM tasks WHERE id = NEW.parent_task_id) INTO parent_task_exists;
+
+            -- Only create notifications if parent task exists
+            IF parent_task_exists = TRUE THEN
+                -- Get parent task title (bypass RLS)
+                SELECT title INTO parent_task_title
+                FROM tasks
+                WHERE id = NEW.parent_task_id;
+
+                -- Create notifications for all assignees of the parent task
+                FOR assignee_record IN
+                    SELECT assignee_id
+                    FROM task_assignments
+                    WHERE task_id = NEW.parent_task_id
+                LOOP
+                    -- Skip the creator if they're also an assignee on the parent task
+                    IF assignee_record.assignee_id != NEW.creator_id THEN
+                        INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                        VALUES (
+                            assignee_record.assignee_id,
+                            'Sub-task Created',
+                            'Sub-task "' || NEW.title || '" was added to "' || COALESCE(parent_task_title, 'Unknown Parent') || '"',
+                            'task_updated',
+                            false,
+                            NOW(),
+                            NOW()
+                        );
+                    END IF;
+                END LOOP;
+            END IF;
+        END IF;
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  // Create the trigger on tasks table for creation notifications (including subtasks)
+  await sql`DROP TRIGGER IF EXISTS trg_notify_task_creation ON tasks`;
+
+  await sql`
+    CREATE TRIGGER trg_notify_task_creation
+    AFTER INSERT OR UPDATE ON tasks
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_creation();
+  `;
+
+  // Drop existing function first, then recreate it
+  await sql`DROP FUNCTION IF EXISTS create_task_with_assignment CASCADE`;
+
+  // Create RPC function to create task with assignment in a single transaction
+  await sql`
+    CREATE FUNCTION create_task_with_assignment(
+      p_task_title TEXT,
+      p_creator_id UUID,
+      p_project_id BIGINT,
+      p_assignee_id UUID,
+      p_task_description TEXT DEFAULT NULL,
+      p_priority_bucket INT DEFAULT 5,
+      p_assignor_id UUID DEFAULT NULL
+    )
+    RETURNS TABLE(task_id BIGINT, task_title TEXT)
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+      new_task_id BIGINT;
+      task_title_param TEXT := p_task_title;
+      task_description_param TEXT := p_task_description;
+      creator_id_param UUID := p_creator_id;
+      project_id_param BIGINT := p_project_id;
+      priority_bucket_param INT := p_priority_bucket;
+      assignee_id_param UUID := p_assignee_id;
+      assignor_id_param UUID := COALESCE(p_assignor_id, p_assignee_id);
+    BEGIN
+      -- Insert the task first
+      INSERT INTO tasks (title, description, creator_id, project_id, priority_bucket, status)
+      VALUES (task_title_param, task_description_param, creator_id_param, project_id_param, priority_bucket_param, 'To Do')
+      RETURNING tasks.id INTO new_task_id;
+
+      -- Then insert the assignment
+      INSERT INTO task_assignments (task_id, assignee_id, assignor_id)
+      VALUES (new_task_id, assignee_id_param, assignor_id_param);
+
+      -- Return the created task info
+      RETURN QUERY SELECT new_task_id as task_id, task_title_param as task_title;
+    END;
+    $$;
   `;
 }
 
