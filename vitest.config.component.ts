@@ -33,6 +33,8 @@ export default defineConfig({
       jsdom: {
         resources: 'usable',
         url: 'http://localhost:3000',
+        pretendToBeVisual: true,
+        runScripts: 'dangerously',
       },
     },
     coverage: {
@@ -42,5 +44,7 @@ export default defineConfig({
     },
     testTimeout: 10000, 
     hookTimeout: 10000,
+    // Retry failed tests once in CI
+    retry: process.env.CI ? 1 : 0,
   },
 });

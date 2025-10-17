@@ -78,7 +78,7 @@ jobs:
         run: pnpm test:component
         env:
           NODE_ENV: test
-          NODE_OPTIONS: --experimental-vm-modules
+          NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
 
       - name: Upload component test results
         if: always()
