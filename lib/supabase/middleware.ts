@@ -6,8 +6,6 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  // With Fluid compute, don't put this client in a global environment
-  // variable. Always create a new one on each request.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,12 +27,6 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: If you remove getClaims() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims
 
@@ -50,6 +42,39 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Fetch and store user info in cookie for authenticated users
+  if (user && !isApiRoute) {
+    const userId = user.sub as string
+    
+    // Check if we already have user info in cookie
+    const existingUserInfo = request.cookies.get('user-info')?.value
+    
+    if (!existingUserInfo) {
+      // Fetch user info including department
+      const { data: userInfo, error: userInfoError } = await supabase
+        .from('user_info')
+        .select('department_id')
+        .eq('id', userId)
+        .single()
+
+      if (!userInfoError && userInfo) {
+        // Store user department in cookie
+        const userInfoData = {
+          userId,
+          departmentId: userInfo.department_id,
+        }
+        
+        supabaseResponse.cookies.set('user-info', JSON.stringify(userInfoData), {
+          path: '/',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+        })
+      }
+    }
+  }
+
   // Check admin role for /report routes
   if (user && isReportRoute) {
     const userId = user.sub as string
@@ -62,7 +87,6 @@ export async function updateSession(request: NextRequest) {
 
     if (error) {
       console.error('Error checking user roles:', error)
-      // Redirect to tasks page if we can't verify role
       const url = request.nextUrl.clone()
       url.pathname = '/tasks'
       return NextResponse.redirect(url)
@@ -71,26 +95,12 @@ export async function updateSession(request: NextRequest) {
     const roles = roleRows?.map((r: { role: string }) => r.role) || []
     const isAdmin = roles.includes('admin')
 
-    // Redirect non-admins away from report routes
     if (!isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = '/unauthorized'
       return NextResponse.redirect(url)
     }
   }
-
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
 
   return supabaseResponse
 }
