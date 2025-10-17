@@ -25,7 +25,7 @@ export const testUsers = {
     email: 'joel.wang.2023@scis.smu.edu.sg',
     password: 'password123',
     department: 'Engineering Operations Division Director',
-    roles: ['admin', 'manager', 'staff'], // SMU accounts have all roles
+    roles: ['admin', 'manager', 'staff'], 
   },
   mitch: {
     id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
@@ -68,6 +68,13 @@ export const testUsers = {
     email: 'mitchshonaaa@gmail.com',
     password: 'password123',
     department: 'Finance Executive',
+    roles: ['staff'],
+  },
+  ryanPersonal: {
+    id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
+    email: 'ryanhung919@gmail.com',
+    password: 'password123',
+    departnent: 'Finance Managers',
     roles: ['staff'],
   },
 };
@@ -162,7 +169,7 @@ async function seedDatabase(): Promise<void> {
     }
     
     const result = await response.json();
-    console.log('✅ Database seeded successfully');
+    console.log('Database seeded successfully');
     console.log('   Message:', result.message);
   } catch (error) {
     console.error('❌ Failed to seed database:', error);
@@ -175,7 +182,7 @@ async function seedDatabase(): Promise<void> {
  * Verify user roles are correctly seeded
  */
 async function verifyUserRoles(): Promise<void> {
-  console.log('🔐 Verifying user roles...');
+  console.log('Verifying user roles...');
   
   for (const [key, userData] of Object.entries(testUsers)) {
     const { data: roles, error } = await adminClient
@@ -193,11 +200,11 @@ async function verifyUserRoles(): Promise<void> {
 
     const missingRoles = expectedRoles.filter(r => !actualRoles.includes(r));
     if (missingRoles.length > 0) {
-      console.warn(`⚠️  User ${key} missing roles: ${missingRoles.join(', ')}`);
+      console.warn(`User ${key} missing roles: ${missingRoles.join(', ')}`);
     }
   }
   
-  console.log('✅ User roles verified');
+  console.log('User roles verified');
 }
 
 // Run before all integration tests
@@ -230,13 +237,13 @@ beforeAll(async () => {
       throw new Error('Database seeding failed. Please run: pnpm db:seed');
     }
   } else {
-    console.log('✅ Database already seeded');
+    console.log('Database already seeded');
   }
 
   // Verify user roles
   await verifyUserRoles();
 
-  console.log('✅ Integration test environment ready\n');
+  console.log('Integration test environment ready\n');
 }, 120000); // 2 minute timeout for setup
 
 // Clean up after all tests
@@ -250,7 +257,7 @@ afterAll(async () => {
     console.error('Error during cleanup:', error);
   }
   
-  console.log('✅ Integration test cleanup complete\n');
+  console.log('Integration test cleanup complete\n');
 });
 
 // Reset state before each test

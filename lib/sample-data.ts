@@ -83,7 +83,9 @@ export const departments = [
   { name: 'Senior Engineers', parent_department_name: 'Engineering Operations Division Director' },
   { name: 'Junior Engineers', parent_department_name: 'Engineering Operations Division Director' },
   { name: 'Call Centre', parent_department_name: 'Engineering Operations Division Director' },
-  { name: 'Operation Planning Team', parent_department_name: 'Engineering Operations Division Director',
+  {
+    name: 'Operation Planning Team',
+    parent_department_name: 'Engineering Operations Division Director',
   },
 
   // HR and Admin Branch
@@ -116,7 +118,6 @@ export const user_info = [
     id: '61ca6b82-6d42-4058-bb4c-9316e7079b24',
     first_name: 'Ryan',
     last_name: 'Hung',
-    mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Director',
   },
@@ -124,7 +125,6 @@ export const user_info = [
     id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
     first_name: 'Joel',
     last_name: 'Wang',
-    mode: 'dark',
     default_view: 'calendar',
     department_name: 'Engineering Operations Division Director',
   },
@@ -132,7 +132,6 @@ export const user_info = [
     id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
     first_name: 'Mitch',
     last_name: 'Shona',
-    mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Director',
   },
@@ -140,7 +139,6 @@ export const user_info = [
     id: '32635261-038c-4405-b6ed-2d446738f94c',
     first_name: 'Garrison',
     last_name: 'Koh',
-    mode: 'light',
     default_view: 'calendar',
     department_name: 'System Solutioning Division Director',
   },
@@ -148,7 +146,6 @@ export const user_info = [
     id: '67393282-3a06-452b-a05a-9c93a95b597f',
     first_name: 'Kester',
     last_name: 'Yeo',
-    mode: 'dark',
     default_view: 'tasks',
     department_name: 'Engineering Operations Division Director',
   },
@@ -158,7 +155,6 @@ export const user_info = [
     id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
     first_name: 'Bryan',
     last_name: 'Hong',
-    mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Managers',
   },
@@ -166,7 +162,6 @@ export const user_info = [
     id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
     first_name: 'Noel',
     last_name: 'Tang',
-    mode: 'dark',
     default_view: 'tasks',
     department_name: 'Senior Engineers',
   },
@@ -174,7 +169,6 @@ export const user_info = [
     id: 'aa344933-c44b-4097-b0ac-56987a10734b',
     first_name: 'Michelle',
     last_name: 'Jhona',
-    mode: 'light',
     default_view: 'tasks',
     department_name: 'Finance Executive',
   },
@@ -182,7 +176,6 @@ export const user_info = [
     id: '235d62da-62cc-484b-8715-6683b2a3805a',
     first_name: 'Garry',
     last_name: 'Toh',
-    mode: 'light',
     default_view: 'tasks',
     department_name: 'System Solutioning Division Director',
   },
@@ -190,7 +183,6 @@ export const user_info = [
     id: '9a3c4306-8beb-494a-aee9-ba71a444f19a',
     first_name: 'Chester',
     last_name: 'Nut',
-    mode: 'dark',
     default_view: 'tasks',
     department_name: 'Junior Engineers',
   },
@@ -221,52 +213,29 @@ export const user_roles = [
 
   // Mirror roles on personal accounts for future tests:
   { user_id: 'baa47e05-2dba-4f12-8321-71769a9a3702', role: 'staff' }, // Noel (personal)
+
   { user_id: 'aa344933-c44b-4097-b0ac-56987a10734b', role: 'staff' }, // Mitchelle (personal)
-  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' }, // Bryan (personal)
+
+  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' },
+  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'admin' }, // Bryan (personal)
+
   { user_id: '235d62da-62cc-484b-8715-6683b2a3805a', role: 'staff' }, // Garry (personal)
+
   { user_id: '9a3c4306-8beb-494a-aee9-ba71a444f19a', role: 'staff' }, // Chester (personal)
 ];
 
 /* ======================== PROJECTS & LINKS ======================== */
 export const projects = [
-  { name: 'Annual Budget FY25', department_name: 'Finance Director', is_archived: false },
-  {
-    name: 'Website Redesign',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Data Warehouse Lift',
-    department_name: 'System Solutioning Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Digital Collaboration Rollout',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Client Onboarding Portal',
-    department_name: 'System Solutioning Division Director',
-    is_archived: false,
-  },
-  { name: 'Internal Analytics Dashboard', department_name: 'Finance Director', is_archived: false },
-  {
-    name: 'Cloud Doc Management',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Regional Training Program',
-    department_name: 'System Solutioning Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Workflow Automation Pilot',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  { name: 'FY25 Forecast Review', department_name: 'Finance Director', is_archived: false },
+  { name: 'Annual Budget FY25', is_archived: false },
+  { name: 'Website Redesign', is_archived: false },
+  { name: 'Data Warehouse Lift', is_archived: false },
+  { name: 'Digital Collaboration Rollout', is_archived: false },
+  { name: 'Client Onboarding Portal', is_archived: false },
+  { name: 'Internal Analytics Dashboard', is_archived: false },
+  { name: 'Cloud Doc Management', is_archived: false },
+  { name: 'Regional Training Program', is_archived: false },
+  { name: 'Workflow Automation Pilot', is_archived: false },
+  { name: 'FY25 Forecast Review', is_archived: false },
 ];
 
 /* ======================== PROJECT DEPARTMENTS ======================== */
@@ -290,6 +259,10 @@ export const project_departments = [
   },
   { project_name: 'Digital Collaboration Rollout', department_name: 'Sales Director' },
   {
+    project_name: 'Digital Collaboration Rollout',
+    department_name: 'Finance Director',
+  },
+  {
     project_name: 'Client Onboarding Portal',
     department_name: 'Engineering Operations Division Director',
   },
@@ -299,25 +272,47 @@ export const project_departments = [
     department_name: 'System Solutioning Division Director',
   },
   {
+    project_name: 'Client Onboarding Portal',
+    department_name: 'System Solutioning Division Director',
+  }, // Garrison is assigned
+
+  {
     project_name: 'Internal Analytics Dashboard',
     department_name: 'Engineering Operations Division Director',
   },
   { project_name: 'Internal Analytics Dashboard', department_name: 'Finance Director' },
+  { project_name: 'Internal Analytics Dashboard', department_name: 'Finance Managers' }, // Bryan is assigned
+  {
+    project_name: 'Internal Analytics Dashboard',
+    department_name: 'System Solutioning Division Director',
+  }, // Garrison is assigned
   {
     project_name: 'Cloud Doc Management',
     department_name: 'Engineering Operations Division Director',
   },
   { project_name: 'Cloud Doc Management', department_name: 'System Solutioning Division Director' },
+  { project_name: 'Cloud Doc Management', department_name: 'Finance Director' }, // Ryan is assigned
   {
     project_name: 'Regional Training Program',
     department_name: 'System Solutioning Division Director',
   },
+  { project_name: 'Regional Training Program', department_name: 'Finance Director' }, // Mitch is assigned
+
   {
     project_name: 'Workflow Automation Pilot',
     department_name: 'Engineering Operations Division Director',
   },
   { project_name: 'Workflow Automation Pilot', department_name: 'Finance Director' },
+  { project_name: 'Workflow Automation Pilot', department_name: 'Finance Executive' }, // Michelle is assigned
+
   { project_name: 'FY25 Forecast Review', department_name: 'Finance Director' },
+  {
+    project_name: 'FY25 Forecast Review',
+    department_name: 'Engineering Operations Division Director',
+  }, // Joel and Kester are assigned
+
+  { project_name: 'Website Redesign', department_name: 'Finance Director' }, // Ryan is assigned
+  { project_name: 'Website Redesign', department_name: 'Finance Director' }, // Mitch is assigned
 ];
 
 /* ======================== TAGS ======================== */
@@ -500,8 +495,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-25T09:30:00+08:00'),
     updated_at: new Date('2025-09-25T09:30:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 1,
+    recurrence_date: new Date('2025-10-16T17:00:00+08:00'),
     logged_time: 10900,
   },
   {
@@ -568,8 +563,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-26T11:00:00+08:00'),
     updated_at: new Date('2025-09-26T11:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 7,
+    recurrence_date: new Date('2025-10-15T17:00:00+08:00'),
     logged_time: 0,
   },
   {
@@ -619,8 +614,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-28T11:00:00+08:00'),
     updated_at: new Date('2025-09-28T11:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 14,
+    recurrence_date: new Date('2025-10-20T17:00:00+08:00'),
     logged_time: 1390,
   },
   {
@@ -653,8 +648,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-30T10:00:00+08:00'),
     updated_at: new Date('2025-09-30T10:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 30,
+    recurrence_date: new Date('2025-10-10T17:00:00+08:00'),
     logged_time: 41230,
   },
   {
@@ -961,7 +956,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Design budget dashboard layout',
-    storage_path: 'task-attachments/1/wireframe.png',
+    storage_path: 'wireframe.png',
     uploaded_by: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
     uploaded_at: new Date('2025-09-19T11:10:00+08:00'),
   },
@@ -973,7 +968,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Roll out collaboration tools to SG office',
-    storage_path: 'task-attachments/4/collab_tools_guide.pdf',
+    storage_path: 'TEST FILE.pdf',
     uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c',
     uploaded_at: new Date('2025-09-21T09:15:00+08:00'),
   },

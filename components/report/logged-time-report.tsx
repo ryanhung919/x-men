@@ -15,6 +15,7 @@ import type {
   KPI,
   ChartData,
 } from '@/components/report/export-buttons';
+import { LoggedTimeReportSkeleton } from '@/components/report/report-skeletons';
 
 interface LoggedTimeProps {
   departmentIds?: number[];
@@ -22,6 +23,7 @@ interface LoggedTimeProps {
   startDate?: string;
   endDate?: string;
   onDataLoaded?: (data: LoggedTimeReportType) => void;
+  initialData?: any;
 }
 
 interface Metrics {
@@ -135,7 +137,11 @@ const DISPLAY_CARDS = [
       const completedTime = round(m.totalLoggedHours - m.incompleteHours, 2);
       const nonOverdueIncompleteTime = round(m.incompleteHours - m.overdueHours, 2);
       const chartData = [
-        { name: 'incomplete', value: nonOverdueIncompleteTime, fill: timeBreakdownConfig.incomplete.color },
+        {
+          name: 'incomplete',
+          value: nonOverdueIncompleteTime,
+          fill: timeBreakdownConfig.incomplete.color,
+        },
         { name: 'completed', value: completedTime, fill: timeBreakdownConfig.completed.color },
         {
           name: 'overdue',
@@ -267,7 +273,10 @@ const DISPLAY_CARDS = [
       unit: 'h',
     }),
     subMetrics: [
-      { label: 'Delay (completed late)', format: (m: Metrics) => `${round(m.totalDelayHours, 2)}h` },
+      {
+        label: 'Delay (completed late)',
+        format: (m: Metrics) => `${round(m.totalDelayHours, 2)}h`,
+      },
       { label: 'Overdue time logged', format: (m: Metrics) => `${round(m.overdueHours, 2)}h` },
     ],
     chart: (m: Metrics) => ({
@@ -318,15 +327,76 @@ export function LoggedTimeReport({
   startDate,
   endDate,
   onDataLoaded,
+  initialData,
 }: LoggedTimeProps) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const prevMetricsRef = useRef<Metrics | null>(null);
+  const initializedRef = useRef(false);
 
+  // Initialize with preloaded data if available
+  useEffect(() => {
+    if (initialData && !startDate && !endDate && !initializedRef.current) {
+      const initialMetrics: Metrics = {
+        completedTasks: initialData.completedTasks || 0,
+        overdueTasks: initialData.overdueTasks || 0,
+        blockedTasks: initialData.blockedTasks || 0,
+        totalLoggedHours: initialData.totalTime || 0,
+        avgLoggedHours: initialData.avgTime || 0,
+        incompleteHours: initialData.incompleteTime || 0,
+        timeByTask:
+          initialData.timeByTask instanceof Map
+            ? Object.fromEntries(initialData.timeByTask)
+            : initialData.timeByTask || {},
+        onTimeCompletionRate: initialData.onTimeCompletionRate ?? 0,
+        totalDelayHours: initialData.totalDelayHours ?? 0,
+        overdueHours: initialData.overdueTime ?? 0,
+      };
+
+      setMetrics(initialMetrics);
+      prevMetricsRef.current = initialMetrics;
+      initializedRef.current = true;
+
+      // Generate export data for initial load
+      if (onDataLoaded) {
+        const kpis = DISPLAY_CARDS.map((card) => card.kpi(initialMetrics));
+        const charts = DISPLAY_CARDS.filter((card) => card.chart).map((card) =>
+          card.chart!(initialMetrics)
+        );
+
+        const exportData: LoggedTimeReportType = {
+          kind: 'loggedTime',
+          totalTime: round(initialMetrics.totalLoggedHours, 2),
+          avgTime: round(initialMetrics.avgLoggedHours, 2),
+          completedTasks: initialMetrics.completedTasks,
+          overdueTasks: initialMetrics.overdueTasks,
+          onTimeCompletionRate: round(initialMetrics.onTimeCompletionRate, 2),
+          totalDelayHours: round(initialMetrics.totalDelayHours, 2),
+          incompleteTime: round(initialMetrics.incompleteHours, 2),
+          overdueTime: round(initialMetrics.overdueHours, 2),
+          blockedTasks: initialMetrics.blockedTasks,
+          timeByTask: new Map(
+            Object.entries(initialMetrics.timeByTask).map(([k, v]) => [Number(k), v])
+          ),
+          kpis,
+          charts,
+        };
+        onDataLoaded(exportData);
+      }
+    }
+  }, [initialData, onDataLoaded, startDate, endDate]);
+
+  // Fetch data when filters change
   useEffect(() => {
     if (!departmentIds.length) {
       setMetrics(null);
       prevMetricsRef.current = null;
+      initializedRef.current = false;
+      return;
+    }
+
+    // Skip fetch only on the very first render if we have preloaded data and no date filters
+    if (initialData && !startDate && !endDate && !initializedRef.current) {
       return;
     }
 
@@ -398,7 +468,7 @@ export function LoggedTimeReport({
 
   const displayMetrics = loading && prevMetricsRef.current ? prevMetricsRef.current : metrics;
 
-  if (!displayMetrics) return <div className="text-muted-foreground">No data</div>;
+  if (!displayMetrics) return <LoggedTimeReportSkeleton />;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

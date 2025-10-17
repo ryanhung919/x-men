@@ -6,26 +6,41 @@ This project uses a comprehensive testing strategy with unit and integration tes
 
 ```
 __tests__/
-├── fixtures/               # Test data fixtures
-│   └── database.fixtures.ts
-├── helpers/                # helper functions
-├── integration/            # Integration tests (real database)
+├── fixtures/                   # Test data fixtures
+│   ├── database.fixtures.ts    # Mock data for unit tests
+│   └── api.fixtures.ts         # API response fixtures
+├── helpers/                    # Helper functions
+│   ├── test.utils.ts          # Common test utilities
+│   └── auth.helpers.ts        # Authentication helpers
+├── integration/               # Integration tests (real database)
+│   ├── app/                   
+│   │   └── api/               # API route tests
+│   │       ├── auth.test.ts
+│   │       └── users.test.ts
+│   └── lib/                   # Library integration tests
+│       ├── database.test.ts
+│       └── services.test.ts
+├── unit/                      # Unit tests (mocked dependencies)
 │   ├── app/
-    │   └── api/
-│   └── lib/
-├── unit/                   # Unit tests (mocked dependencies)
-│   ├── app/
-    │   └── api/
+│   │   └── api/              # API unit tests
+│   │       ├── auth.test.ts
+│   │       └── users.test.ts
 │   ├── lib/
-│   │   ├── db/             # Database layer tests
-│   │   └── services/       # Service layer tests
-│   └── components/         # Component tests
-├── setup/                  # Test setup files
-│   ├── vitest.setup.ts    # Unit test setup
+│   │   ├── db/              # Database layer tests
+│   │   │   ├── users.test.ts
+│   │   │   └── projects.test.ts
+│   │   └── services/        # Service layer tests
+│   │       ├── auth.test.ts
+│   │       └── filter.test.ts
+│   └── components/          # Component tests
+│       ├── Button.test.tsx
+│       └── Card.test.tsx
+├── setup/                   # Test setup files
+│   ├── vitest.setup.ts     # Unit test setup
 │   └── integration.setup.ts # Integration test setup
-├── mocks/                  # Mock utilities
-│   └── supabase.mock.ts
-
+└── mocks/                  # Mock utilities
+    ├── supabase.mock.ts    # Supabase client mocks
+    └── auth.mock.ts        # Authentication mocks
 ```
 
 ## Running Tests

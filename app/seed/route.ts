@@ -97,7 +97,6 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
       first_name VARCHAR(255) NOT NULL,
       last_name  VARCHAR(255) NOT NULL,
-      mode       VARCHAR(10) NOT NULL DEFAULT 'light',
       default_view VARCHAR(20) NOT NULL DEFAULT 'tasks',
       department_id BIGINT NOT NULL REFERENCES departments(id) ON DELETE RESTRICT
     );
@@ -110,14 +109,13 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       if (!depId) throw new Error(`Unknown department: ${ui.department_name}`);
 
       return sql`
-        INSERT INTO user_info (id, first_name, last_name, mode, default_view, department_id)
-        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${ui.mode}, ${
+        INSERT INTO user_info (id, first_name, last_name, default_view, department_id)
+        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${
         ui.default_view ?? 'tasks'
       }, ${depId})
         ON CONFLICT (id) DO UPDATE
           SET first_name = EXCLUDED.first_name,
               last_name  = EXCLUDED.last_name,
-              mode       = EXCLUDED.mode,
               default_view = EXCLUDED.default_view,
               department_id = EXCLUDED.department_id
       `;
@@ -413,7 +411,32 @@ async function seedTaskTags(sql: postgres.Sql) {
 async function resetTaskAttachmentsBucket(sql: postgres.Sql) {
   console.log('Resetting storage bucket: task-attachments');
 
-  // Remove objects referencing the bucket first to satisfy FK constraint objects.bucket_id -> buckets.id
+  // First, delete all files from the bucket using Supabase client
+  try {
+    const { data: files, error: listError } = await supabase.storage
+      .from('task-attachments')
+      .list();
+
+    if (listError) {
+      console.warn('Could not list files in bucket (bucket may not exist):', listError.message);
+    } else if (files && files.length > 0) {
+      console.log(`Deleting ${files.length} files from task-attachments bucket...`);
+      const filePaths = files.map((file) => file.name);
+      const { error: deleteError } = await supabase.storage
+        .from('task-attachments')
+        .remove(filePaths);
+
+      if (deleteError) {
+        console.warn('Error deleting some files:', deleteError.message);
+      } else {
+        console.log('Successfully deleted all files from bucket');
+      }
+    }
+  } catch (e) {
+    console.warn('Error during file cleanup:', e);
+  }
+
+  // Remove objects referencing the bucket from storage.objects table
   // (Different self-hosted versions may use bucket_id or bucketId; handle both defensively)
   try {
     await sql`DELETE FROM storage.objects WHERE bucket_id = 'task-attachments'`;
@@ -436,10 +459,10 @@ async function resetTaskAttachmentsBucket(sql: postgres.Sql) {
   // Now drop bucket if exists
   await sql`DELETE FROM storage.buckets WHERE id = 'task-attachments'`;
 
-  // Recreate bucket (private by default)
+  // Recreate bucket (public for easy file access)
   await sql`
     INSERT INTO storage.buckets (id, name, public)
-    VALUES ('task-attachments', 'task-attachments', false)
+    VALUES ('task-attachments', 'task-attachments', true)
   `;
 }
 
