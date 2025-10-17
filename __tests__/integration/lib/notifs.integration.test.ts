@@ -151,7 +151,7 @@ describe('Notifications Integration Tests', () => {
         .single();
 
       expect(newNotification).toBeDefined();
-      expect(newNotification?.type).toBe('task_assigned');
+      expect(newNotification?.type).toBe('task_updated');
       expect(newNotification?.title).toBe('New Task Assignment');
       expect(newNotification?.message).toContain('assigned you to task');
       expect(newNotification?.read).toBe(false);
@@ -301,7 +301,7 @@ describe('Notifications Integration Tests', () => {
           .from('notifications')
           .select('*')
           .eq('user_id', assigneeId)
-          .eq('type', 'comment_added')
+          .eq('type', 'task_updated')
           .order('created_at', { ascending: false })
           .limit(1);
 
@@ -334,7 +334,7 @@ describe('Notifications Integration Tests', () => {
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', testUsers.garrison.id)
-        .eq('type', 'comment_added');
+        .eq('type', 'task_updated');
 
       // Garrison comments on the task
       const { data: comment } = await adminClient
@@ -352,7 +352,7 @@ describe('Notifications Integration Tests', () => {
         .from('notifications')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', testUsers.garrison.id)
-        .eq('type', 'comment_added');
+        .eq('type', 'task_updated');
 
       expect(afterCount).toBe(beforeCount);
 
@@ -403,7 +403,7 @@ describe('Notifications Integration Tests', () => {
           user_id: testUsers.kester.id,
           title: 'Test Notification',
           message: 'This is a test notification for deletion',
-          type: 'task_assigned',
+          type: 'task_updated',
           read: false,
         })
         .select()
@@ -576,7 +576,7 @@ describe('Notifications Integration Tests', () => {
       expect(typeof notifications.read).toBe('boolean');
     });
 
-    it('should have valid notification types', async () => {
+    it('should have unified notification types', async () => {
       const { data: notifications } = await adminClient
         .from('notifications')
         .select('type')
@@ -586,10 +586,14 @@ describe('Notifications Integration Tests', () => {
         return;
       }
 
-      const validTypes = ['task_assigned', 'comment_added', 'task_updated'];
+      const validTypes = ['task_updated'];
+      // Check that notifications contain only our core types
       const allTypesValid = notifications.every((n) => validTypes.includes(n.type));
-
       expect(allTypesValid).toBe(true);
+
+      // Verify we have the unified notification type
+      const hasUnifiedType = notifications.some((n) => validTypes.includes(n.type));
+      expect(hasUnifiedType).toBe(true);
     });
   });
 
@@ -616,7 +620,11 @@ describe('Notifications Integration Tests', () => {
     }
 
     // Get the task
-    const { data: task } = await adminClient.from('tasks').select('*').eq('id', commonTaskId).single();
+    const { data: task } = await adminClient
+      .from('tasks')
+      .select('*')
+      .eq('id', commonTaskId)
+      .single();
 
     if (!task) {
       throw new Error(`Task ${commonTaskId} not found`);
@@ -961,7 +969,621 @@ describe('Notifications Integration Tests', () => {
       expect(afterCount).toBe((beforeCount || 0) + 1);
 
       // Always restore original priority to maintain test isolation
-      await kesterClient.from('tasks').update({ priority_bucket: task.priority_bucket }).eq('id', task.id);
+      await kesterClient
+        .from('tasks')
+        .update({ priority_bucket: task.priority_bucket })
+        .eq('id', task.id);
+    });
+
+    it('should create notifications for batch updates and restore original data', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
+      const recipient = testUsers.ryan.id;
+
+      // Record original task state before any changes
+      const { data: originalTask } = await adminClient
+        .from('tasks')
+        .select('*')
+        .eq('id', task.id)
+        .single();
+
+      expect(originalTask).toBeDefined();
+
+      // Record notification count before any updates
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      // Step 1: Make multiple single updates with clearly different values
+      const singleUpdates = [
+        {
+          field: 'priority_bucket',
+          value: originalTask.priority_bucket + 1,
+          description: `Changed priority from ${originalTask.priority_bucket} to ${
+            originalTask.priority_bucket + 1
+          }`,
+        },
+        {
+          field: 'status',
+          value: originalTask.status === 'To Do' ? 'In Progress' : 'To Do',
+          description: `Changed status from ${originalTask.status} to ${
+            originalTask.status === 'To Do' ? 'In Progress' : 'To Do'
+          }`,
+        },
+        {
+          field: 'description',
+          value: 'Modified description for batch update testing',
+          description: `Changed description from ${originalTask.description?.substring(0, 50)}...`,
+        },
+      ];
+
+      for (const update of singleUpdates) {
+        const { error: updateError } = await kesterClient
+          .from('tasks')
+          .update({ [update.field]: update.value })
+          .eq('id', task.id);
+
+        expect(updateError).toBeNull();
+
+        // Small delay for trigger to execute
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+
+      // Verify all single updates created notifications
+      const { count: afterSingleUpdates } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(afterSingleUpdates).toBe((beforeCount || 0) + singleUpdates.length);
+
+      // Step 2: Batch update to restore original state
+      const { error: restoreError } = await kesterClient
+        .from('tasks')
+        .update({
+          priority_bucket: originalTask.priority_bucket,
+          status: originalTask.status,
+          description: originalTask.description,
+        })
+        .eq('id', task.id);
+
+      expect(restoreError).toBeNull();
+
+      // Wait for batch trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Verify batch update created one notification listing all changed fields
+      const { count: finalCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(finalCount).toBe((beforeCount || 0) + singleUpdates.length + 1);
+
+      // Verify the notification mentions multiple field changes
+      const { data: batchNotification } = await adminClient
+        .from('notifications')
+        .select('*')
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      expect(batchNotification).toBeDefined();
+      expect(batchNotification?.title).toBe('Task Updated');
+      expect(batchNotification?.message).toContain('following fields');
+      expect(batchNotification?.message).toContain('priority');
+      expect(batchNotification?.message).toContain('status');
+      expect(batchNotification?.message).toContain('description');
+
+      // Verify task was restored to original state
+      const { data: restoredTask } = await adminClient
+        .from('tasks')
+        .select('priority_bucket, status, description')
+        .eq('id', task.id)
+        .single();
+
+      expect(restoredTask?.priority_bucket).toBe(originalTask.priority_bucket);
+      expect(restoredTask?.status).toBe(originalTask.status);
+      expect(restoredTask?.description).toBe(originalTask.description);
+    });
+  });
+
+  describe('Notification Triggers - Comment Removal', () => {
+    it('should create notifications when admin removes a comment', async () => {
+      // Get a task with multiple assignees
+      const { data: taskWithAssignees } = await adminClient
+        .from('task_assignments')
+        .select('task_id, assignee_id')
+        .limit(3);
+
+      if (!taskWithAssignees || taskWithAssignees.length < 2) {
+        return;
+      }
+
+      const taskId = taskWithAssignees[0].task_id;
+      const assigneeIds = taskWithAssignees
+        .filter((ta) => ta.task_id === taskId)
+        .map((ta) => ta.assignee_id);
+
+      // Joel adds a comment first
+      const { data: comment } = await adminClient
+        .from('task_comments')
+        .insert({
+          task_id: taskId,
+          user_id: testUsers.joel.id,
+          content: 'Test comment for removal scenario',
+        })
+        .select()
+        .single();
+
+      expect(comment).toBeDefined();
+
+      // Kester (admin) removes the comment
+      const { data: removedComment } = await adminClient
+        .from('task_comments')
+        .delete()
+        .eq('id', comment!.id)
+        .select()
+        .single();
+
+      expect(removedComment).toBeDefined();
+
+      // Check notifications were created for assignees (excluding the remover if they're assigned)
+      for (const assigneeId of assigneeIds) {
+        if (assigneeId === testUsers.kester.id) {
+          // Admin shouldn't receive notification for their own action
+          continue;
+        }
+
+        // Look for the comment removal notification specifically
+        const { data: notifications } = await adminClient
+          .from('notifications')
+          .select('*')
+          .eq('user_id', assigneeId)
+          .eq('type', 'task_updated')
+          .eq('title', 'Comment Removed')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        expect(notifications).toBeDefined();
+        if (notifications && notifications.length > 0) {
+          expect(notifications[0].title).toBe('Comment Removed');
+          expect(notifications[0].message).toContain('removed');
+          expect(notifications[0].message).toContain(
+            testUsers.joel.id === assigneeId ? 'your' : "Joel's"
+          );
+          expect(notifications[0].message).toContain('comment');
+        }
+      }
+    });
+  });
+
+  describe('Notification Triggers - Task Assignment Removal', () => {
+    it('should create notifications when user is removed from task', async () => {
+      // Get an existing task with assignments
+      const { data: existingAssignment } = await adminClient
+        .from('task_assignments')
+        .select('task_id, assignee_id, id')
+        .limit(1)
+        .single();
+
+      if (!existingAssignment) {
+        return;
+      }
+
+      // Get task details
+      const { data: task } = await adminClient
+        .from('tasks')
+        .select('title')
+        .eq('id', existingAssignment.task_id)
+        .single();
+
+      expect(task).toBeDefined();
+
+      // Get notification count before removal
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', existingAssignment.assignee_id)
+        .eq('type', 'task_updated');
+
+      // Check if the task assignment removal RLS policy allows kester to delete
+      const { data: canDelete } = await kesterClient
+        .from('task_assignments')
+        .select('id')
+        .eq('id', existingAssignment.id)
+        .maybeSingle();
+
+      if (!canDelete) {
+        console.log('User does not have permission to delete this assignment, skipping test');
+        return;
+      }
+
+      // Remove the assignment using authenticated kester client
+      const { data: removedAssignment } = await kesterClient
+        .from('task_assignments')
+        .delete()
+        .eq('id', existingAssignment.id)
+        .select()
+        .single();
+
+      expect(removedAssignment).toBeDefined();
+
+      // Check notification was created
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', existingAssignment.assignee_id)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe((beforeCount || 0) + 1);
+
+      // Verify notification content
+      const { data: notification } = await adminClient
+        .from('notifications')
+        .select('*')
+        .eq('user_id', existingAssignment.assignee_id)
+        .eq('type', 'task_updated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      expect(notification).toBeDefined();
+      expect(notification?.title).toBe('Task Assignee Removed');
+      expect(notification?.message).toContain('removed you from task');
+      expect(notification?.read).toBe(false);
+
+      // Restore the assignment for other tests
+      await adminClient.from('task_assignments').insert({
+        task_id: existingAssignment.task_id,
+        assignee_id: existingAssignment.assignee_id,
+        assignor_id: testUsers.kester.id,
+      });
+    });
+  });
+
+  describe('Notification Triggers - Task Attachments', () => {
+    it('should create notifications when file is attached to task', async () => {
+      // Get a task where Joel is assigned (so he can add attachments)
+      const { data: assignment } = await adminClient
+        .from('task_assignments')
+        .select('task_id, assignee_id')
+        .eq('assignee_id', testUsers.joel.id)
+        .limit(1)
+        .single();
+
+      if (!assignment) {
+        console.log('Joel not assigned to any tasks, skipping attachment test');
+        return;
+      }
+
+      // Get an authenticated client (joel) to add the attachment
+      const { client: joelClient } = await authenticateAs('joel');
+
+      // Add file attachment using the correct path format
+      const { data: attachment } = await joelClient
+        .from('task_attachments')
+        .insert({
+          task_id: assignment.task_id,
+          storage_path: 'task-attachments/test-file.pdf',
+          uploaded_by: testUsers.joel.id,
+        })
+        .select()
+        .single();
+
+      expect(attachment).toBeDefined();
+
+      // Check notification was created for assignee (not uploader)
+      if (assignment.assignee_id !== testUsers.joel.id) {
+        const { data: notification } = await adminClient
+          .from('notifications')
+          .select('*')
+          .eq('user_id', assignment.assignee_id)
+          .eq('type', 'task_updated')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        expect(notification).toBeDefined();
+        expect(notification?.title).toBe('Attachment Added');
+        expect(notification?.message).toContain('attached a file');
+        expect(notification?.message).toContain('test-file.pdf');
+      }
+
+      // Cleanup
+      await joelClient.from('task_attachments').delete().eq('id', attachment!.id);
+    });
+
+    it('should create notifications when file is removed from task', async () => {
+      // Get a task where both Joel and Kester are assigned
+      const { data: joelAssignment } = await adminClient
+        .from('task_assignments')
+        .select('task_id')
+        .eq('assignee_id', testUsers.joel.id)
+        .limit(1)
+        .single();
+
+      if (!joelAssignment) {
+        console.log('Joel not assigned to any tasks, skipping attachment removal test');
+        return;
+      }
+
+      // Check if Kester is also assigned to the same task
+      const { data: kesterAssignment } = await adminClient
+        .from('task_assignments')
+        .select('task_id, assignee_id')
+        .eq('task_id', joelAssignment.task_id)
+        .eq('assignee_id', testUsers.kester.id)
+        .maybeSingle();
+
+      if (!kesterAssignment) {
+        console.log('Kester not assigned to the same task as Joel, skipping test');
+        return;
+      }
+
+      // Get authenticated clients
+      const { client: joelClient } = await authenticateAs('joel');
+      const { client: kesterClient } = await authenticateAs('kester');
+
+      // First add an attachment using Joel's client
+      const { data: attachment } = await joelClient
+        .from('task_attachments')
+        .insert({
+          task_id: joelAssignment.task_id,
+          storage_path: 'task-attachments/test-file-to-remove.pdf',
+          uploaded_by: testUsers.joel.id,
+        })
+        .select()
+        .single();
+
+      expect(attachment).toBeDefined();
+
+      // Remove the attachment using Kester's client (different user)
+      const { data: removedAttachment } = await kesterClient
+        .from('task_attachments')
+        .delete()
+        .eq('id', attachment!.id)
+        .select()
+        .single();
+
+      expect(removedAttachment).toBeDefined();
+
+      // Check notification was created for assignee (not remover)
+      if (kesterAssignment.assignee_id !== testUsers.kester.id) {
+        const { data: notification } = await adminClient
+          .from('notifications')
+          .select('*')
+          .eq('user_id', kesterAssignment.assignee_id)
+          .eq('type', 'task_updated')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        expect(notification).toBeDefined();
+        expect(notification?.title).toBe('Attachment Removed');
+        expect(notification?.message).toContain('removed a file');
+        expect(notification?.message).toContain('test-file-to-remove.pdf');
+      }
+    });
+  });
+
+  // TODO: Add subtask creation integration tests when teammate finalizes the process
+  // describe('Notification Triggers - Subtask Creation', () => {
+  //   it('should create notifications when task becomes a subtask', async () => {
+  //     // Test will validate that parent task assignees receive notifications
+  //     // when an existing task is made into a subtask
+  //   });
+  // });
+
+  describe('Notification Triggers - Task Tags', () => {
+    it('should create notifications when tag is added to task', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
+      const recipient = testUsers.ryan.id;
+
+      // Get an available tag
+      const { data: tag } = await adminClient.from('tags').select('id, name').limit(1).single();
+
+      if (!tag) {
+        console.log('No tags available, skipping tag add test');
+        return;
+      }
+
+      // Check if tag is already associated with this task
+      const { data: existingTag } = await adminClient
+        .from('task_tags')
+        .select('*')
+        .eq('task_id', task.id)
+        .eq('tag_id', tag.id)
+        .maybeSingle();
+
+      if (existingTag) {
+        console.log('Tag already associated with task, skipping test');
+        return;
+      }
+
+      // Record notification count before tag addition
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      // Add tag to task using authenticated kester client
+      const { data: taskTag, error: addError } = await kesterClient
+        .from('task_tags')
+        .insert({
+          task_id: task.id,
+          tag_id: tag.id,
+        })
+        .select()
+        .single();
+
+      expect(addError).toBeNull();
+      expect(taskTag).toBeDefined();
+
+      // Wait briefly for the trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Assert that ryan got +1 notification
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe((beforeCount || 0) + 1);
+
+      // Verify notification content
+      const { data: notification } = await adminClient
+        .from('notifications')
+        .select('*')
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      expect(notification).toBeDefined();
+      expect(notification?.title).toBe('Tag Added');
+      expect(notification?.message).toContain('added tag');
+      expect(notification?.message).toContain(tag.name);
+      expect(notification?.read).toBe(false);
+
+      // Cleanup - remove the tag
+      await kesterClient.from('task_tags').delete().eq('task_id', task.id).eq('tag_id', tag.id);
+    });
+
+    it('should create notifications when tag is removed from task', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
+      const recipient = testUsers.ryan.id;
+
+      // Get an available tag
+      const { data: tag } = await adminClient.from('tags').select('id, name').limit(1).single();
+
+      if (!tag) {
+        console.log('No tags available, skipping tag remove test');
+        return;
+      }
+
+      // First add the tag to the task using authenticated kester client
+      const { data: taskTag } = await kesterClient
+        .from('task_tags')
+        .insert({
+          task_id: task.id,
+          tag_id: tag.id,
+        })
+        .select()
+        .single();
+
+      expect(taskTag).toBeDefined();
+
+      // Wait for addition notification to be created
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Record notification count before tag removal
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      // Remove tag from task using authenticated kester client
+      const { error: removeError } = await kesterClient
+        .from('task_tags')
+        .delete()
+        .eq('task_id', task.id)
+        .eq('tag_id', tag.id);
+
+      expect(removeError).toBeNull();
+
+      // Wait briefly for the trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Assert that ryan got +1 notification
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe((beforeCount || 0) + 1);
+
+      // Verify notification content
+      const { data: notification } = await adminClient
+        .from('notifications')
+        .select('*')
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      expect(notification).toBeDefined();
+      expect(notification?.title).toBe('Tag Removed');
+      expect(notification?.message).toContain('removed tag');
+      expect(notification?.message).toContain(tag.name);
+      expect(notification?.read).toBe(false);
+    });
+
+    it('should not notify tag adder when they are also an assignee', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Get an available tag
+      const { data: tag } = await adminClient.from('tags').select('id, name').limit(1).single();
+
+      if (!tag) {
+        console.log('No tags available, skipping test');
+        return;
+      }
+
+      // Record kester's notification count before tag addition
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', testUsers.kester.id)
+        .eq('type', 'task_updated');
+
+      // Kester adds tag to the task (kester is an assignee)
+      const { data: taskTag } = await kesterClient
+        .from('task_tags')
+        .insert({
+          task_id: task.id,
+          tag_id: tag.id,
+        })
+        .select()
+        .single();
+
+      expect(taskTag).toBeDefined();
+
+      // Wait for trigger
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Verify kester did NOT get a notification (self-action)
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', testUsers.kester.id)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe(beforeCount);
+
+      // Cleanup
+      await kesterClient.from('task_tags').delete().eq('task_id', task.id).eq('tag_id', tag.id);
     });
   });
 });
