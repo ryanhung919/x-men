@@ -1,40 +1,7 @@
-import { vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 
-// Reset all mocks before each test
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-// Mock Next.js modules
-vi.mock('next/headers', () => ({
-  cookies: vi.fn(() => ({
-    get: vi.fn((name: string) => ({ 
-      name, 
-      value: 'mock-session-token' 
-    })),
-    set: vi.fn(),
-    delete: vi.fn(),
-  })),
-  headers: vi.fn(() => ({
-    get: vi.fn((name: string) => 'mock-header-value'),
-  })),
-}));
-
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(() => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-    prefetch: vi.fn(),
-  })),
-  usePathname: vi.fn(() => '/'),
-  useSearchParams: vi.fn(() => new URLSearchParams()),
-}));
-
-// Mock jsPDF
+// Mock jsPDF for component tests
 vi.mock('jspdf', () => ({
   jsPDF: vi.fn().mockImplementation(() => ({
     internal: {
@@ -56,7 +23,7 @@ vi.mock('jspdf', () => ({
   })),
 }));
 
-// Mock XLSX
+// Mock XLSX for component tests
 vi.mock('xlsx', () => ({
   default: {
     utils: {
@@ -74,10 +41,16 @@ vi.mock('xlsx', () => ({
   writeFile: vi.fn(),
 }));
 
-// Global test utilities
-global.console = {
-  ...console,
-  error: vi.fn(),
-  warn: vi.fn(),
-  log: vi.fn(),
-};
+// Mock Next.js navigation for React components
+vi.mock('next/navigation', () => ({
+  useRouter: vi.fn(() => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  })),
+  usePathname: vi.fn(() => '/'),
+  useSearchParams: vi.fn(() => new URLSearchParams()),
+}));

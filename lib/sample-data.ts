@@ -213,52 +213,29 @@ export const user_roles = [
 
   // Mirror roles on personal accounts for future tests:
   { user_id: 'baa47e05-2dba-4f12-8321-71769a9a3702', role: 'staff' }, // Noel (personal)
+
   { user_id: 'aa344933-c44b-4097-b0ac-56987a10734b', role: 'staff' }, // Mitchelle (personal)
-  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' }, // Bryan (personal)
+
+  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' },
+  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'admin' }, // Bryan (personal)
+
   { user_id: '235d62da-62cc-484b-8715-6683b2a3805a', role: 'staff' }, // Garry (personal)
+
   { user_id: '9a3c4306-8beb-494a-aee9-ba71a444f19a', role: 'staff' }, // Chester (personal)
 ];
 
 /* ======================== PROJECTS & LINKS ======================== */
 export const projects = [
-  { name: 'Annual Budget FY25', department_name: 'Finance Director', is_archived: false },
-  {
-    name: 'Website Redesign',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Data Warehouse Lift',
-    department_name: 'System Solutioning Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Digital Collaboration Rollout',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Client Onboarding Portal',
-    department_name: 'System Solutioning Division Director',
-    is_archived: false,
-  },
-  { name: 'Internal Analytics Dashboard', department_name: 'Finance Director', is_archived: false },
-  {
-    name: 'Cloud Doc Management',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Regional Training Program',
-    department_name: 'System Solutioning Division Director',
-    is_archived: false,
-  },
-  {
-    name: 'Workflow Automation Pilot',
-    department_name: 'Engineering Operations Division Director',
-    is_archived: false,
-  },
-  { name: 'FY25 Forecast Review', department_name: 'Finance Director', is_archived: false },
+  { name: 'Annual Budget FY25', is_archived: false },
+  { name: 'Website Redesign', is_archived: false },
+  { name: 'Data Warehouse Lift', is_archived: false },
+  { name: 'Digital Collaboration Rollout', is_archived: false },
+  { name: 'Client Onboarding Portal', is_archived: false },
+  { name: 'Internal Analytics Dashboard', is_archived: false },
+  { name: 'Cloud Doc Management', is_archived: false },
+  { name: 'Regional Training Program', is_archived: false },
+  { name: 'Workflow Automation Pilot', is_archived: false },
+  { name: 'FY25 Forecast Review', is_archived: false },
 ];
 
 /* ======================== PROJECT DEPARTMENTS ======================== */
@@ -282,6 +259,10 @@ export const project_departments = [
   },
   { project_name: 'Digital Collaboration Rollout', department_name: 'Sales Director' },
   {
+    project_name: 'Digital Collaboration Rollout',
+    department_name: 'Finance Director',
+  },
+  {
     project_name: 'Client Onboarding Portal',
     department_name: 'Engineering Operations Division Director',
   },
@@ -291,25 +272,47 @@ export const project_departments = [
     department_name: 'System Solutioning Division Director',
   },
   {
+    project_name: 'Client Onboarding Portal',
+    department_name: 'System Solutioning Division Director',
+  }, // Garrison is assigned
+
+  {
     project_name: 'Internal Analytics Dashboard',
     department_name: 'Engineering Operations Division Director',
   },
   { project_name: 'Internal Analytics Dashboard', department_name: 'Finance Director' },
+  { project_name: 'Internal Analytics Dashboard', department_name: 'Finance Managers' }, // Bryan is assigned
+  {
+    project_name: 'Internal Analytics Dashboard',
+    department_name: 'System Solutioning Division Director',
+  }, // Garrison is assigned
   {
     project_name: 'Cloud Doc Management',
     department_name: 'Engineering Operations Division Director',
   },
   { project_name: 'Cloud Doc Management', department_name: 'System Solutioning Division Director' },
+  { project_name: 'Cloud Doc Management', department_name: 'Finance Director' }, // Ryan is assigned
   {
     project_name: 'Regional Training Program',
     department_name: 'System Solutioning Division Director',
   },
+  { project_name: 'Regional Training Program', department_name: 'Finance Director' }, // Mitch is assigned
+
   {
     project_name: 'Workflow Automation Pilot',
     department_name: 'Engineering Operations Division Director',
   },
   { project_name: 'Workflow Automation Pilot', department_name: 'Finance Director' },
+  { project_name: 'Workflow Automation Pilot', department_name: 'Finance Executive' }, // Michelle is assigned
+
   { project_name: 'FY25 Forecast Review', department_name: 'Finance Director' },
+  {
+    project_name: 'FY25 Forecast Review',
+    department_name: 'Engineering Operations Division Director',
+  }, // Joel and Kester are assigned
+
+  { project_name: 'Website Redesign', department_name: 'Finance Director' }, // Ryan is assigned
+  { project_name: 'Website Redesign', department_name: 'Finance Director' }, // Mitch is assigned
 ];
 
 /* ======================== TAGS ======================== */

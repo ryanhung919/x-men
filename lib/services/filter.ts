@@ -7,7 +7,10 @@ import {
 } from '@/lib/db/filter';
 
 // Service function: applies business rules, handles errors, and adapts results for consumers
-export async function filterProjects(userId: string, departmentIds?: number[]): Promise<Project[]> {
+export async function filterProjects(
+  userId: string,
+  departmentIds?: number[]
+): Promise<Project[]> {
   try {
     // Input validation
     if (!userId) {
@@ -26,7 +29,8 @@ export async function filterProjects(userId: string, departmentIds?: number[]): 
     }
 
     // Get projects for valid departments (or all if none specified)
-    const projects = await fetchProjectsByDepartments(validDeptIds || []);
+    // Pass userId to respect role-based filtering
+    const projects = await fetchProjectsByDepartments(userId, validDeptIds || []);
 
     // Deduplicate by ID and sort alphabetically
     const uniqueProjects = Array.from(
@@ -64,7 +68,7 @@ export async function filterDepartments(
       return [];
     }
 
-    // Get all available departments for the user
+    // Get all available departments for the user (respects role-based filtering)
     console.log('filterDepartments: Fetching departments for user', { userId });
     const allDepartments = await getDepartmentsForUser(userId);
 

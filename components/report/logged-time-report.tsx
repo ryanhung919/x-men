@@ -15,6 +15,7 @@ import type {
   KPI,
   ChartData,
 } from '@/components/report/export-buttons';
+import { LoggedTimeReportSkeleton } from '@/components/report/report-skeletons';
 
 interface LoggedTimeProps {
   departmentIds?: number[];
@@ -135,7 +136,11 @@ const DISPLAY_CARDS = [
       const completedTime = round(m.totalLoggedHours - m.incompleteHours, 2);
       const nonOverdueIncompleteTime = round(m.incompleteHours - m.overdueHours, 2);
       const chartData = [
-        { name: 'incomplete', value: nonOverdueIncompleteTime, fill: timeBreakdownConfig.incomplete.color },
+        {
+          name: 'incomplete',
+          value: nonOverdueIncompleteTime,
+          fill: timeBreakdownConfig.incomplete.color,
+        },
         { name: 'completed', value: completedTime, fill: timeBreakdownConfig.completed.color },
         {
           name: 'overdue',
@@ -267,7 +272,10 @@ const DISPLAY_CARDS = [
       unit: 'h',
     }),
     subMetrics: [
-      { label: 'Delay (completed late)', format: (m: Metrics) => `${round(m.totalDelayHours, 2)}h` },
+      {
+        label: 'Delay (completed late)',
+        format: (m: Metrics) => `${round(m.totalDelayHours, 2)}h`,
+      },
       { label: 'Overdue time logged', format: (m: Metrics) => `${round(m.overdueHours, 2)}h` },
     ],
     chart: (m: Metrics) => ({
@@ -398,7 +406,7 @@ export function LoggedTimeReport({
 
   const displayMetrics = loading && prevMetricsRef.current ? prevMetricsRef.current : metrics;
 
-  if (!displayMetrics) return <div className="text-muted-foreground">No data</div>;
+  if (!displayMetrics) return <LoggedTimeReportSkeleton />;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

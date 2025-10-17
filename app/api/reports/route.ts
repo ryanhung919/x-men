@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
     switch (action) {
       case 'departments': {
         // Return departments user can see, optionally filtered by projects
+        // Pass userId for role-based filtering
         try {
           const departments = await filterDepartments(
             user.id,
@@ -81,6 +82,7 @@ export async function GET(req: NextRequest) {
 
       case 'projects': {
         // Return projects user can see, optionally filtered by departments
+        // Pass userId for role-based filtering
         const projects = await filterProjects(
           user.id,
           departmentIds.length ? departmentIds : undefined

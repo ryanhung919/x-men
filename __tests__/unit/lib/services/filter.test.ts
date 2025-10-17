@@ -47,7 +47,10 @@ describe('lib/services/filter', () => {
 
       const result = await filterProjects(authUsersFixtures.alice.id);
 
-      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith([]);
+      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith(
+        authUsersFixtures.alice.id,
+        []
+      );
       expect(result).toHaveLength(2);
       // Should be sorted alphabetically
       expect(result[0].name).toBe(projectsFixtures.alpha.name);
@@ -68,7 +71,10 @@ describe('lib/services/filter', () => {
 
       const result = await filterProjects(authUsersFixtures.alice.id, departmentIds);
 
-      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith(departmentIds);
+      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith(
+        authUsersFixtures.alice.id,
+        departmentIds
+      );
       expect(result).toHaveLength(2);
     });
 
@@ -79,7 +85,10 @@ describe('lib/services/filter', () => {
 
       const result = await filterProjects(authUsersFixtures.alice.id, []);
 
-      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith([]);
+      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith(
+        authUsersFixtures.alice.id,
+        []
+      );
       expect(result).toEqual([projectsFixtures.alpha]);
     });
 
@@ -138,10 +147,10 @@ describe('lib/services/filter', () => {
           valid: [departmentsFixtures.engineering.id, departmentsFixtures.finance.id],
         })
       );
-      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith([
-        departmentsFixtures.engineering.id,
-        departmentsFixtures.finance.id,
-      ]);
+      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith(
+        authUsersFixtures.alice.id,
+        [departmentsFixtures.engineering.id, departmentsFixtures.finance.id]
+      );
     });
 
     it('should deduplicate projects with same ID', async () => {
@@ -190,7 +199,7 @@ describe('lib/services/filter', () => {
       const result = await filterProjects(authUsersFixtures.alice.id, departmentIds);
 
       expect(result).toHaveLength(3);
-      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith(departmentIds);
+      expect(dbFilter.fetchProjectsByDepartments).toHaveBeenCalledWith(authUsersFixtures.alice.id, departmentIds);
     });
   });
 

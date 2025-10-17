@@ -579,7 +579,18 @@ describe('Notifications Integration Tests', () => {
         return;
       }
 
-      const validTypes = ['task_assigned', 'comment_added'];
+      const validTypes = [
+        'task_assigned',
+        'comment_added',
+        'task_updated',
+        'comment_removed',
+        'assignment_removed',
+        'attachment_added',
+        'attachment_removed',
+        'subtask_added',
+        'team_member_added',
+        'team_member_removed',
+      ];
       const allTypesValid = notifications.every((n) => validTypes.includes(n.type));
 
       expect(allTypesValid).toBe(true);
