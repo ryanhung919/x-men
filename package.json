@@ -10,7 +10,7 @@
     "lint": "next lint",
     "test": "pnpm test:unit && pnpm test:component && pnpm test:integration:dev",
     "test:unit": "vitest --config vitest.config.unit.ts",
-    "test:component": "vitest --config vitest.config.component.ts",
+    "test:component": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' vitest --config vitest.config.component.ts",
     "test:integration": "vitest --config vitest.config.integration.ts",
     "test:integration:dev": "concurrently --kill-others --success first \"pnpm dev\" \"wait-on http://localhost:3000 && pnpm test:integration\"",
     "test:watch": "vitest --watch",
