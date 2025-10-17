@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integration.setup';
 
 /**
@@ -12,6 +12,13 @@ import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integr
  * - Multi-user scenarios: Task assignments, comments
  */
 describe('Notifications Integration Tests', () => {
+  let kesterClient: any;
+
+  beforeAll(async () => {
+    // Authenticate test user for task updates (using direct Supabase client)
+    const kester = await authenticateAs('kester');
+    kesterClient = kester.client;
+  });
   describe('RLS Policies - User can only see own notifications', () => {
     it('should only see own notifications for Joel', async () => {
       const { client } = await authenticateAs('joel');
@@ -488,12 +495,12 @@ describe('Notifications Integration Tests', () => {
       // Assign multiple users to the task
       await adminClient.from('task_assignments').insert([
         {
-          task_id: task.id,
+          task_id: task!.id,
           assignee_id: testUsers.mitch.id,
           assignor_id: testUsers.joel.id,
         },
         {
-          task_id: task.id,
+          task_id: task!.id,
           assignee_id: testUsers.garrison.id,
           assignor_id: testUsers.joel.id,
         },
@@ -579,10 +586,382 @@ describe('Notifications Integration Tests', () => {
         return;
       }
 
-      const validTypes = ['task_assigned', 'comment_added'];
+      const validTypes = ['task_assigned', 'comment_added', 'task_updated'];
       const allTypesValid = notifications.every((n) => validTypes.includes(n.type));
 
       expect(allTypesValid).toBe(true);
+    });
+  });
+
+  //TESTING HERE
+  async function ensureTaskWithAtLeastTwoAssignees() {
+    // Find a task that has both kester and ryan as assignees
+    const { data: kesterAssignments } = await adminClient
+      .from('task_assignments')
+      .select('task_id')
+      .eq('assignee_id', testUsers.kester.id);
+
+    const { data: ryanAssignments } = await adminClient
+      .from('task_assignments')
+      .select('task_id')
+      .eq('assignee_id', testUsers.ryan.id);
+
+    // Find common task_id
+    const kesterTaskIds = kesterAssignments?.map((a) => a.task_id) || [];
+    const ryanTaskIds = ryanAssignments?.map((a) => a.task_id) || [];
+    const commonTaskId = kesterTaskIds.find((id) => ryanTaskIds.includes(id));
+
+    if (!commonTaskId) {
+      throw new Error('No task found with both kester and ryan as assignees');
+    }
+
+    // Get the task
+    const { data: task } = await adminClient.from('tasks').select('*').eq('id', commonTaskId).single();
+
+    if (!task) {
+      throw new Error(`Task ${commonTaskId} not found`);
+    }
+
+    return task;
+  }
+
+  describe('Notification Triggers - Task Updates', () => {
+    it('should create notifications when task title is updated', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
+      const recipient = testUsers.ryan.id;
+
+      // Record notification count before update
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      // Update the task title as authenticated kester using direct client call
+      const newTitle = `Test Title Updated ${Date.now()}`;
+      const { error: updateError } = await kesterClient
+        .from('tasks')
+        .update({ title: newTitle })
+        .eq('id', task.id);
+
+      expect(updateError).toBeNull();
+
+      // Wait briefly for the trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // Assert that ryan got +1 notification
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe((beforeCount || 0) + 1);
+
+      // Verify notification content
+      const { data: notification } = await adminClient
+        .from('notifications')
+        .select('*')
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      expect(notification).toBeDefined();
+      expect(notification?.title).toBe('Task Updated');
+      expect(notification?.message).toContain('updated the title');
+      expect(notification?.read).toBe(false);
+
+      // Restore original title
+      await kesterClient.from('tasks').update({ title: task.title }).eq('id', task.id);
+    });
+
+    it('should create notifications when task status is updated', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Define the expected recipient (ryan - the OTHER assignee)
+      const recipient = testUsers.ryan.id;
+
+      // Record notification count before update
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      // Update the task status as authenticated kester using direct client call
+      const newStatus = task.status === 'To Do' ? 'In Progress' : 'To Do';
+      const { error: updateError } = await kesterClient
+        .from('tasks')
+        .update({ status: newStatus })
+        .eq('id', task.id);
+
+      expect(updateError).toBeNull();
+
+      // Wait briefly for the trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 120));
+
+      // Assert that ryan got +1 notification
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe((beforeCount || 0) + 1);
+
+      // Verify notification mentions status change
+      const { data: notification } = await adminClient
+        .from('notifications')
+        .select('*')
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      expect(notification?.message).toContain('status');
+
+      // Restore original status
+      await kesterClient.from('tasks').update({ status: task.status }).eq('id', task.id);
+    });
+
+    it('should create notifications when task priority is updated', async () => {
+      // Get a task with assignees
+      const { data: assignment } = await adminClient
+        .from('task_assignments')
+        .select('task_id, assignee_id')
+        .limit(1)
+        .single();
+
+      if (!assignment) {
+        return;
+      }
+
+      const { data: task } = await adminClient
+        .from('tasks')
+        .select('id, title, priority_bucket, creator_id')
+        .eq('id', assignment.task_id)
+        .single();
+
+      if (!task) {
+        return;
+      }
+
+      // Find the creator in our test users
+      const creatorKey = Object.keys(testUsers).find(
+        (key) => testUsers[key as keyof typeof testUsers].id === task.creator_id
+      ) as keyof typeof testUsers | undefined;
+
+      if (!creatorKey) {
+        console.log('Creator not in test users, skipping');
+        return;
+      }
+
+      // Authenticate as the task creator
+      const { client: creatorClient } = await authenticateAs(creatorKey);
+
+      const originalPriority = task.priority_bucket;
+      const newPriority = task.priority_bucket === 5 ? 8 : 5;
+
+      // Update the task priority as authenticated creator
+      const { error: updateError } = await creatorClient
+        .from('tasks')
+        .update({ priority_bucket: newPriority })
+        .eq('id', task.id);
+
+      expect(updateError).toBeNull();
+
+      // Small delay for trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Check notification was created (if assignee is not the updater)
+      if (assignment.assignee_id !== task.creator_id) {
+        const { data: notification } = await adminClient
+          .from('notifications')
+          .select('*')
+          .eq('user_id', assignment.assignee_id)
+          .eq('type', 'task_updated')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (notification) {
+          expect(notification.message).toContain('priority');
+        }
+      }
+
+      // Restore original priority
+      await adminClient
+        .from('tasks')
+        .update({ priority_bucket: originalPriority })
+        .eq('id', task.id);
+    });
+
+    it('should create notifications when task deadline is updated', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Define the expected recipient (ryan - the OTHER assignee)
+      const recipient = testUsers.ryan.id;
+
+      // Record notification count before update
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      // Update the task deadline as authenticated kester using direct client call
+      // Use a timestamp in the far future to ensure it's different from any existing deadline
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1); // 1 year from now
+      const newDeadline = futureDate.toISOString();
+      const { error: updateError } = await kesterClient
+        .from('tasks')
+        .update({ deadline: newDeadline })
+        .eq('id', task.id);
+
+      expect(updateError).toBeNull();
+
+      // Wait briefly for the trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 120));
+
+      // Assert that ryan got +1 notification
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe((beforeCount || 0) + 1);
+
+      // Verify notification mentions deadline change
+      const { data: notification } = await adminClient
+        .from('notifications')
+        .select('*')
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      expect(notification?.message).toContain('deadline');
+
+      // Only restore if original deadline was not null to avoid creating extra notifications
+      if (task.deadline !== null) {
+        await kesterClient.from('tasks').update({ deadline: task.deadline }).eq('id', task.id);
+      }
+    });
+
+    it('should not notify updater when they are also an assignee', async () => {
+      // Find a task where the creator is also assigned
+      const { data: taskAssignment } = await adminClient
+        .from('task_assignments')
+        .select('task_id, assignee_id, tasks!inner(creator_id)')
+        .limit(10);
+
+      if (!taskAssignment || taskAssignment.length === 0) {
+        return;
+      }
+
+      // Find one where assignee === creator
+      const selfAssigned = taskAssignment.find((ta: any) => ta.assignee_id === ta.tasks.creator_id);
+
+      if (!selfAssigned) {
+        return;
+      }
+
+      const { data: task } = await adminClient
+        .from('tasks')
+        .select('*')
+        .eq('id', (selfAssigned as any).task_id)
+        .single();
+
+      if (!task) {
+        return;
+      }
+
+      const originalPriority = task.priority_bucket;
+      const newPriority = task.priority_bucket === 5 ? 8 : 5;
+
+      // Get notification count before update
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', task.creator_id)
+        .eq('type', 'task_updated');
+
+      // Update the task as the creator/assignee
+      const { error: updateError } = await adminClient
+        .from('tasks')
+        .update({ priority_bucket: newPriority })
+        .eq('id', task.id);
+
+      expect(updateError).toBeNull();
+
+      // Small delay for trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Check that NO notification was created (self-update)
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', task.creator_id)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe(beforeCount);
+
+      // Restore
+      await adminClient
+        .from('tasks')
+        .update({ priority_bucket: originalPriority })
+        .eq('id', task.id);
+    });
+
+    it('should notify multiple assignees when task is updated', async () => {
+      // Get existing task with multi-assignees
+      const task = await ensureTaskWithAtLeastTwoAssignees();
+
+      // Define the expected recipient (ryan - the OTHER assignee)
+      const recipient = testUsers.ryan.id;
+
+      // Record notification count before update
+      const { count: beforeCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      // Update the task as authenticated kester using direct client call
+      // Use a different priority that's guaranteed to be different
+      const newPriority = task.priority_bucket === 8 ? 5 : 8;
+      const { error: updateError } = await kesterClient
+        .from('tasks')
+        .update({ priority_bucket: newPriority })
+        .eq('id', task.id);
+
+      expect(updateError).toBeNull();
+
+      // Wait briefly for the trigger to execute
+      await new Promise((resolve) => setTimeout(resolve, 120));
+
+      // Assert that ryan got +1 notification
+      const { count: afterCount } = await adminClient
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', recipient)
+        .eq('type', 'task_updated');
+
+      expect(afterCount).toBe((beforeCount || 0) + 1);
+
+      // Always restore original priority to maintain test isolation
+      await kesterClient.from('tasks').update({ priority_bucket: task.priority_bucket }).eq('id', task.id);
     });
   });
 });

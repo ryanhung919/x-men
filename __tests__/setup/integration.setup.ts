@@ -95,6 +95,8 @@ export async function authenticateAs(userKey: keyof typeof testUsers) {
   }
 
   // Create a new client with the user's session
+  // IMPORTANT: Use global.headers to ensure Authorization header is sent with EVERY request
+  // This is required for auth.uid() to work in database triggers
   const authenticatedClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

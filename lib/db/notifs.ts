@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export type Notification = {
   id: number;
@@ -23,9 +24,21 @@ export async function createNotification(
   input: CreateNotificationInput
 ): Promise<Notification | null> {
   console.log("DB: createNotification called with:", input);
-  const supabase = await createClient();
 
-  const { data, error } = await supabase
+  // Use admin client to bypass RLS when creating notifications
+  // This is appropriate since notifications are system-generated
+  const adminClient = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+
+  const { data, error } = await adminClient
     .from("notifications")
     .insert({
       user_id: input.user_id,

@@ -30,6 +30,7 @@ async function teardownSchema(sql: postgres.Sql) {
   const triggersToDrop = [
     'DROP TRIGGER IF EXISTS trg_notify_new_comment ON task_comments CASCADE',
     'DROP TRIGGER IF EXISTS trg_notify_task_assignment ON task_assignments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_update ON tasks CASCADE',
     'DROP TRIGGER IF EXISTS trg_update_project_departments ON task_assignments CASCADE',
     'DROP TRIGGER IF EXISTS trg_validate_task_assignee_count ON tasks CASCADE',
   ];
@@ -46,6 +47,7 @@ async function teardownSchema(sql: postgres.Sql) {
   // Drop functions
   await sql`DROP FUNCTION IF EXISTS notify_new_comment() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS notify_task_assignment() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_update() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS update_project_departments() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS validate_task_assignee_count() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS get_department_hierarchy(BIGINT) CASCADE`;
@@ -1395,6 +1397,177 @@ async function createTriggers(sql: postgres.Sql) {
     AFTER INSERT ON task_comments
     FOR EACH ROW
     EXECUTE FUNCTION notify_new_comment();
+  `;
+
+  await sql`
+    -- Trigger function to create notifications when a task is updated
+    -- SECURITY DEFINER allows it to bypass RLS policies
+    -- Uses auth.uid() to identify the actual user making the update
+    CREATE OR REPLACE FUNCTION notify_task_update()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        updater_id UUID;
+        updater_first_name TEXT;
+        updater_last_name TEXT;
+        updater_full_name TEXT;
+        assignee_record RECORD;
+        message_text TEXT;
+        changed_fields TEXT[] := ARRAY[]::TEXT[];
+        field_label TEXT;
+    BEGIN
+        -- Get the user who made the update from auth context
+        updater_id := auth.uid();
+
+        RAISE NOTICE 'notify_task_update triggered for task % by user %', NEW.id, updater_id;
+
+        -- If no authenticated user (e.g., system update), skip notifications
+        IF updater_id IS NULL THEN
+            RAISE NOTICE 'No authenticated user, skipping notifications';
+            RETURN NEW;
+        END IF;
+
+        -- Get updater name (bypass RLS)
+        SELECT first_name, last_name INTO updater_first_name, updater_last_name
+        FROM user_info
+        WHERE id = updater_id;
+
+        IF updater_first_name IS NOT NULL AND updater_last_name IS NOT NULL THEN
+            updater_full_name := updater_first_name || ' ' || updater_last_name;
+        ELSE
+            updater_full_name := 'Someone';
+        END IF;
+
+        -- Collect all changed fields
+        IF OLD.title IS DISTINCT FROM NEW.title THEN
+            changed_fields := array_append(changed_fields, 'title');
+        END IF;
+
+        IF OLD.status IS DISTINCT FROM NEW.status THEN
+            changed_fields := array_append(changed_fields, 'status');
+        END IF;
+
+        IF OLD.priority_bucket IS DISTINCT FROM NEW.priority_bucket THEN
+            changed_fields := array_append(changed_fields, 'priority_bucket');
+        END IF;
+
+        IF OLD.description IS DISTINCT FROM NEW.description THEN
+            changed_fields := array_append(changed_fields, 'description');
+        END IF;
+
+        IF OLD.deadline IS DISTINCT FROM NEW.deadline THEN
+            changed_fields := array_append(changed_fields, 'deadline');
+        END IF;
+
+        IF OLD.notes IS DISTINCT FROM NEW.notes THEN
+            changed_fields := array_append(changed_fields, 'notes');
+        END IF;
+
+        IF OLD.recurrence_date IS DISTINCT FROM NEW.recurrence_date THEN
+            changed_fields := array_append(changed_fields, 'recurrence_date');
+        END IF;
+
+        IF OLD.is_archived IS DISTINCT FROM NEW.is_archived THEN
+            changed_fields := array_append(changed_fields, 'is_archived');
+        END IF;
+
+        -- If no fields changed, skip notification
+        IF array_length(changed_fields, 1) IS NULL THEN
+            RAISE NOTICE 'No fields changed, skipping notification';
+            RETURN NEW;
+        END IF;
+
+        RAISE NOTICE 'Changed fields: %, count: %', changed_fields, array_length(changed_fields, 1);
+
+        -- Generate message based on number of changed fields
+        IF array_length(changed_fields, 1) = 1 THEN
+            -- Single field - detailed message with from/to
+            CASE changed_fields[1]
+                WHEN 'title' THEN
+                    message_text := updater_full_name || ' updated the title of task "' || OLD.title || '" to "' || NEW.title || '"';
+                WHEN 'status' THEN
+                    message_text := updater_full_name || ' changed the status of task "' || NEW.title || '" from "' || OLD.status || '" to "' || NEW.status || '"';
+                WHEN 'priority_bucket' THEN
+                    message_text := updater_full_name || ' changed the priority of task "' || NEW.title || '" from ' || OLD.priority_bucket || ' to ' || NEW.priority_bucket;
+                WHEN 'description' THEN
+                    message_text := updater_full_name || ' changed the description of task "' || NEW.title || '" from "' || COALESCE(OLD.description, '(empty)') || '" to "' || COALESCE(NEW.description, '(empty)') || '"';
+                WHEN 'deadline' THEN
+                    message_text := updater_full_name || ' changed the deadline of task "' || NEW.title || '" from ' || COALESCE(TO_CHAR(OLD.deadline, 'MM/DD/YYYY'), '(none)') || ' to ' || COALESCE(TO_CHAR(NEW.deadline, 'MM/DD/YYYY'), '(none)');
+                WHEN 'notes' THEN
+                    message_text := updater_full_name || ' changed the notes of task "' || NEW.title || '" from "' || COALESCE(OLD.notes, '(empty)') || '" to "' || COALESCE(NEW.notes, '(empty)') || '"';
+                WHEN 'recurrence_date' THEN
+                    IF OLD.recurrence_date IS NULL THEN
+                        message_text := updater_full_name || ' set a recurrence date for task "' || NEW.title || '"';
+                    ELSIF NEW.recurrence_date IS NULL THEN
+                        message_text := updater_full_name || ' removed the recurrence date from task "' || NEW.title || '"';
+                    ELSE
+                        message_text := updater_full_name || ' changed the recurrence date for task "' || NEW.title || '"';
+                    END IF;
+                WHEN 'is_archived' THEN
+                    IF NEW.is_archived = true THEN
+                        message_text := updater_full_name || ' archived task "' || NEW.title || '"';
+                    ELSE
+                        message_text := updater_full_name || ' unarchived task "' || NEW.title || '"';
+                    END IF;
+                ELSE
+                    message_text := updater_full_name || ' updated ' || changed_fields[1] || ' of task "' || NEW.title || '"';
+            END CASE;
+        ELSE
+            -- Multiple fields - compact format listing all fields
+            message_text := updater_full_name || ' updated the following fields in task "' || NEW.title || '": ';
+            FOR i IN 1..array_length(changed_fields, 1) LOOP
+                CASE changed_fields[i]
+                    WHEN 'title' THEN field_label := 'title';
+                    WHEN 'status' THEN field_label := 'status';
+                    WHEN 'priority_bucket' THEN field_label := 'priority';
+                    WHEN 'description' THEN field_label := 'description';
+                    WHEN 'deadline' THEN field_label := 'deadline';
+                    WHEN 'notes' THEN field_label := 'notes';
+                    WHEN 'recurrence_date' THEN field_label := 'recurrence date';
+                    WHEN 'is_archived' THEN field_label := 'archive status';
+                    ELSE field_label := changed_fields[i];
+                END CASE;
+
+                IF i = 1 THEN
+                    message_text := message_text || field_label;
+                ELSE
+                    message_text := message_text || ', ' || field_label;
+                END IF;
+            END LOOP;
+        END IF;
+
+        -- Create notifications for all assignees except the updater
+        RAISE NOTICE 'Looking for assignees for task %', NEW.id;
+        FOR assignee_record IN
+            SELECT assignee_id FROM task_assignments WHERE task_id = NEW.id
+        LOOP
+            RAISE NOTICE 'Found assignee: %, updater: %', assignee_record.assignee_id, updater_id;
+            -- Skip the updater
+            IF assignee_record.assignee_id != updater_id THEN
+                RAISE NOTICE 'Creating notification for assignee %', assignee_record.assignee_id;
+                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                VALUES (assignee_record.assignee_id, 'Task Updated', message_text, 'task_updated', false, NOW(), NOW());
+                RAISE NOTICE 'Notification created successfully';
+            ELSE
+                RAISE NOTICE 'Skipping updater %', assignee_record.assignee_id;
+            END IF;
+        END LOOP;
+
+        RAISE NOTICE 'Finished creating notifications for task %', NEW.id;
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on tasks table for notifications
+    CREATE TRIGGER trg_notify_task_update
+    AFTER UPDATE ON tasks
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_update();
   `;
 }
 
