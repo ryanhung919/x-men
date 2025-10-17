@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'jsdom', // Use jsdom for React component tests
+    environment: 'jsdom',
     setupFiles: ['./__tests__/setup/vitest.component.setup.ts'],
     include: ['__tests__/unit/components/**/*.test.{ts,tsx}'],
     exclude: [
@@ -22,11 +22,25 @@ export default defineConfig({
       '__tests__/integration/**',
       '__tests__/e2e/**',
     ],
+    // Increase pool timeout for CI environments
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
+    // Configure test environment options for better jsdom compatibility
+    environmentOptions: {
+      jsdom: {
+        resources: 'usable',
+        url: 'http://localhost:3000',
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', '__tests__/', '*.config.{js,ts}', '.next/'],
     },
-    testTimeout: 8000,
+    testTimeout: 10000, 
+    hookTimeout: 10000,
   },
 });

@@ -76,6 +76,9 @@ jobs:
 
       - name: Run component tests (jsdom environment)
         run: pnpm test:component
+        env:
+          NODE_ENV: test
+          NODE_OPTIONS: --experimental-vm-modules
 
       - name: Upload component test results
         if: always()
