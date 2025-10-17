@@ -16,7 +16,7 @@ import type {
   KPI,
   ChartData,
 } from '@/components/report/export-buttons';
-
+import { TaskCompletionReportSkeleton } from '@/components/report/report-skeletons';
 
 interface Props {
   departmentIds?: number[];
@@ -191,7 +191,7 @@ export function TaskCompletionsChart({
   const displayData = loading && prevDataRef.current ? prevDataRef.current : data;
 
   if (!displayData) {
-    return <div className="text-muted-foreground">No data available</div>;
+    return <TaskCompletionReportSkeleton />;
   }
 
   return (
@@ -296,19 +296,27 @@ export function TaskCompletionsChart({
                 </ChartContainer>
                 <div className="grid grid-cols-4 gap-2 text-xs mt-2">
                   <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--chart-1)' }}>{user.completedTasks}</div>
+                    <div className="font-medium" style={{ color: 'var(--chart-1)' }}>
+                      {user.completedTasks}
+                    </div>
                     <div className="text-muted-foreground">Done</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--chart-4)' }}>{user.inProgressTasks}</div>
+                    <div className="font-medium" style={{ color: 'var(--chart-4)' }}>
+                      {user.inProgressTasks}
+                    </div>
                     <div className="text-muted-foreground">In Progress</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--chart-5)' }}>{user.todoTasks}</div>
+                    <div className="font-medium" style={{ color: 'var(--chart-5)' }}>
+                      {user.todoTasks}
+                    </div>
                     <div className="text-muted-foreground">To Do</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--destructive)' }}>{user.blockedTasks}</div>
+                    <div className="font-medium" style={{ color: 'var(--destructive)' }}>
+                      {user.blockedTasks}
+                    </div>
                     <div className="text-muted-foreground">Blocked</div>
                   </div>
                 </div>

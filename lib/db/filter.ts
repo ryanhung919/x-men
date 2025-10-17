@@ -3,6 +3,20 @@ import { createClient } from '@/lib/supabase/server';
 export type Project = { id: number; name: string };
 export type Department = { id: number; name: string };
 
+/**
+ * Helper function to check if user has manager role
+ */
+async function userHasManagerRole(userId: string, supabase: any): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('role', 'manager')
+    .single();
+
+  return !error && !!data;
+}
+
 // PROJECT FILTERING
 
 /**
@@ -27,55 +41,35 @@ export async function getUserIdsFromDepartments(
 }
 
 /**
- * Filter projects based on user's department hierarchy and whether assignee includes a department mate.
- * @param {string} userId - the user's UUID
- * @param {number[]} [departmentIds] - optional, an array of department IDs to filter by
- * @returns {Promise<Project[]>} - a promise resolving to an array of filtered projects
- * @throws {Error} - if any of the database queries fail
+ * Filter projects based on selected departments via project_departments table.
+ * Simply returns projects that have a row in project_departments for the selected department IDs.
  */
-export async function fetchProjectsByDepartments(departmentIds: number[]): Promise<Project[]> {
+export async function fetchProjectsByDepartments(
+  userId: string,
+  departmentIds: number[]
+): Promise<Project[]> {
   const supabase = await createClient();
 
-  // Get all descendant + selected departmentIds, with your RPC
-  let allDeptIds: number[] = [];
-  for (const deptId of departmentIds) {
-    const { data: hierarchy, error } = await supabase.rpc('get_department_hierarchy', {
-      dept_id: deptId,
-    });
-    if (error) throw error;
-    const ids = hierarchy?.map((d: { id: number }) => d.id) ?? [];
-    allDeptIds.push(...ids);
-  }
-  allDeptIds = Array.from(new Set(allDeptIds));
-  if (allDeptIds.length === 0) return [];
+  if (departmentIds.length === 0) return [];
 
-  // Projects linked directly to these departments
+  // Get projects linked to the selected departments via project_departments table
   const { data: projDeptLinks, error: pdError } = await supabase
     .from('project_departments')
     .select('project_id')
-    .in('department_id', allDeptIds);
+    .in('department_id', departmentIds);
+
   if (pdError) throw pdError;
-  const deptProjectIds = projDeptLinks?.map((pd: { project_id: number }) => pd.project_id) ?? [];
 
-  // Projects with a task assigned to user from one of these departments
-  const userIds = await getUserIdsFromDepartments(allDeptIds, supabase);
-  const { data: taskProjLinks, error: tpError } = await supabase
-    .from('tasks')
-    .select('project_id, task_assignments!inner(assignee_id)')
-    .in('task_assignments.assignee_id', userIds);
-  if (tpError) throw tpError;
-  const assignmentProjectIds =
-    taskProjLinks?.map((t: { project_id: number }) => t.project_id) ?? [];
+  const projectIds = projDeptLinks?.map((pd: { project_id: number }) => pd.project_id) ?? [];
 
-  // Union all project ids from both sets, dedupe
-  const projectIdSet = new Set<number>(deptProjectIds.concat(assignmentProjectIds));
-  if (projectIdSet.size === 0) return [];
+  if (projectIds.length === 0) return [];
 
   // Fetch actual project details
   const { data: projects, error: projError } = await supabase
     .from('projects')
     .select('id, name')
-    .in('id', Array.from(projectIdSet));
+    .in('id', Array.from(new Set(projectIds))); // Dedupe project IDs
+
   if (projError) throw projError;
 
   return projects ?? [];
@@ -92,11 +86,18 @@ export async function fetchDepartmentDetails(deptIds: number[]): Promise<Departm
   return data || [];
 }
 
-// Get departments for user based on hierarchy + shared task assignees
+/**
+ * Get departments for user based on role.
+ * - Managers: See own department + descendant departments
+ * - Non-managers (Staff/Admin only): See ONLY own department
+ */
 export async function getDepartmentsForUser(userId: string): Promise<Department[]> {
   const supabase = await createClient();
 
-  // Step 1: Get user's department
+  // Check if user is a manager
+  const isManager = await userHasManagerRole(userId, supabase);
+
+  // Get user's department
   const { data: userInfo, error: userErr } = await supabase
     .from('user_info')
     .select('department_id')
@@ -109,66 +110,23 @@ export async function getDepartmentsForUser(userId: string): Promise<Department[
 
   const userDeptId = userInfo.department_id;
 
-  // Step 2: Get user's department and all descendant departments (recursive)
-  const { data: hierarchyDepts, error: hierErr } = await supabase.rpc('get_department_hierarchy', {
-    dept_id: userDeptId,
-  });
+  if (isManager) {
+    // Managers get user's department and all descendant departments
+    const { data: hierarchyDepts, error: hierErr } = await supabase.rpc(
+      'get_department_hierarchy',
+      {
+        dept_id: userDeptId,
+      }
+    );
 
-  if (hierErr) throw hierErr;
-  const hierarchyDeptIds = new Set((hierarchyDepts || []).map((d: { id: number }) => d.id));
-
-  // Step 3: Get colleagues (users in same department hierarchy)
-  const { data: colleagues, error: colErr } = await supabase.rpc('get_department_colleagues', {
-    user_uuid: userId,
-  });
-
-  if (colErr) throw colErr;
-  const colleagueIds = (colleagues || []).map((c: { id: string }) => c.id);
-
-  // Step 4: Get departments of assignees who share tasks with colleagues
-  const { data: sharedTasks, error: taskErr } = await supabase
-    .from('task_assignments')
-    .select('task_id, assignee_id')
-    .in('assignee_id', colleagueIds);
-
-  if (taskErr) throw taskErr;
-
-  if (!sharedTasks?.length) {
-    // Return only hierarchy departments
-    return await fetchDepartmentDetails(Array.from(hierarchyDeptIds, (id) => id as number));
+    if (hierErr) throw hierErr;
+    
+    const hierarchyDeptIds = (hierarchyDepts || []).map((d: { id: number }) => d.id);
+    return await fetchDepartmentDetails(hierarchyDeptIds);
+  } else {
+    // Non-managers only get their own department
+    return await fetchDepartmentDetails([userDeptId]);
   }
-
-  // Get unique task IDs
-  const taskIds = [...new Set(sharedTasks.map((t: { task_id: number }) => t.task_id))];
-
-  // Step 5: Get ALL assignees on these shared tasks
-  const { data: allAssignees, error: assignErr } = await supabase
-    .from('task_assignments')
-    .select('assignee_id')
-    .in('task_id', taskIds);
-
-  if (assignErr) throw assignErr;
-  const allAssigneeIds = [
-    ...new Set((allAssignees || []).map((a: { assignee_id: string }) => a.assignee_id)),
-  ];
-
-  // Step 6: Get departments of all these assignees
-  const { data: assigneeDepts, error: deptErr } = await supabase
-    .from('user_info')
-    .select('department_id')
-    .in('id', allAssigneeIds)
-    .not('department_id', 'is', null);
-
-  if (deptErr) throw deptErr;
-
-  const sharedDeptIds = new Set(
-    (assigneeDepts || []).map((u: { department_id: number }) => u.department_id)
-  );
-
-  // Step 7: Combine hierarchy departments + shared task departments
-  const allDeptIds = new Set([...hierarchyDeptIds, ...sharedDeptIds]);
-
-  return await fetchDepartmentDetails(Array.from(allDeptIds, (id) => id as number));
 }
 
 // Filter departments by project IDs

@@ -29,10 +29,7 @@ describe('lib/db/filter', () => {
 
   describe('getUserIdsFromDepartments', () => {
     it('should return user IDs for given department IDs', async () => {
-      const mockUsers = [
-        { id: authUsersFixtures.alice.id },
-        { id: authUsersFixtures.carol.id },
-      ];
+      const mockUsers = [{ id: authUsersFixtures.alice.id }, { id: authUsersFixtures.carol.id }];
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
@@ -88,16 +85,7 @@ describe('lib/db/filter', () => {
   });
 
   describe('fetchProjectsByDepartments', () => {
-    it('should return projects for given departments including hierarchy', async () => {
-      // Mock get_department_hierarchy RPC
-      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
-        data: [
-          { id: departmentsFixtures.engineering.id },
-          { id: departmentsFixtures.operations.id }, // child dept
-        ],
-        error: null,
-      });
-
+    it('should return projects for given departments via project_departments table', async () => {
       // Mock project_departments query
       mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
         if (table === 'project_departments') {
@@ -113,21 +101,135 @@ describe('lib/db/filter', () => {
             }),
           };
         }
-        if (table === 'user_info') {
+        if (table === 'projects') {
           return {
             select: vi.fn().mockReturnValue({
               in: vi.fn().mockResolvedValue({
-                data: [{ id: authUsersFixtures.alice.id }],
+                data: [
+                  { id: projectsFixtures.alpha.id, name: projectsFixtures.alpha.name },
+                  { id: projectsFixtures.gamma.id, name: projectsFixtures.gamma.name },
+                ],
                 error: null,
               }),
             }),
           };
         }
-        if (table === 'tasks') {
+        return { select: vi.fn() };
+      });
+
+      const result = await fetchProjectsByDepartments(authUsersFixtures.alice.id, [
+        departmentsFixtures.engineering.id,
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          { id: projectsFixtures.alpha.id, name: projectsFixtures.alpha.name },
+          { id: projectsFixtures.gamma.id, name: projectsFixtures.gamma.name },
+        ])
+      );
+    });
+
+    it('should return empty array when departmentIds is empty', async () => {
+      const result = await fetchProjectsByDepartments(authUsersFixtures.alice.id, []);
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when no project_departments links found', async () => {
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'project_departments') {
           return {
             select: vi.fn().mockReturnValue({
               in: vi.fn().mockResolvedValue({
-                data: [{ project_id: projectsFixtures.beta.id }],
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return { select: vi.fn() };
+      });
+
+      const result = await fetchProjectsByDepartments(authUsersFixtures.alice.id, [
+        departmentsFixtures.engineering.id,
+      ]);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw error when project_departments query fails', async () => {
+      const mockError = new Error('Query failed');
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          in: vi.fn().mockResolvedValue({
+            data: null,
+            error: mockError,
+          }),
+        }),
+      });
+
+      await expect(
+        fetchProjectsByDepartments(authUsersFixtures.alice.id, [departmentsFixtures.engineering.id])
+      ).rejects.toThrow('Query failed');
+    });
+
+    it('should deduplicate projects with same ID', async () => {
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'project_departments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [
+                  { project_id: projectsFixtures.alpha.id },
+                  { project_id: projectsFixtures.alpha.id }, // duplicate
+                  { project_id: projectsFixtures.beta.id },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'projects') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [
+                  { id: projectsFixtures.alpha.id, name: projectsFixtures.alpha.name },
+                  { id: projectsFixtures.beta.id, name: projectsFixtures.beta.name },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return { select: vi.fn() };
+      });
+
+      const result = await fetchProjectsByDepartments(authUsersFixtures.alice.id, [
+        departmentsFixtures.engineering.id,
+        departmentsFixtures.finance.id,
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          { id: projectsFixtures.alpha.id, name: projectsFixtures.alpha.name },
+          { id: projectsFixtures.beta.id, name: projectsFixtures.beta.name },
+        ])
+      );
+    });
+
+    it('should handle multiple department IDs', async () => {
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'project_departments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [
+                  { project_id: projectsFixtures.alpha.id },
+                  { project_id: projectsFixtures.beta.id },
+                  { project_id: projectsFixtures.gamma.id },
+                ],
                 error: null,
               }),
             }),
@@ -150,97 +252,12 @@ describe('lib/db/filter', () => {
         return { select: vi.fn() };
       });
 
-      const result = await fetchProjectsByDepartments([departmentsFixtures.engineering.id]);
+      const result = await fetchProjectsByDepartments(authUsersFixtures.alice.id, [
+        departmentsFixtures.engineering.id,
+        departmentsFixtures.finance.id,
+      ]);
 
       expect(result).toHaveLength(3);
-      expect(result).toEqual(
-        expect.arrayContaining([
-          { id: projectsFixtures.alpha.id, name: projectsFixtures.alpha.name },
-          { id: projectsFixtures.beta.id, name: projectsFixtures.beta.name },
-          { id: projectsFixtures.gamma.id, name: projectsFixtures.gamma.name },
-        ])
-      );
-    });
-
-    it('should return empty array when departmentIds is empty', async () => {
-      const result = await fetchProjectsByDepartments([]);
-      expect(result).toEqual([]);
-    });
-
-    it('should throw error when hierarchy RPC fails', async () => {
-      const mockError = new Error('RPC failed');
-      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
-        data: null,
-        error: mockError,
-      });
-
-      await expect(
-        fetchProjectsByDepartments([departmentsFixtures.engineering.id])
-      ).rejects.toThrow('RPC failed');
-    });
-
-    it('should deduplicate projects from multiple sources', async () => {
-      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
-        data: [{ id: departmentsFixtures.engineering.id }],
-        error: null,
-      });
-
-      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
-        if (table === 'project_departments') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({
-                data: [
-                  { project_id: projectsFixtures.alpha.id },
-                  { project_id: projectsFixtures.alpha.id }, // duplicate
-                ],
-                error: null,
-              }),
-            }),
-          };
-        }
-        if (table === 'user_info') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({
-                data: [{ id: authUsersFixtures.alice.id }],
-                error: null,
-              }),
-            }),
-          };
-        }
-        if (table === 'tasks') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({
-                data: [
-                  { project_id: projectsFixtures.alpha.id }, // same as dept link
-                ],
-                error: null,
-              }),
-            }),
-          };
-        }
-        if (table === 'projects') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({
-                data: [{ id: projectsFixtures.alpha.id, name: projectsFixtures.alpha.name }],
-                error: null,
-              }),
-            }),
-          };
-        }
-        return { select: vi.fn() };
-      });
-
-      const result = await fetchProjectsByDepartments([departmentsFixtures.engineering.id]);
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        id: projectsFixtures.alpha.id,
-        name: projectsFixtures.alpha.name,
-      });
     });
   });
 
@@ -250,9 +267,18 @@ describe('lib/db/filter', () => {
         select: vi.fn().mockReturnValue({
           in: vi.fn().mockResolvedValue({
             data: [
-              { project_id: projectsFixtures.alpha.id, department_id: departmentsFixtures.engineering.id },
-              { project_id: projectsFixtures.alpha.id, department_id: departmentsFixtures.finance.id },
-              { project_id: projectsFixtures.beta.id, department_id: departmentsFixtures.operations.id },
+              {
+                project_id: projectsFixtures.alpha.id,
+                department_id: departmentsFixtures.engineering.id,
+              },
+              {
+                project_id: projectsFixtures.alpha.id,
+                department_id: departmentsFixtures.finance.id,
+              },
+              {
+                project_id: projectsFixtures.beta.id,
+                department_id: departmentsFixtures.operations.id,
+              },
             ],
             error: null,
           }),
@@ -284,8 +310,14 @@ describe('lib/db/filter', () => {
         select: vi.fn().mockReturnValue({
           in: vi.fn().mockResolvedValue({
             data: [
-              { project_id: projectsFixtures.alpha.id, department_id: departmentsFixtures.engineering.id },
-              { project_id: projectsFixtures.beta.id, department_id: departmentsFixtures.engineering.id },
+              {
+                project_id: projectsFixtures.alpha.id,
+                department_id: departmentsFixtures.engineering.id,
+              },
+              {
+                project_id: projectsFixtures.beta.id,
+                department_id: departmentsFixtures.engineering.id,
+              },
             ],
             error: null,
           }),
@@ -312,9 +344,9 @@ describe('lib/db/filter', () => {
         }),
       });
 
-      await expect(
-        fetchDepartmentsByProjects([projectsFixtures.alpha.id])
-      ).rejects.toThrow('Query failed');
+      await expect(fetchDepartmentsByProjects([projectsFixtures.alpha.id])).rejects.toThrow(
+        'Query failed'
+      );
     });
   });
 
@@ -323,10 +355,7 @@ describe('lib/db/filter', () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           in: vi.fn().mockResolvedValue({
-            data: [
-              departmentsFixtures.engineering,
-              departmentsFixtures.finance,
-            ],
+            data: [departmentsFixtures.engineering, departmentsFixtures.finance],
             error: null,
           }),
         }),
@@ -339,10 +368,7 @@ describe('lib/db/filter', () => {
 
       expect(result).toHaveLength(2);
       expect(result).toEqual(
-        expect.arrayContaining([
-          departmentsFixtures.engineering,
-          departmentsFixtures.finance,
-        ])
+        expect.arrayContaining([departmentsFixtures.engineering, departmentsFixtures.finance])
       );
     });
 
@@ -363,20 +389,34 @@ describe('lib/db/filter', () => {
         }),
       });
 
-      await expect(
-        fetchDepartmentDetails([departmentsFixtures.engineering.id])
-      ).rejects.toThrow('Query failed');
+      await expect(fetchDepartmentDetails([departmentsFixtures.engineering.id])).rejects.toThrow(
+        'Query failed'
+      );
     });
   });
 
   describe('getDepartmentsForUser', () => {
-    it('should return user hierarchy + shared task departments', async () => {
-      // Mock user's department query
+    it('should return user hierarchy for managers', async () => {
       let fromCallCount = 0;
       mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
         fromCallCount++;
-        
-        if (table === 'user_info' && fromCallCount === 1) {
+
+        if (table === 'user_roles' && fromCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { role: 'manager' },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'user_info' && fromCallCount === 2) {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
@@ -388,102 +428,129 @@ describe('lib/db/filter', () => {
             }),
           };
         }
-        
-        if (table === 'task_assignments') {
+
+        if (table === 'departments') {
           return {
             select: vi.fn().mockReturnValue({
               in: vi.fn().mockResolvedValue({
-                data: [
-                  { task_id: 1, assignee_id: authUsersFixtures.alice.id },
-                  { task_id: 1, assignee_id: authUsersFixtures.bob.id },
-                ],
+                data: [departmentsFixtures.engineering, departmentsFixtures.operations],
                 error: null,
               }),
             }),
           };
         }
-        
-        if (table === 'user_info' && fromCallCount > 1) {
+
+        return { select: vi.fn() };
+      });
+
+      // Mock hierarchy RPC
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: [
+          { id: departmentsFixtures.engineering.id },
+          { id: departmentsFixtures.operations.id },
+        ],
+        error: null,
+      });
+
+      const result = await getDepartmentsForUser(authUsersFixtures.bob.id);
+
+      expect(result.length).toBe(2);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: departmentsFixtures.engineering.id }),
+          expect.objectContaining({ id: departmentsFixtures.operations.id }),
+        ])
+      );
+    });
+
+    it('should return only own department for non-managers', async () => {
+      let fromCallCount = 0;
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        fromCallCount++;
+
+        // Mock user_roles query - no manager role
+        if (table === 'user_roles' && fromCallCount === 1) {
           return {
             select: vi.fn().mockReturnValue({
-              in: vi.fn().mockReturnValue({
-                not: vi.fn().mockResolvedValue({
-                  data: [
-                    { department_id: departmentsFixtures.finance.id },
-                  ],
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { code: 'PGRST116' },
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === 'user_info' && fromCallCount === 2) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { department_id: departmentsFixtures.engineering.id },
                   error: null,
                 }),
               }),
             }),
           };
         }
-        
+
         if (table === 'departments') {
           return {
             select: vi.fn().mockReturnValue({
               in: vi.fn().mockResolvedValue({
-                data: [
-                  departmentsFixtures.engineering,
-                  departmentsFixtures.operations,
-                  departmentsFixtures.finance,
-                ],
+                data: [departmentsFixtures.engineering],
                 error: null,
               }),
             }),
           };
         }
-        
-        return { select: vi.fn() };
-      });
 
-      // Mock hierarchy RPC
-      let rpcCallCount = 0;
-      mockSupabaseClient.rpc = vi.fn().mockImplementation((funcName: string) => {
-        rpcCallCount++;
-        
-        if (funcName === 'get_department_hierarchy') {
-          return Promise.resolve({
-            data: [
-              { id: departmentsFixtures.engineering.id },
-              { id: departmentsFixtures.operations.id },
-            ],
-            error: null,
-          });
-        }
-        
-        if (funcName === 'get_department_colleagues') {
-          return Promise.resolve({
-            data: [
-              { id: authUsersFixtures.alice.id },
-              { id: authUsersFixtures.carol.id },
-            ],
-            error: null,
-          });
-        }
-        
-        return Promise.resolve({ data: [], error: null });
+        return { select: vi.fn() };
       });
 
       const result = await getDepartmentsForUser(authUsersFixtures.alice.id);
 
-      expect(result.length).toBeGreaterThan(0);
-      expect(result).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ id: departmentsFixtures.engineering.id }),
-        ])
-      );
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(departmentsFixtures.engineering);
     });
 
     it('should return empty array when user has no department', async () => {
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: null,
-              error: null,
+      let fromCallCount = 0;
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        fromCallCount++;
+
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { code: 'PGRST116' },
+                  }),
+                }),
+              }),
             }),
-          }),
-        }),
+          };
+        }
+
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: null,
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        return { select: vi.fn() };
       });
 
       const result = await getDepartmentsForUser(authUsersFixtures.alice.id);
@@ -491,15 +558,39 @@ describe('lib/db/filter', () => {
     });
 
     it('should return empty array when user department_id is null', async () => {
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: { department_id: null },
-              error: null,
+      let fromCallCount = 0;
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        fromCallCount++;
+
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { code: 'PGRST116' },
+                  }),
+                }),
+              }),
             }),
-          }),
-        }),
+          };
+        }
+
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { department_id: null },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        return { select: vi.fn() };
       });
 
       const result = await getDepartmentsForUser(authUsersFixtures.alice.id);
@@ -507,15 +598,39 @@ describe('lib/db/filter', () => {
     });
 
     it('should throw error when hierarchy RPC fails', async () => {
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: { department_id: departmentsFixtures.engineering.id },
-              error: null,
+      let fromCallCount = 0;
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        fromCallCount++;
+
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { role: 'manager' },
+                    error: null,
+                  }),
+                }),
+              }),
             }),
-          }),
-        }),
+          };
+        }
+
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { department_id: departmentsFixtures.engineering.id },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        return { select: vi.fn() };
       });
 
       const mockError = new Error('RPC failed');
@@ -524,87 +639,7 @@ describe('lib/db/filter', () => {
         error: mockError,
       });
 
-      await expect(
-        getDepartmentsForUser(authUsersFixtures.alice.id)
-      ).rejects.toThrow('RPC failed');
-    });
-
-    it('should handle empty shared tasks', async () => {
-      let fromCallCount = 0;
-      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
-        fromCallCount++;
-        
-        if (table === 'user_info' && fromCallCount === 1) {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: { department_id: departmentsFixtures.engineering.id },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        
-        if (table === 'task_assignments') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({
-                data: [],
-                error: null,
-              }),
-            }),
-          };
-        }
-        
-        if (table === 'departments') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({
-                data: [
-                  departmentsFixtures.engineering,
-                  departmentsFixtures.operations,
-                ],
-                error: null,
-              }),
-            }),
-          };
-        }
-        
-        return { select: vi.fn() };
-      });
-
-      mockSupabaseClient.rpc = vi.fn().mockImplementation((funcName: string) => {
-        if (funcName === 'get_department_hierarchy') {
-          return Promise.resolve({
-            data: [
-              { id: departmentsFixtures.engineering.id },
-              { id: departmentsFixtures.operations.id },
-            ],
-            error: null,
-          });
-        }
-        
-        if (funcName === 'get_department_colleagues') {
-          return Promise.resolve({
-            data: [{ id: authUsersFixtures.alice.id }],
-            error: null,
-          });
-        }
-        
-        return Promise.resolve({ data: [], error: null });
-      });
-
-      const result = await getDepartmentsForUser(authUsersFixtures.alice.id);
-
-      expect(result).toHaveLength(2);
-      expect(result).toEqual(
-        expect.arrayContaining([
-          departmentsFixtures.engineering,
-          departmentsFixtures.operations,
-        ])
-      );
+      await expect(getDepartmentsForUser(authUsersFixtures.alice.id)).rejects.toThrow('RPC failed');
     });
   });
 });

@@ -16,6 +16,7 @@ import type {
   KPI,
   ChartData,
 } from '@/components/report/export-buttons';
+import { TeamSummaryReportSkeleton } from '@/components/report/report-skeletons';
 
 interface Props {
   departmentIds?: number[];
@@ -154,14 +155,17 @@ export function TeamSummaryChart({
 
           // Transform user data
           const userTotals: UserData[] = [];
-          const userTotalsMap = new Map<string, {
-            userName: string;
-            todo: number;
-            inProgress: number;
-            completed: number;
-            blocked: number;
-            total: number;
-          }>();
+          const userTotalsMap = new Map<
+            string,
+            {
+              userName: string;
+              todo: number;
+              inProgress: number;
+              completed: number;
+              blocked: number;
+              total: number;
+            }
+          >();
 
           if (json.userTotals) {
             Object.entries(json.userTotals).forEach(([userId, data]: [string, any]) => {
@@ -210,7 +214,8 @@ export function TeamSummaryChart({
               { label: 'Weeks Tracked', value: weeklyTotals.length, unit: 'weeks' },
               {
                 label: 'Avg Tasks per User',
-                value: newData.totalUsers > 0 ? round(newData.totalTasks / newData.totalUsers, 1) : 0,
+                value:
+                  newData.totalUsers > 0 ? round(newData.totalTasks / newData.totalUsers, 1) : 0,
                 unit: 'tasks/user',
               },
             ];
@@ -281,7 +286,7 @@ export function TeamSummaryChart({
   const displayData = loading && prevDataRef.current ? prevDataRef.current : data;
 
   if (!displayData) {
-    return <div className="text-muted-foreground">No data available</div>;
+    return <TeamSummaryReportSkeleton />;
   }
 
   return (

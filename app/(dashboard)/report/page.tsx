@@ -54,6 +54,7 @@ export default function ReportsPage() {
 
   const [loadingDepartments, setLoadingDepartments] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [dateRange, setDateRange] = useState<DateRangeType>({
     startDate: undefined,
@@ -68,6 +69,7 @@ export default function ReportsPage() {
     (dateRange.startDate && dateRange.endDate);
 
   const clearAllFilters = () => {
+    setIsLoading(true);
     setSelectedDepartments([]);
     setSelectedProjects([]);
     setDateRange({ startDate: undefined, endDate: undefined });
@@ -83,6 +85,7 @@ export default function ReportsPage() {
       .finally(() => {
         setLoadingDepartments(false);
         setLoadingProjects(false);
+        setIsLoading(false);
       });
   }, []);
 
@@ -109,7 +112,28 @@ export default function ReportsPage() {
   // Callback to lift report data from child components
   const handleReportDataLoaded = useCallback((data: AnyReport) => {
     setReportData(data);
+    setIsLoading(false);
   }, []);
+
+  const handleDepartmentChange = (newDepts: number[]) => {
+    setIsLoading(true);
+    setSelectedDepartments(newDepts);
+  };
+
+  const handleProjectChange = (newProjs: number[]) => {
+    setIsLoading(true);
+    setSelectedProjects(newProjs);
+  };
+
+  const handleDateRangeChange = (range: DateRangeType) => {
+    setIsLoading(true);
+    setDateRange(range);
+  };
+
+  const handleReportTypeChange = (type: typeof selectedReport) => {
+    setIsLoading(true);
+    setSelectedReport(type);
+  };
 
   return (
     <div className="space-y-6 p-4">
@@ -117,18 +141,18 @@ export default function ReportsPage() {
         <DepartmentSelector
           departments={departments}
           selectedDepartments={selectedDepartments}
-          onChange={setSelectedDepartments}
+          onChange={handleDepartmentChange}
           loading={loadingDepartments}
         />
         <ProjectSelector
           projects={projects}
           selectedProjects={selectedProjects}
-          onChange={setSelectedProjects}
+          onChange={handleProjectChange}
           loading={loadingProjects}
         />
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <DateRangeFilter value={dateRange} onChange={handleDateRangeChange} />
 
-        <Select value={selectedReport} onValueChange={(v) => setSelectedReport(v as any)}>
+        <Select value={selectedReport} onValueChange={handleReportTypeChange}>
           <SelectTrigger
             className={cn(
               'w-52 border border-input bg-background text-foreground',
@@ -174,6 +198,7 @@ export default function ReportsPage() {
           <ExportButtons
             reportData={reportData}
             reportTitle={REPORT_OPTIONS.find((o) => o.value === selectedReport)?.label}
+            disabled={isLoading || !reportData}
           />
         )}
       </div>

@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
+  plugins: [tsconfigPaths(), react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
@@ -11,22 +12,27 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'node',
-    setupFiles: ['./__tests__/setup/vitest.setup.ts'],
-    include: ['__tests__/unit/**/*.test.{ts,tsx}'],
+    environment: 'happy-dom', 
+    setupFiles: ['./__tests__/setup/vitest.component.setup.ts'],
+    include: ['__tests__/unit/components/**/*.test.{ts,tsx}'],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
-      '__tests__/unit/components/**', // Exclude component tests from unit config
       '__tests__/integration/**',
       '__tests__/e2e/**',
     ],
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', '__tests__/', '*.config.{js,ts}', '.next/'],
     },
-    testTimeout: 8000,
+    testTimeout: 10000, 
+    hookTimeout: 10000,
   },
 });

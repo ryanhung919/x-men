@@ -113,11 +113,11 @@ export function DateRangeFilter({
     <div className="relative w-52" ref={ref}>
       <button
         className={cn(
-          "flex w-52 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
-          "ring-offset-background placeholder:text-muted-foreground",
-          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          "hover:bg-accent hover:text-accent-foreground",
+          'flex w-52 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm',
+          'ring-offset-background placeholder:text-muted-foreground',
+          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          'hover:bg-accent hover:text-accent-foreground'
         )}
         onClick={() => setShowCalendar((v) => !v)}
       >
@@ -136,25 +136,15 @@ export function DateRangeFilter({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d={showCalendar ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"}
+            d={showCalendar ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}
           />
         </svg>
       </button>
 
       {showCalendar && (
-        <div
-          className="absolute z-50 mt-2 w-auto border border-border rounded-lg shadow-xl overflow-hidden"
-          style={{
-            backgroundColor: 'oklch(var(--popover))',
-          }}
-        >
+        <div className="absolute z-50 mt-2 w-auto border border-border rounded-lg shadow-xl overflow-hidden bg-popover">
           {/* Preset buttons */}
-          <div
-            className="flex gap-2 p-3 border-b border-border flex-wrap"
-            style={{
-              backgroundColor: 'oklch(var(--destructive))',
-            }}
-          >
+          <div className="flex gap-2 p-3 border-b border-border flex-wrap bg-background">
             {presets.map((p) => (
               <button
                 key={p.label}
@@ -173,12 +163,7 @@ export function DateRangeFilter({
           </div>
 
           {/* Calendar */}
-          <div
-            className="p-3"
-            style={{
-              backgroundColor: 'oklch(var(--popover))',
-            }}
-          >
+          <div className="p-3 bg-popover">
             <Calendar
               mode="range"
               selected={dateRange}
