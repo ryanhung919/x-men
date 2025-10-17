@@ -397,7 +397,32 @@ async function seedTaskTags(sql: postgres.Sql) {
 async function resetTaskAttachmentsBucket(sql: postgres.Sql) {
   console.log('Resetting storage bucket: task-attachments');
 
-  // Remove objects referencing the bucket first to satisfy FK constraint objects.bucket_id -> buckets.id
+  // First, delete all files from the bucket using Supabase client
+  try {
+    const { data: files, error: listError } = await supabase.storage
+      .from('task-attachments')
+      .list();
+
+    if (listError) {
+      console.warn('Could not list files in bucket (bucket may not exist):', listError.message);
+    } else if (files && files.length > 0) {
+      console.log(`Deleting ${files.length} files from task-attachments bucket...`);
+      const filePaths = files.map((file) => file.name);
+      const { error: deleteError } = await supabase.storage
+        .from('task-attachments')
+        .remove(filePaths);
+
+      if (deleteError) {
+        console.warn('Error deleting some files:', deleteError.message);
+      } else {
+        console.log('Successfully deleted all files from bucket');
+      }
+    }
+  } catch (e) {
+    console.warn('Error during file cleanup:', e);
+  }
+
+  // Remove objects referencing the bucket from storage.objects table
   // (Different self-hosted versions may use bucket_id or bucketId; handle both defensively)
   try {
     await sql`DELETE FROM storage.objects WHERE bucket_id = 'task-attachments'`;
@@ -420,10 +445,10 @@ async function resetTaskAttachmentsBucket(sql: postgres.Sql) {
   // Now drop bucket if exists
   await sql`DELETE FROM storage.buckets WHERE id = 'task-attachments'`;
 
-  // Recreate bucket (private by default)
+  // Recreate bucket (public for easy file access)
   await sql`
     INSERT INTO storage.buckets (id, name, public)
-    VALUES ('task-attachments', 'task-attachments', false)
+    VALUES ('task-attachments', 'task-attachments', true)
   `;
 }
 
