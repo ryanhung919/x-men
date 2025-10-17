@@ -32,6 +32,21 @@ export function DepartmentSelector({
     onChange(newIds);
   };
 
+  // Get display text for selected departments
+  const getDisplayText = () => {
+    if (selectedDepartments.length === 0) {
+      return 'Select departments';
+    }
+
+    // Show department names if available
+    if (selectedDepartments.length === 1) {
+      const dept = departments.find((d) => d.id === selectedDepartments[0]);
+      return dept?.name || `${selectedDepartments.length} department`;
+    }
+
+    return `${selectedDepartments.length} departments`;
+  };
+
   return (
     <div className="relative">
       <Select value="" onValueChange={() => {}}>
@@ -43,19 +58,10 @@ export function DepartmentSelector({
             '[&>span]:text-foreground [&>span]:font-medium'
           )}
         >
-          {' '}
-          <SelectValue
-            placeholder={
-              selectedDepartments.length
-                ? `${selectedDepartments.length} department${
-                    selectedDepartments.length > 1 ? 's' : ''
-                  }`
-                : 'Select departments'
-            }
-          />
+          <SelectValue placeholder={getDisplayText()} />
         </SelectTrigger>
         <SelectContent
-          className="bg-popover text-popover-foreground border border-border shadow-md "
+          className="bg-popover text-popover-foreground border border-border shadow-md"
           style={{
             backgroundColor: 'hsl(var(--popover))',
             backdropFilter: 'none',
