@@ -495,8 +495,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-25T09:30:00+08:00'),
     updated_at: new Date('2025-09-25T09:30:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 1,
+    recurrence_date: new Date('2025-10-16T17:00:00+08:00'),
     logged_time: 10900,
   },
   {
@@ -563,8 +563,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-26T11:00:00+08:00'),
     updated_at: new Date('2025-09-26T11:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 7,
+    recurrence_date: new Date('2025-10-15T17:00:00+08:00'),
     logged_time: 0,
   },
   {
@@ -614,8 +614,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-28T11:00:00+08:00'),
     updated_at: new Date('2025-09-28T11:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 14,
+    recurrence_date: new Date('2025-10-20T17:00:00+08:00'),
     logged_time: 1390,
   },
   {
@@ -648,8 +648,8 @@ export const tasks = [
     is_archived: false,
     created_at: new Date('2025-09-30T10:00:00+08:00'),
     updated_at: new Date('2025-09-30T10:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
+    recurrence_interval: 30,
+    recurrence_date: new Date('2025-10-10T17:00:00+08:00'),
     logged_time: 41230,
   },
   {
@@ -956,7 +956,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Design budget dashboard layout',
-    storage_path: 'task-attachments/1/wireframe.png',
+    storage_path: 'wireframe.png',
     uploaded_by: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
     uploaded_at: new Date('2025-09-19T11:10:00+08:00'),
   },
@@ -968,7 +968,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Roll out collaboration tools to SG office',
-    storage_path: 'task-attachments/4/collab_tools_guide.pdf',
+    storage_path: 'TEST FILE.pdf',
     uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c',
     uploaded_at: new Date('2025-09-21T09:15:00+08:00'),
   },
