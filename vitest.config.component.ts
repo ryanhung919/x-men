@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'happy-dom', 
     setupFiles: ['./__tests__/setup/vitest.component.setup.ts'],
     include: ['__tests__/unit/components/**/*.test.{ts,tsx}'],
     exclude: [
@@ -22,19 +22,9 @@ export default defineConfig({
       '__tests__/integration/**',
       '__tests__/e2e/**',
     ],
-    // Increase pool timeout for CI environments
     poolOptions: {
       threads: {
         singleThread: true,
-      },
-    },
-    // Configure test environment options for better jsdom compatibility
-    environmentOptions: {
-      jsdom: {
-        resources: 'usable',
-        url: 'http://localhost:3000',
-        pretendToBeVisual: true,
-        runScripts: 'dangerously',
       },
     },
     coverage: {
@@ -44,7 +34,5 @@ export default defineConfig({
     },
     testTimeout: 10000, 
     hookTimeout: 10000,
-    // Retry failed tests once in CI
-    retry: process.env.CI ? 1 : 0,
   },
 });
