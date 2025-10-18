@@ -988,8 +988,19 @@ export const notifications = [
     message: 'You have been assigned to "Implement task board drag/drop".',
     type: 'task_updated',
     read: false,
+    is_archived: false,
     created_at: new Date('2025-09-19T10:22:05+08:00'),
     updated_at: new Date('2025-09-19T10:22:05+08:00'),
+  },
+  {
+    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
+    title: 'Test Notification for Archive',
+    message: 'This notification will be archived during the test flow.',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-19T10:00:00+08:00'),
+    updated_at: new Date('2025-09-19T10:00:00+08:00'),
   },
 ];
 
