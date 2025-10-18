@@ -5,7 +5,7 @@ import {
   getUnreadCount,
   markNotificationAsRead,
   markAllAsRead,
-  deleteNotification,
+  archiveNotification,
 } from "@/lib/db/notifs";
 import { createMockSupabaseClient } from "@/__tests__/mocks/supabase.mock";
 import {
@@ -99,9 +99,11 @@ describe("lib/db/notifs", () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({
-              data: aliceNotifications,
-              error: null,
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: aliceNotifications,
+                error: null,
+              }),
             }),
           }),
         }),
@@ -118,9 +120,11 @@ describe("lib/db/notifs", () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({
-              data: [],
-              error: null,
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
             }),
           }),
         }),
@@ -306,34 +310,50 @@ describe("lib/db/notifs", () => {
     });
   });
 
-  describe("deleteNotification", () => {
-    it("should delete a notification successfully", async () => {
+  describe("archiveNotification", () => {
+    it("should archive a notification successfully", async () => {
+      const archivedNotification = {
+        ...notificationsFixtures.aliceTaskAssigned,
+        is_archived: true,
+        updated_at: new Date().toISOString(),
+      };
+
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        delete: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({
-            error: null,
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: archivedNotification,
+                error: null,
+              }),
+            }),
           }),
         }),
       });
 
-      const result = await deleteNotification(1);
+      const result = await archiveNotification(1);
 
-      expect(result).toBe(true);
+      expect(result?.is_archived).toBe(true);
       expect(mockSupabaseClient.from).toHaveBeenCalledWith("notifications");
     });
 
-    it("should throw error when deletion fails", async () => {
-      const mockError = { message: "Delete failed" };
+    it("should throw error when archiving fails", async () => {
+      const mockError = { message: "Archive failed" };
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        delete: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({
-            error: mockError,
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: null,
+                error: mockError,
+              }),
+            }),
           }),
         }),
       });
 
-      await expect(deleteNotification(1)).rejects.toThrow();
+      await expect(archiveNotification(1)).rejects.toThrow();
     });
   });
 });
