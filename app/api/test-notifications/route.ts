@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getNotificationsForUser, archiveNotification as archiveNotificationDB } from '@/lib/db/notifs';
 
 /**
  * Test Notifications API Endpoint
@@ -29,6 +30,8 @@ import { createClient } from '@/lib/supabase/server';
  * - addTag: Add tag to task
  * - removeTag: Remove tag from task
  * - makeSubtask: Create subtask with parent task
+ * - listNotifications: List current user's non-archived notifications
+ * - archiveNotification: Archive the first notification in the list
  */
 
 // ==============================
@@ -543,6 +546,50 @@ function getTestActions(supabase: any) {
         params?.description || 'Test subtask description',
         supabase
       ),
+
+    /** List current user's non-archived notifications */
+    listNotifications: async () => {
+      const user = await getAuthenticatedUser(supabase);
+      const notifications = await getNotificationsForUser(user.id);
+      return {
+        success: true,
+        message: `Found ${notifications.length} non-archived notifications for ${user.email}`,
+        count: notifications.length,
+        notifications: notifications.map((n) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          read: n.read,
+          is_archived: n.is_archived,
+        })),
+      };
+    },
+
+    /** Archive the first notification in the user's list */
+    archiveNotification: async () => {
+      const user = await getAuthenticatedUser(supabase);
+      const notifications = await getNotificationsForUser(user.id);
+
+      if (notifications.length === 0) {
+        return {
+          success: false,
+          message: `No notifications found for ${user.email} to archive`,
+        };
+      }
+
+      const firstNotification = notifications[0];
+      const result = await archiveNotificationDB(firstNotification.id);
+
+      return {
+        success: true,
+        message: `Archived notification ID ${firstNotification.id}: "${firstNotification.title}" for ${user.email}`,
+        archivedNotification: {
+          id: result?.id,
+          title: result?.title,
+          is_archived: result?.is_archived,
+        },
+      };
+    },
   };
 }
 
@@ -573,6 +620,7 @@ export async function GET(req: NextRequest) {
         { name: 'reassignJoel', action: () => testActions.reassignJoel() },
         { name: 'removeAttachment', action: () => testActions.removeAttachment() },
         { name: 'makeSubtask', action: () => testActions.makeSubtask() },
+        { name: 'archiveNotification', action: () => testActions.archiveNotification() },
       ];
 
       const results = [];

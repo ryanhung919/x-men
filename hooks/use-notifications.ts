@@ -59,13 +59,24 @@ export function useNotifications() {
           // Handle update
           if (payload.eventType === 'UPDATE') {
             const updatedNotification = payload.new as Notification;
-            setNotifications((prev) =>
-              prev.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
-            );
 
-            // Update unread counter
-            const count = await getUnreadNotificationCount();
-            setUnreadCount(count);
+            // If notification was archived, remove it from the list
+            if (updatedNotification.is_archived) {
+              setNotifications((prev) => prev.filter((n) => n.id !== updatedNotification.id));
+              const oldNotification = payload.old as Notification;
+              if (!oldNotification.read) {
+                setUnreadCount((prev) => Math.max(0, prev - 1));
+              }
+            } else {
+              // Normal update (e.g., marking as read)
+              setNotifications((prev) =>
+                prev.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
+              );
+
+              // Update unread counter
+              const count = await getUnreadNotificationCount();
+              setUnreadCount(count);
+            }
           }
 
           // Handle delete
@@ -88,28 +99,51 @@ export function useNotifications() {
 
   const handleMarkAsRead = async (id: number) => {
     try {
+      // Optimistic update
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
       await markNotificationRead(id);
-      // State will update via realtime subscription
+      // Realtime will confirm the update
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      // Revert on error
+      fetchNotifications();
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
+      // Optimistic update
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadCount(0);
+
       await markAllNotificationsRead();
-      // State will update via realtime subscription
+      // Realtime will confirm the update
     } catch (error) {
       console.error('Error marking all as read:', error);
+      // Revert on error
+      fetchNotifications();
     }
   };
 
   const handleDelete = async (id: number) => {
     try {
+      // Optimistic update - remove from UI immediately
+      const notificationToDelete = notifications.find((n) => n.id === id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      if (notificationToDelete && !notificationToDelete.read) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+
       await deleteNotificationAction(id);
-      // State will update via realtime subscription
+      // Realtime will confirm the update
     } catch (error) {
       console.error('Error deleting notification:', error);
+      // Revert on error
+      fetchNotifications();
     }
   };
 
