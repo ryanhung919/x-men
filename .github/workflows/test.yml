@@ -49,6 +49,29 @@ jobs:
             coverage/
           retention-days: 7
 
+  deno-unit-tests:
+    name: Unit Tests (Deno)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.5.4  
+
+      - name: Run Deno unit tests
+        run: pnpm test:unit:deno
+      
+      - name: Upload Deno test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deno-test-results
+          path: coverage/edge/
+          retention-days: 7
+
   component-tests:
     name: Component Tests (happy-dom)
     runs-on: ubuntu-latest
