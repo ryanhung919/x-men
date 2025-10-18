@@ -21,11 +21,12 @@ export default defineConfig({
       '__tests__/unit/components/**', // Exclude component tests from unit config
       '__tests__/integration/**',
       '__tests__/e2e/**',
+      "__tests__/deno/**",
     ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/', '__tests__/', '*.config.{js,ts}', '.next/'],
+      exclude: ['node_modules/', '__tests__/', '*.config.{js,ts}', '.next/', '__tests__/deno/**'],
     },
     testTimeout: 8000,
   },
