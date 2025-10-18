@@ -110,11 +110,10 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       const depId = nameToDeptId.get(ui.department_name);
       if (!depId) throw new Error(`Unknown department: ${ui.department_name}`);
 
+      const defaultView = (ui.default_view === 'calendar') ? 'schedule' : (ui.default_view ?? 'tasks');
       return sql`
         INSERT INTO user_info (id, first_name, last_name, default_view, department_id)
-        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${
-        ui.default_view ?? 'tasks'
-      }, ${depId})
+        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${defaultView}, ${depId})
         ON CONFLICT (id) DO UPDATE
           SET first_name = EXCLUDED.first_name,
               last_name  = EXCLUDED.last_name,
@@ -737,9 +736,9 @@ async function enableRLS(sql: postgres.Sql) {
   `;
 
   //User Info: Users can see colleagues in their department
-  await sql`
-  DROP POLICY IF EXISTS "Users can view colleagues in their department" ON user_info;
-  `;
+  await sql`DROP POLICY IF EXISTS "Users can view colleagues in their department" ON user_info;`;
+  await sql`DROP POLICY IF EXISTS "Users can view colleagues, descendants, and shared task assignees" ON user_info;`;
+  await sql`DROP POLICY IF EXISTS "Users can update own settings" ON user_info;`;
 
   await sql`
     CREATE POLICY "Users can view colleagues, descendants, and shared task assignees"
@@ -750,6 +749,13 @@ USING (
 );
 
 `;
+  // Allow a user to view and update their own settings row
+  await sql`
+    CREATE POLICY "Users can update own settings" ON user_info
+    FOR UPDATE
+    USING (id = auth.uid())
+    WITH CHECK (id = auth.uid());
+  `;
 
   /* ---------------- USER ROLES ---------------- */
 

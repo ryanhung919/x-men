@@ -32,16 +32,29 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
       const userId = userRes.user?.id
       if (userId) {
         try {
+          // Load user settings
+          const { data: ui, error: uiErr } = await supabase
+            .from('user_info')
+            .select('default_view')
+            .eq('id', userId)
+            .maybeSingle()
+          if (!uiErr && ui) {
+            // Redirect to preferred default view
+            const path = ui.default_view === 'schedule' ? '/schedule' : '/tasks'
+            router.push(path)
+            return
+          }
+
+          // Fallback to roles logic if no settings
           const roles = await getRolesForUserClient(supabase, userId)
           if (roles.includes('manager')) {
             router.push('/tasks')
-            return
-          }
-          else {
+          } else {
             router.push('/tasks')
           }
         } catch (rolesErr) {
-          console.warn('Failed to load roles, defaulting redirect', rolesErr)
+          console.warn('Failed to load settings/roles, defaulting redirect', rolesErr)
+          router.push('/tasks')
         }
       }
 

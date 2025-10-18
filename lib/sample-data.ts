@@ -125,7 +125,7 @@ export const user_info = [
     id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
     first_name: 'Joel',
     last_name: 'Wang',
-    default_view: 'calendar',
+    default_view: 'schedule',
     department_name: 'Engineering Operations Division Director',
   },
   {
@@ -139,7 +139,7 @@ export const user_info = [
     id: '32635261-038c-4405-b6ed-2d446738f94c',
     first_name: 'Garrison',
     last_name: 'Koh',
-    default_view: 'calendar',
+    default_view: 'schedule',
     department_name: 'System Solutioning Division Director',
   },
   {
