@@ -5,7 +5,7 @@ import {
   getUnreadCount,
   markNotificationAsRead,
   markAllAsRead,
-  deleteNotification,
+  archiveNotification,
 } from "@/lib/db/notifs";
 import { createMockSupabaseClient } from "@/__tests__/mocks/supabase.mock";
 import {
@@ -13,16 +13,22 @@ import {
   notificationsFixtures,
 } from "@/__tests__/fixtures/database.fixtures";
 
-// Mock the Supabase client module
+// Mock the Supabase client modules
 let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
+let mockAdminClient: ReturnType<typeof createMockSupabaseClient>;
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => mockSupabaseClient),
 }));
 
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => mockAdminClient),
+}));
+
 describe("lib/db/notifs", () => {
   beforeEach(() => {
     mockSupabaseClient = createMockSupabaseClient();
+    mockAdminClient = createMockSupabaseClient();
   });
 
   describe("createNotification", () => {
@@ -42,8 +48,8 @@ describe("lib/db/notifs", () => {
         updated_at: new Date().toISOString(),
       };
 
-      // Mock the insert chain
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
+      // Mock the insert chain for admin client
+      mockAdminClient.from = vi.fn().mockReturnValue({
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
@@ -56,7 +62,7 @@ describe("lib/db/notifs", () => {
 
       const result = await createNotification(newNotification);
 
-      expect(mockSupabaseClient.from).toHaveBeenCalledWith("notifications");
+      expect(mockAdminClient.from).toHaveBeenCalledWith("notifications");
       expect(result).toEqual(expectedResult);
       expect(result?.read).toBe(false);
     });
@@ -71,7 +77,7 @@ describe("lib/db/notifs", () => {
 
       const mockError = { message: "Database error", code: "23505" };
 
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
+      mockAdminClient.from = vi.fn().mockReturnValue({
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
@@ -93,9 +99,11 @@ describe("lib/db/notifs", () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({
-              data: aliceNotifications,
-              error: null,
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: aliceNotifications,
+                error: null,
+              }),
             }),
           }),
         }),
@@ -112,9 +120,11 @@ describe("lib/db/notifs", () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({
-              data: [],
-              error: null,
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
             }),
           }),
         }),
@@ -300,34 +310,50 @@ describe("lib/db/notifs", () => {
     });
   });
 
-  describe("deleteNotification", () => {
-    it("should delete a notification successfully", async () => {
+  describe("archiveNotification", () => {
+    it("should archive a notification successfully", async () => {
+      const archivedNotification = {
+        ...notificationsFixtures.aliceTaskAssigned,
+        is_archived: true,
+        updated_at: new Date().toISOString(),
+      };
+
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        delete: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({
-            error: null,
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: archivedNotification,
+                error: null,
+              }),
+            }),
           }),
         }),
       });
 
-      const result = await deleteNotification(1);
+      const result = await archiveNotification(1);
 
-      expect(result).toBe(true);
+      expect(result?.is_archived).toBe(true);
       expect(mockSupabaseClient.from).toHaveBeenCalledWith("notifications");
     });
 
-    it("should throw error when deletion fails", async () => {
-      const mockError = { message: "Delete failed" };
+    it("should throw error when archiving fails", async () => {
+      const mockError = { message: "Archive failed" };
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        delete: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({
-            error: mockError,
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: null,
+                error: mockError,
+              }),
+            }),
           }),
         }),
       });
 
-      await expect(deleteNotification(1)).rejects.toThrow();
+      await expect(archiveNotification(1)).rejects.toThrow();
     });
   });
 });

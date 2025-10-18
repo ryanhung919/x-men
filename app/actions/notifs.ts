@@ -6,7 +6,7 @@ import {
   getUnreadCount,
   markNotificationAsRead,
   markAllAsRead,
-  deleteNotification,
+  archiveNotification,
 } from "@/lib/db/notifs";
 
 // Get current user's notifications
@@ -69,7 +69,7 @@ export async function markAllNotificationsRead() {
   return await markAllAsRead(user.id);
 }
 
-// Delete notification
+// Archive notification (soft delete)
 export async function deleteNotificationAction(notificationId: number) {
   const supabase = await createClient();
   const {
@@ -81,5 +81,5 @@ export async function deleteNotificationAction(notificationId: number) {
     throw new Error("Unauthorized");
   }
 
-  return await deleteNotification(notificationId);
+  return await archiveNotification(notificationId);
 }
