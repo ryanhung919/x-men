@@ -16,6 +16,7 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const supabase = createClient();
 
   const fetchNotifications = useCallback(async () => {
@@ -100,9 +101,7 @@ export function useNotifications() {
   const handleMarkAsRead = async (id: number) => {
     try {
       // Optimistic update
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
 
       await markNotificationRead(id);
@@ -147,13 +146,44 @@ export function useNotifications() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (isDeleting) return; // Prevent multiple clicks
+
+    try {
+      setIsDeleting(true);
+
+      // Save current notifications before clearing
+      const currentNotifications = [...notifications];
+
+      // Mark all as read first
+      await markAllNotificationsRead();
+
+      // Archive all notifications in parallel
+      await Promise.all(
+        currentNotifications.map((notification) => deleteNotificationAction(notification.id))
+      );
+
+      // Clear UI after all operations complete
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      // Revert on error
+      fetchNotifications();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return {
     notifications,
     unreadCount,
     isLoading,
+    isDeleting,
     handleMarkAsRead,
     handleMarkAllAsRead,
     handleDelete,
+    handleDeleteAll,
     refetch: fetchNotifications,
   };
 }
