@@ -13,16 +13,22 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 export function Navbar() {
   const router = useRouter();
   const supabase = createClient();
-  const [user, setUser] = useState<{ email: string | undefined } | null>(null);
+  const [user, setUser] = useState<{ id: string; email: string | undefined } | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [defaultView, setDefaultView] = useState<'tasks' | 'schedule'>('tasks');
+  const [savingDefaultView, setSavingDefaultView] = useState(false);
 
   useEffect(() => {
     async function fetchUser() {
@@ -36,7 +42,7 @@ export function Navbar() {
           setUser(null);
           setRoles([]);
         } else {
-          setUser(user ? { email: user.email } : null);
+          setUser(user ? { id: user.id, email: user.email } : null);
 
           // Fetch user roles
           if (user) {
@@ -50,6 +56,21 @@ export function Navbar() {
               setRoles([]);
             } else {
               setRoles(roleRows.map((r) => r.role));
+            }
+
+            // Fetch default view preference
+            try {
+              const { data: uiRow, error: uiErr } = await supabase
+                .from('user_info')
+                .select('default_view')
+                .eq('id', user.id)
+                .maybeSingle();
+              if (!uiErr && uiRow?.default_view) {
+                const dv = uiRow.default_view === 'calendar' ? 'schedule' : uiRow.default_view;
+                if (dv === 'tasks' || dv === 'schedule') setDefaultView(dv);
+              }
+            } catch (e) {
+              console.warn('Failed to fetch default view', e);
             }
           }
         }
@@ -75,6 +96,31 @@ export function Navbar() {
   };
 
   const isAdmin = roles.includes('admin');
+
+  const handleDefaultViewChange = async (value: string) => {
+    if (value !== 'tasks' && value !== 'schedule') return;
+    const previous = defaultView;
+    setDefaultView(value);
+    try {
+      setSavingDefaultView(true);
+      const res = await fetch('/api/user/role', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultView: value }),
+        credentials: 'same-origin',
+      });
+      if (!res.ok) {
+        const msg = await res.json().catch(() => ({}));
+        console.error('Failed to update default_view via API:', msg?.error || res.statusText);
+        setDefaultView(previous);
+      }
+    } catch (e) {
+      console.error('Failed to update default_view via API:', e);
+      setDefaultView(previous);
+    } finally {
+      setSavingDefaultView(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -176,6 +222,7 @@ export function Navbar() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-background border">
+            <DropdownMenuLabel>Account</DropdownMenuLabel>
             <DropdownMenuItem asChild className="cursor-pointer">
               <Link href="/profile">
                 <User2 className="mr-2 h-4 w-4" />
@@ -188,6 +235,13 @@ export function Navbar() {
                 Settings
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Default view</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={defaultView} onValueChange={handleDefaultViewChange}>
+              <DropdownMenuRadioItem value="tasks">Tasks</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="schedule">Schedule</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleSignOut}
               className="cursor-pointer text-destructive focus:text-destructive"
