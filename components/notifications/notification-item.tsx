@@ -9,6 +9,7 @@ export type Notification = {
   message: string;
   type: string;
   read: boolean;
+  is_archived: boolean;
   created_at: string;
 };
 

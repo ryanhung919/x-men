@@ -511,10 +511,26 @@ async function seedNotifications(sql: postgres.Sql) {
       message TEXT NOT NULL,
       type VARCHAR(50) NOT NULL,
       read BOOLEAN NOT NULL DEFAULT FALSE,
+      is_archived BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `;
+
+  // Add is_archived column if it doesn't exist (idempotent)
+  await sql`
+    DO $do$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'notifications'
+        AND column_name = 'is_archived'
+      ) THEN
+        ALTER TABLE notifications ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE;
+      END IF;
+    END $do$;
+  `;
+
   await sql`TRUNCATE TABLE notifications RESTART IDENTITY CASCADE;`;
 
   // Enable realtime for notifications table
@@ -538,8 +554,8 @@ async function seedNotifications(sql: postgres.Sql) {
     notifications.map(
       (n) =>
         sql`
-        INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
-        VALUES (${n.user_id}, ${n.title}, ${n.message}, ${n.type}, ${n.read}, ${n.created_at}, ${n.updated_at})
+        INSERT INTO notifications (user_id, title, message, type, read, is_archived, created_at, updated_at)
+        VALUES (${n.user_id}, ${n.title}, ${n.message}, ${n.type}, ${n.read}, ${n.is_archived ?? false}, ${n.created_at}, ${n.updated_at})
         ON CONFLICT DO NOTHING
       `
     )
@@ -913,17 +929,19 @@ USING (
 
   // Drop any existing notification policies to avoid duplicates when reseeding
   await sql`DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;`;
+  await sql`DROP POLICY IF EXISTS "Users can view own non-archived notifications" ON notifications;`;
   await sql`DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;`;
   await sql`DROP POLICY IF EXISTS "Users can delete own notifications" ON notifications;`;
   await sql`DROP POLICY IF EXISTS "System can create notifications" ON notifications;`;
 
-  // Notifications: Users can only see their own notifications
+  // Notifications: Users can see all their own notifications (archived and non-archived)
+  // Application code filters is_archived = false when listing notifications
   await sql`
     CREATE POLICY "Users can view own notifications" ON notifications
     FOR SELECT USING (auth.uid() = user_id)
   `;
 
-  // Notifications: Users can update (mark as read) their own notifications
+  // Notifications: Users can update (mark as read, archive, unarchive) their own notifications
   await sql`
     CREATE POLICY "Users can update own notifications" ON notifications
     FOR UPDATE
