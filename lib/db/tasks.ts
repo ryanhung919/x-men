@@ -45,6 +45,7 @@ export async function getUserTasks(userId: string) {
       parent_task_id,
       recurrence_interval,
       recurrence_date,
+      creator_id,
       task_assignments(assignee_id),
       tags:task_tags(tags(name))
     `
@@ -72,7 +73,7 @@ export async function getUserTasks(userId: string) {
 
   if (attachmentsError) throw new Error(attachmentsError.message);
 
-  // Fetch user info for assignees
+  // Fetch user info for assignees AND creators
   let userInfoData: { id: string; first_name: string; last_name: string }[] = [];
   if (taskIds.length > 0) {
     const { data: userInfo, error: userInfoError } = await supabase.rpc('get_task_assignees_info', {
@@ -81,6 +82,22 @@ export async function getUserTasks(userId: string) {
 
     if (userInfoError) throw new Error(userInfoError.message);
     userInfoData = (userInfo ?? []) as { id: string; first_name: string; last_name: string }[];
+
+    // Also fetch creator info for all tasks
+    const creatorIds = Array.from(new Set(tasksData.map((task: any) => task.creator_id)));
+    const missingCreatorIds = creatorIds.filter((id) => !userInfoData.some((user) => user.id === id));
+
+    if (missingCreatorIds.length > 0) {
+      const { data: creatorInfo, error: creatorInfoError } = await supabase
+        .from('user_info')
+        .select('id, first_name, last_name')
+        .in('id', missingCreatorIds);
+
+      if (creatorInfoError) throw new Error(creatorInfoError.message);
+      if (creatorInfo) {
+        userInfoData = [...userInfoData, ...creatorInfo];
+      }
+    }
   }
 
   // Transform tasks data to match RawTask type (project should be object, not array)
@@ -151,6 +168,7 @@ export async function getTaskById(taskId: number): Promise<{
       parent_task_id,
       recurrence_interval,
       recurrence_date,
+      creator_id,
       task_assignments(assignee_id),
       tags:task_tags(tags(name))
       `
@@ -214,6 +232,7 @@ export async function getTaskById(taskId: number): Promise<{
   let userInfoData: RawAssignee[] = [];
   const userIds = [
     ...new Set([
+      transformedTask.creator_id, // Include creator
       ...transformedTask.task_assignments.map((a: any) => a.assignee_id),
       ...(commentsData || []).map((c) => c.user_id),
     ]),

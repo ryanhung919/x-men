@@ -57,6 +57,10 @@ export default async function TaskDetailsPage({ params }: { params: Promise<{ ta
               <strong>Status:</strong> <Badge>{task.status}</Badge>
             </p>
             <p>
+              <strong>Creator:</strong>{' '}
+              {task.creator.user_info.first_name} {task.creator.user_info.last_name}
+            </p>
+            <p>
               <strong>Assignees:</strong>{' '}
               {task.assignees.length > 0
                 ? task.assignees

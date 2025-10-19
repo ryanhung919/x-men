@@ -38,6 +38,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [{ assignee_id: 'user1' }],
           tags: [{ tags: { name: 'urgent' } }],
         },
@@ -131,6 +132,16 @@ describe('lib/db/tasks', () => {
             select: attachmentsSelectMock,
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -166,6 +177,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -216,6 +228,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -243,6 +265,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -284,6 +307,16 @@ describe('lib/db/tasks', () => {
           }
         }
         if (table === 'task_attachments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'user_info') {
           return {
             select: vi.fn().mockReturnValue({
               in: vi.fn().mockResolvedValue({
@@ -352,6 +385,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -399,6 +442,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -469,6 +513,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -588,6 +633,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -612,6 +667,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 7,
           recurrence_date: '2025-10-16T00:00:00.000Z',
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -664,6 +720,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -693,6 +759,7 @@ describe('lib/db/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 7,
         recurrence_date: '2025-10-16T00:00:00.000Z',
+        creator_id: 'creator-1',
         task_assignments: [{ assignee_id: 'user1' }],
         tags: [{ tags: { name: 'urgent' } }],
       };
@@ -1023,6 +1090,16 @@ describe('lib/db/tasks', () => {
         if (table === 'task_comments') {
           return commentsFromMock();
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -1156,6 +1233,16 @@ describe('lib/db/tasks', () => {
         if (table === 'task_comments') {
           return commentsFromMock();
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -1271,6 +1358,16 @@ describe('lib/db/tasks', () => {
         }
         if (table === 'task_comments') {
           return commentsFromMock();
+        }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
         }
         return {};
       });
