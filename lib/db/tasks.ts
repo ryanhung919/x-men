@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { RawTask, RawSubtask, RawAttachment, RawAssignee, RawComment } from '../services/tasks';
+import { CreateTaskPayload } from '../types/task-creation';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 
 /**
  * Fetches all non-archived tasks for a specific user along with related data.
@@ -250,4 +253,202 @@ export async function getTaskById(taskId: number): Promise<{
     comments: commentsData ?? [],
     assignees: userInfoData,
   };
+}
+
+/**
+ * Creates a new task with all related data (assignments, tags, attachments).
+ *
+ * This function performs the following operations:
+ * 1. Creates the main task record AND task assignments in a single transaction
+ *    using the `create_task_with_assignments` stored procedure
+ * 2. Creates or links tags to the task
+ * 3. Uploads and links file attachments
+ *
+ * The stored procedure ensures the DEFERRABLE trigger `trg_validate_task_assignee_count`
+ * waits for both the task and assignments to be inserted before validating.
+ *
+ * The database trigger `update_project_departments` will automatically link
+ * the task's project to the departments of the assignees.
+ *
+ * @param supabase - Authenticated Supabase client with user context (not currently used)
+ * @param payload - The task creation payload with all task details
+ * @param creatorId - The UUID of the user creating the task
+ * @param attachmentFiles - Optional array of files to attach to the task
+ * @returns The ID of the newly created task
+ * @throws {Error} If there's a database error or validation failure
+ *
+ * @example
+ * const supabase = await createClient();
+ * const taskId = await createTask(supabase, {
+ *   project_id: 1,
+ *   title: "New Feature",
+ *   description: "Implement feature X",
+ *   priority_bucket: 6,
+ *   status: "To Do",
+ *   assignee_ids: ["user-123", "user-456"],
+ *   deadline: "2025-12-31T23:59:59Z",
+ *   tags: ["frontend", "urgent"]
+ * }, "user-123");
+ */
+export async function createTask(
+  supabase: SupabaseClient,
+  payload: CreateTaskPayload,
+  creatorId: string,
+  attachmentFiles?: File[]
+): Promise<number> {
+
+  // Use service role client to bypass RLS for task creation
+  // Regular user client can't SELECT the task back because task_assignments don't exist yet
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Prepare assignments (ensure creator is included)
+  const uniqueAssigneeIds = Array.from(new Set([creatorId, ...payload.assignee_ids]));
+
+  // Validate assignee count (1-5)
+  if (uniqueAssigneeIds.length > 5) {
+    throw new Error('Cannot assign more than 5 users to a task');
+  }
+
+  // 1. Create the task and assignments in a single transaction using stored procedure
+  // This ensures the DEFERRABLE trigger waits for both inserts before validating
+  const { data: taskId, error: taskError } = await serviceClient.rpc(
+    'create_task_with_assignments',
+    {
+      p_title: payload.title,
+      p_description: payload.description,
+      p_priority_bucket: payload.priority_bucket,
+      p_status: payload.status,
+      p_deadline: payload.deadline,
+      p_notes: payload.notes ?? null,
+      p_project_id: payload.project_id,
+      p_creator_id: creatorId,
+      p_recurrence_interval: payload.recurrence_interval ?? 0,
+      p_recurrence_date: payload.recurrence_date ?? null,
+      p_assignee_ids: uniqueAssigneeIds,
+    }
+  );
+
+  if (taskError || !taskId) {
+    throw new Error(`Failed to create task: ${taskError?.message || 'Unknown error'}`);
+  }
+
+  // 2. Handle tags (use service client)
+  if (payload.tags && payload.tags.length > 0) {
+    // Insert tags if they don't exist and get their IDs
+    for (const tagName of payload.tags) {
+      // Try to insert the tag (will be ignored if it exists due to UNIQUE constraint)
+      await serviceClient.from('tags').insert({ name: tagName }).select();
+    }
+
+    // Get all tag IDs
+    const { data: tagData, error: tagFetchError } = await serviceClient
+      .from('tags')
+      .select('id, name')
+      .in('name', payload.tags);
+
+    if (tagFetchError) {
+      console.error('Error fetching tags:', tagFetchError);
+    } else if (tagData) {
+      // Link tags to task
+      const taskTags = tagData.map((tag) => ({
+        task_id: taskId,
+        tag_id: tag.id,
+      }));
+
+      const { error: taskTagError} = await serviceClient
+        .from('task_tags')
+        .insert(taskTags);
+
+      if (taskTagError) {
+        console.error('Error linking tags to task:', taskTagError);
+      }
+    }
+  }
+
+  // 3. Handle file attachments (storage uses service client, but user client for uploads is ok)
+  if (attachmentFiles && attachmentFiles.length > 0) {
+    for (const file of attachmentFiles) {
+      // Generate unique file path: tasks/{taskId}/{timestamp}-{filename}
+      const timestamp = Date.now();
+      const storagePath = `tasks/${taskId}/${timestamp}-${file.name}`;
+
+      // Upload to Supabase Storage (use service client for storage)
+      const { error: uploadError } = await serviceClient.storage
+        .from('task-attachments')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error(`Error uploading file ${file.name}:`, uploadError);
+        continue; // Skip this file but continue with others
+      }
+
+      // Create attachment record (use service client)
+      const { error: attachmentError } = await serviceClient
+        .from('task_attachments')
+        .insert({
+          task_id: taskId,
+          storage_path: storagePath,
+          uploaded_by: creatorId,
+        });
+
+      if (attachmentError) {
+        console.error(`Error creating attachment record for ${file.name}:`, attachmentError);
+        // Clean up the uploaded file
+        await serviceClient.storage.from('task-attachments').remove([storagePath]);
+      }
+    }
+  }
+
+  return taskId;
+}
+
+/**
+ * Fetches all users from the database with their basic information.
+ * Used for populating assignee selection dropdowns.
+ *
+ * @returns Array of user objects with id, first_name, and last_name
+ * @throws {Error} If there's a database error
+ */
+export async function getAllUsers(): Promise<RawAssignee[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('user_info')
+    .select('id, first_name, last_name')
+    .order('first_name', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch users: ${error.message}`);
+  }
+
+  return data as RawAssignee[];
+}
+
+/**
+ * Fetches all non-archived projects from the database.
+ * Used for populating project selection dropdowns.
+ *
+ * @returns Array of project objects with id and name
+ * @throws {Error} If there's a database error
+ */
+export async function getAllProjects(): Promise<{ id: number; name: string }[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name')
+    .eq('is_archived', false)
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch projects: ${error.message}`);
+  }
+
+  return data;
 }

@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import TasksList from '@/components/tasks/task-list';
 import { getUserTasks } from '@/lib/db/tasks';
-
 import { formatTasks } from '@/lib/services/tasks';
+import TasksPageHeader from '@/components/tasks/tasks-page-header';
 
 export default async function TasksPage() {
   const supabase = await createClient();
@@ -22,8 +22,8 @@ export default async function TasksPage() {
   const tasks = formatTasks(rawData);
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">My Tasks</h1>
+    <div className="container mx-auto p-6 space-y-6">
+      <TasksPageHeader tasksCount={tasks.length} />
       <TasksList tasks={tasks} />
     </div>
   );
