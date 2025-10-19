@@ -49,14 +49,17 @@ export interface TeamSummaryReport {
     blocked: number;
     total: number;
   }>;
-  userTotals: Map<string, {
-    userName: string;
-    todo: number;
-    inProgress: number;
-    completed: number;
-    blocked: number;
-    total: number;
-  }>;
+  userTotals: Map<
+    string,
+    {
+      userName: string;
+      todo: number;
+      inProgress: number;
+      completed: number;
+      blocked: number;
+      total: number;
+    }
+  >;
   kpis: KPI[];
   charts?: ChartData[];
 }
@@ -92,23 +95,36 @@ export interface TaskCompletionReport {
 
 export type AnyReport = LoggedTimeReport | TeamSummaryReport | TaskCompletionReport;
 
-// --- Get Metric Descriptions ---
+/**
+ * Returns a description of the given metric key for the given report type
+ *
+ * @param key The metric key to look up
+ * @param report The report type to look up
+ * @returns A human-readable description of the metric
+ */
 function getMetricDescription(key: string, report: AnyReport): string {
   if (report.kind === 'loggedTime') {
     const descriptions: Record<string, string> = {
-      totalTime: 'Total logged time (hours) across all tasks (Completed + In Progress + Blocked + To Do + Overdue)',
+      totalTime:
+        'Total logged time (hours) across all tasks (Completed + In Progress + Blocked + To Do + Overdue)',
       avgTime: 'Average logged time (hours) per completed task only',
       completedTasks: "Count of tasks with status='Completed'",
-      overdueTasks: 'Count of incomplete tasks (In Progress/Blocked/To Do) that are past their deadline',
-      blockedTasks: "Count of tasks with status='Blocked' (waiting on dependencies or external events)",
-      onTimeCompletionRate: 'Ratio (0-1) of completed tasks done on-time, where updated_at <= deadline',
-      totalDelayHours: 'Total hours that completed tasks were late (sum of hours past deadline for completed tasks)',
-      incompleteTime: 'Total logged time (hours) for all incomplete tasks (In Progress + Blocked + To Do), includes both overdue and non-overdue',
-      overdueTime: 'Total logged time (hours) for incomplete tasks that are OVERDUE (subset of incompleteTime)',
+      overdueTasks:
+        'Count of incomplete tasks (In Progress/Blocked/To Do) that are past their deadline',
+      blockedTasks:
+        "Count of tasks with status='Blocked' (waiting on dependencies or external events)",
+      onTimeCompletionRate:
+        'Ratio (0-1) of completed tasks done on-time, where updated_at <= deadline',
+      totalDelayHours:
+        'Total hours that completed tasks were late (sum of hours past deadline for completed tasks)',
+      incompleteTime:
+        'Total logged time (hours) for all incomplete tasks (In Progress + Blocked + To Do), includes both overdue and non-overdue',
+      overdueTime:
+        'Total logged time (hours) for incomplete tasks that are OVERDUE (subset of incompleteTime)',
     };
     return descriptions[key] || '';
   }
-  
+
   if (report.kind === 'teamSummary') {
     const descriptions: Record<string, string> = {
       totalTasks: 'Total number of tasks across all team members in the selected time period',
@@ -116,7 +132,7 @@ function getMetricDescription(key: string, report: AnyReport): string {
     };
     return descriptions[key] || '';
   }
-  
+
   if (report.kind === 'taskCompletions') {
     const descriptions: Record<string, string> = {
       totalTasks: 'Total number of tasks across all users',
@@ -128,11 +144,17 @@ function getMetricDescription(key: string, report: AnyReport): string {
     };
     return descriptions[key] || '';
   }
-  
+
   return '';
 }
 
-// --- Extract summary rows with descriptions ---
+/**
+ * Returns an array of summary rows for the given report, except if key is 'kind', 'kpis', or 'charts'.
+ * Each row is an object with 3 properties: label, value, and description
+ *
+ * @param report The report to generate summary rows for
+ * @returns An array of summary rows
+ */
 function getSummaryRows(report: AnyReport) {
   const rows: Array<{ label: string; value: string; description?: string }> = [];
   Object.entries(report).forEach(([key, value]) => {
@@ -141,6 +163,7 @@ function getSummaryRows(report: AnyReport) {
       key === 'kpis' ||
       key === 'charts' ||
       value instanceof Map ||
+      Array.isArray(value) ||
       typeof value === 'function'
     )
       return;
@@ -157,12 +180,21 @@ function getSummaryRows(report: AnyReport) {
   return rows;
 }
 
-// --- Extract breakdowns ---
+/**
+ * Depending on the `report.kind`, it extracts and formats breakdowns
+ * Each breakdown contains a title and an array of data objects to display or export.
+ * - For `'loggedTime'` reports, it creates breakdowns for each time category, converting seconds to hours.
+ * - For `'teamSummary'` reports, it provides weekly breakdowns by user and user task totals, including completion rates.
+ * - For `'taskCompletions'` reports, it summarizes user statistics and completed tasks by project.
+ *
+ * @param report - The report object containing data to be broken down.
+ * @returns An array of breakdown objects, each with a `title` and a `data` array of records.
+ */
 function getBreakdowns(
   report: AnyReport
 ): Array<{ title: string; data: Array<Record<string, any>> }> {
   const breakdowns: Array<{ title: string; data: Array<Record<string, any>> }> = [];
-  
+
   if (report.kind === 'loggedTime') {
     Object.entries(report).forEach(([key, value]) => {
       if (!(value instanceof Map) || value.size === 0) return;
@@ -175,13 +207,13 @@ function getBreakdowns(
       });
     });
   }
-  
+
   if (report.kind === 'teamSummary') {
     // Weekly breakdown
     if (report.weeklyBreakdown && report.weeklyBreakdown.length > 0) {
       breakdowns.push({
         title: 'Weekly Task Breakdown by User',
-        data: report.weeklyBreakdown.map(w => ({
+        data: report.weeklyBreakdown.map((w) => ({
           Week: w.week,
           'Week Start': new Date(w.weekStart).toLocaleDateString(),
           User: w.userName,
@@ -193,7 +225,7 @@ function getBreakdowns(
         })),
       });
     }
-    
+
     // User totals
     if (report.userTotals && report.userTotals.size > 0) {
       breakdowns.push({
@@ -210,13 +242,13 @@ function getBreakdowns(
       });
     }
   }
-  
+
   if (report.kind === 'taskCompletions') {
     // User stats breakdown
     if (report.userStats && report.userStats.length > 0) {
       breakdowns.push({
         title: 'User Task Completion Statistics',
-        data: report.userStats.map(u => ({
+        data: report.userStats.map((u) => ({
           User: u.userName,
           'Total Tasks': u.totalTasks,
           Completed: u.completedTasks,
@@ -233,7 +265,7 @@ function getBreakdowns(
         })),
       });
     }
-    
+
     // Completed by project
     if (report.completedByProject && report.completedByProject.size > 0) {
       breakdowns.push({
@@ -245,10 +277,20 @@ function getBreakdowns(
       });
     }
   }
-  
+
   return breakdowns;
 }
 
+/**
+ * Renders a chart in a PDF document using jsPDF.
+ *
+ * @param {jsPDF} doc The jsPDF document to render the chart in.
+ * @param {ChartData} chart The chart data to render.
+ * @param {number} x The x-coordinate of the chart.
+ * @param {number} y The y-coordinate of the chart.
+ * @param {number} maxWidth The maximum width of the chart.
+ * @return {number} The new y-coordinate after rendering the chart.
+ */
 function renderChartInPDF(
   doc: jsPDF,
   chart: ChartData,
@@ -373,9 +415,26 @@ interface ExportButtonsProps {
   reportData: AnyReport;
   reportTitle?: string;
   subTitle?: string;
+  disabled?: boolean;
 }
 
-export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButtonsProps) {
+/**
+ * ExportButtons component to export the report data to PDF or Excel.
+ *
+ * This component takes in report data, report title, and subtitle as props.
+ * It renders two buttons: Export PDF and Export Excel.
+ *
+ * When the Export PDF button is clicked, a PDF document is generated with APA formatting.
+ * The PDF includes an executive summary, KPI table, visualizations (charts), detailed metrics, and breakdowns.
+ * When the Export Excel button is clicked, an Excel document is generated with all report data.
+ * The Excel document includes separate sheets for each type of data: summary KPIs, detailed metrics, and breakdowns.
+ */
+export function ExportButtons({
+  reportData,
+  reportTitle,
+  subTitle,
+  disabled = false,
+}: ExportButtonsProps) {
   const title = reportTitle || `${capitalize(reportData.kind)} Report`;
   const timestamp = new Date().toISOString().split('T')[0];
   const filename = `${title.replace(/\s+/g, '_')}_${timestamp}`;
@@ -386,7 +445,7 @@ export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButto
 
   // --- PDF Export with APA formatting ---
   const handleExportPDF = () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
     const page = { w: doc.internal.pageSize.getWidth(), h: doc.internal.pageSize.getHeight() };
     const margin = 72; // 1-inch margins (APA standard)
 
@@ -397,7 +456,14 @@ export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButto
 
     doc.setFont('times', 'normal');
     doc.setFontSize(12);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, page.w / 2, page.h / 2, {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+    const timeStr = now.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    doc.text(`Generated: ${dateStr} - ${timeStr}`, page.w / 2, page.h / 2, {
       align: 'center',
     });
 
@@ -488,6 +554,17 @@ export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButto
     doc.setFontSize(11);
 
     summaryRows.forEach((row) => {
+      // Skip complex objects that shouldn't be in detailed metrics
+      if (
+        row.label === 'Weekly Breakdown' ||
+        row.label === 'User Stats' ||
+        row.label === 'Completed By Project' ||
+        row.label === 'User Totals' ||
+        row.label === 'Time By Task'
+      ) {
+        return;
+      }
+
       if (y > page.h - margin - 60) {
         doc.addPage();
         y = margin;
@@ -527,32 +604,66 @@ export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButto
       y += 20;
 
       doc.setFont('times', 'normal');
-      doc.setFontSize(10);
+      doc.setFontSize(9);
 
       // Table header
-      doc.setFont('times', 'bold');
-      const headers = Object.keys(breakdown.data[0] || {});
-      headers.forEach((header, idx) => {
-        doc.text(header, margin + 20 + idx * 150, y);
-      });
-      y += 16;
-      doc.setFont('times', 'normal');
+      if (breakdown.data.length === 0) {
+        doc.setFont('times', 'italic');
+        doc.text('No data available', margin + 20, y);
+        y += 20;
+        return;
+      }
 
-      breakdown.data.slice(0, 30).forEach((item) => {
+      const headers = Object.keys(breakdown.data[0] || {});
+      const maxWidth = page.w - 2 * margin;
+      const colWidth = Math.min(120, maxWidth / headers.length);
+
+      doc.setFont('times', 'bold');
+      doc.setFontSize(8); // Reduced from 9 for headers
+      headers.forEach((header, idx) => {
+        const xPos = margin + idx * colWidth;
+        if (xPos < page.w - margin - colWidth) {
+          const lines = doc.splitTextToSize(header, colWidth - 2);
+          doc.text(lines, xPos, y);
+        }
+      });
+      y += 30; // Increased spacing after headers
+      doc.setFont('times', 'normal');
+      doc.setFontSize(9);
+
+      // Limit rows to fit on page
+      const maxRows = Math.min(breakdown.data.length, 25);
+      breakdown.data.slice(0, maxRows).forEach((item) => {
         if (y > page.h - margin - 30) {
           doc.addPage();
           y = margin;
+
+          // Repeat headers on new page
+          doc.setFont('times', 'bold');
+          headers.forEach((header, idx) => {
+            const xPos = margin + idx * colWidth;
+            if (xPos < page.w - margin - colWidth) {
+              doc.text(header, xPos, y);
+            }
+          });
+          y += 16;
+          doc.setFont('times', 'normal');
         }
 
         Object.values(item).forEach((val, idx) => {
-          doc.text(String(val), margin + 20 + idx * 150, y);
+          const xPos = margin + idx * colWidth;
+          if (xPos < page.w - margin - colWidth) {
+            const text = String(val);
+            const truncated = text.length > 25 ? text.substring(0, 22) + '...' : text;
+            doc.text(truncated, xPos, y);
+          }
         });
         y += 14;
       });
 
-      if (breakdown.data.length > 30) {
+      if (breakdown.data.length > maxRows) {
         doc.setFont('times', 'italic');
-        doc.text(`... and ${breakdown.data.length - 30} more entries`, margin + 20, y);
+        doc.text(`... and ${breakdown.data.length - maxRows} more entries`, margin, y);
         y += 16;
         doc.setFont('times', 'normal');
       }
@@ -576,11 +687,20 @@ export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButto
     XLSX.utils.book_append_sheet(wb, wsKPI, 'Summary');
 
     // Sheet 2: Detailed Metrics with Descriptions
-    const detailedData = summaryRows.map((r) => ({
-      Metric: r.label,
-      Value: r.value,
-      Description: r.description || '',
-    }));
+    const detailedData = summaryRows
+      .filter(
+        (r) =>
+          r.label !== 'Weekly Breakdown' &&
+          r.label !== 'User Stats' &&
+          r.label !== 'Completed By Project' &&
+          r.label !== 'User Totals' &&
+          r.label !== 'Time By Task'
+      )
+      .map((r) => ({
+        Metric: r.label,
+        Value: r.value,
+        Description: r.description || '',
+      }));
     const wsDetailed = XLSX.utils.json_to_sheet(detailedData);
     XLSX.utils.book_append_sheet(wb, wsDetailed, 'Detailed Metrics');
 
@@ -614,11 +734,11 @@ export function ExportButtons({ reportData, reportTitle, subTitle }: ExportButto
 
   return (
     <div className="flex gap-2">
-      <Button onClick={handleExportPDF} variant="outline" size="sm">
+      <Button onClick={handleExportPDF} variant="outline" size="sm" disabled={disabled}>
         <FileDown className="mr-2 h-4 w-4" />
         Export PDF
       </Button>
-      <Button onClick={handleExportExcel} variant="outline" size="sm">
+      <Button onClick={handleExportExcel} variant="outline" size="sm" disabled={disabled}>
         <FileSpreadsheet className="mr-2 h-4 w-4" />
         Export Excel
       </Button>

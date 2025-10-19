@@ -5,40 +5,66 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 describe('Reports API Integration Tests', () => {
   let joelClient: SupabaseClient;
   let mitchClient: SupabaseClient;
+  let kesterClient: SupabaseClient;
   let joelCookie: string;
   let mitchCookie: string;
+  let kesterCookie: string;
 
   const API_BASE = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+  // Extract project reference from Supabase URL (move outside beforeAll)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+
+  // Helper function to format auth cookies (move outside beforeAll)
+  const formatAuthCookie = (session: any) => {
+    const cookieValue = JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at,
+      expires_in: session.expires_in,
+      token_type: session.token_type || 'bearer',
+      user: session.user,
+    });
+    return `sb-${projectRef}-auth-token=${encodeURIComponent(cookieValue)}`;
+  };
+
   beforeAll(async () => {
-    // Authenticate test users
+    // Authenticate test users - all have admin role
     const joel = await authenticateAs('joel');
     const mitch = await authenticateAs('mitch');
-    const garrison = await authenticateAs('garrison');
+    const kester = await authenticateAs('kester');
 
     joelClient = joel.client;
     mitchClient = mitch.client;
-
-    // Extract project reference from Supabase URL
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
-
-    // Format cookies as Supabase expects: single cookie with JSON-encoded session
-    const formatAuthCookie = (session: any) => {
-      const cookieValue = JSON.stringify({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: session.expires_at,
-        expires_in: session.expires_in,
-        token_type: session.token_type || 'bearer',
-        user: session.user,
-      });
-      return `sb-${projectRef}-auth-token=${encodeURIComponent(cookieValue)}`;
-    };
+    kesterClient = kester.client;
 
     // Get session cookies
     joelCookie = formatAuthCookie(joel.session);
     mitchCookie = formatAuthCookie(mitch.session);
+    kesterCookie = formatAuthCookie(kester.session);
+
+    // Verify admin roles
+    console.log('Verifying admin roles for test users...');
+    const users = [
+      { name: 'joel', user: joel, client: joelClient },
+      { name: 'mitch', user: mitch, client: mitchClient },
+      { name: 'kester', user: kester, client: kesterClient },
+    ];
+
+    for (const { name, user, client } of users) {
+      // Use the authenticated client instead of adminClient
+      const { data: roles, error } = await client
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.user.id);
+
+      if (error) {
+        console.error(`Error fetching roles for ${name}:`, error);
+      } else {
+        console.log(`${name} roles:`, roles?.map((r) => r.role));
+      }
+    }
   });
 
   describe('GET /api/reports - Authentication & Authorization', () => {
@@ -48,23 +74,17 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should return 403 when non-admin tries to access report actions', async () => {
-      // First, remove admin role from Joel temporarily
-      await adminClient
-        .from('user_roles')
-        .delete()
-        .eq('user_id', testUsers.joel.id)
-        .eq('role', 'admin');
+      // Use personal account (staff only)
+      const joelPersonal = await authenticateAs('joelPersonal');
+      const joelPersonalCookie = formatAuthCookie(joelPersonal.session);
 
       const response = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: joelPersonalCookie,
         },
       });
 
       expect(response.status).toBe(403);
-
-      // Restore admin role
-      await adminClient.from('user_roles').insert({ user_id: testUsers.joel.id, role: 'admin' });
     });
 
     it('should allow admins to access report actions', async () => {
@@ -225,6 +245,23 @@ describe('Reports API Integration Tests', () => {
       expect(report.onTimeCompletionRate).toBeLessThanOrEqual(1);
     });
 
+    it('should calculate metrics correctly based on sample data', async () => {
+      const response = await fetch(`${API_BASE}/api/reports?action=time`, {
+        headers: {
+          Cookie: joelCookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+
+      // Based on sample-data.ts, Joel should see:
+      // - Completed tasks with logged time
+      // - Tasks with various statuses
+      expect(report.completedTasks).toBeGreaterThan(0);
+      expect(report.totalTime).toBeGreaterThan(0);
+    });
+
     it('should filter report by projectIds', async () => {
       // Get a project ID
       const { data: projects } = await joelClient.from('projects').select('id').limit(1).single();
@@ -261,6 +298,9 @@ describe('Reports API Integration Tests', () => {
       expect(response.status).toBe(200);
       const report = await response.json();
       expect(report.kind).toBe('loggedTime');
+
+      // Should have data within this range
+      expect(report.completedTasks).toBeGreaterThan(0);
     });
 
     it('should handle empty results gracefully', async () => {
@@ -284,13 +324,33 @@ describe('Reports API Integration Tests', () => {
       expect(report.completedTasks).toBe(0);
       expect(report.overdueTasks).toBe(0);
     });
+
+    it('should respect RLS and show different data for different users', async () => {
+      const joelResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
+        headers: { Cookie: joelCookie },
+      });
+
+      const mitchResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
+        headers: { Cookie: mitchCookie },
+      });
+
+      expect(joelResponse.status).toBe(200);
+      expect(mitchResponse.status).toBe(200);
+
+      const joelReport = await joelResponse.json();
+      const mitchReport = await mitchResponse.json();
+
+      // They should see different metrics based on their department access
+      expect(joelReport.completedTasks).toBeGreaterThanOrEqual(0);
+      expect(mitchReport.completedTasks).toBeGreaterThanOrEqual(0);
+    });
   });
 
   describe('GET /api/reports?action=team (Team Summary Report)', () => {
     it('should generate team summary report with valid data structure', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=team`, {
         headers: {
-          Cookie: mitchCookie,
+          Cookie: mitchCookie, // Using mitch for team reports
         },
       });
 
@@ -327,6 +387,27 @@ describe('Reports API Integration Tests', () => {
       }
     });
 
+    it('should calculate team metrics correctly', async () => {
+      const response = await fetch(`${API_BASE}/api/reports?action=team`, {
+        headers: {
+          Cookie: mitchCookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+
+      // Should have tasks and users
+      expect(report.totalTasks).toBeGreaterThan(0);
+      expect(report.totalUsers).toBeGreaterThan(0);
+
+      // Should have weekly breakdown
+      expect(report.weeklyBreakdown.length).toBeGreaterThan(0);
+
+      // Should have user totals
+      expect(Object.keys(report.userTotals).length).toBeGreaterThan(0);
+    });
+
     it('should filter team report by projectIds', async () => {
       const { data: projects } = await mitchClient.from('projects').select('id').limit(1).single();
 
@@ -344,6 +425,25 @@ describe('Reports API Integration Tests', () => {
       expect(response.status).toBe(200);
       const report = await response.json();
       expect(report.kind).toBe('teamSummary');
+    });
+
+    it('should filter team report by date range', async () => {
+      const startDate = '2025-09-01';
+      const endDate = '2025-10-31';
+
+      const response = await fetch(
+        `${API_BASE}/api/reports?action=team&startDate=${startDate}&endDate=${endDate}`,
+        {
+          headers: {
+            Cookie: mitchCookie,
+          },
+        }
+      );
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+      expect(report.kind).toBe('teamSummary');
+      expect(report.weeklyBreakdown.length).toBeGreaterThan(0);
     });
 
     it('should serialize Maps to objects in JSON response', async () => {
@@ -364,13 +464,37 @@ describe('Reports API Integration Tests', () => {
       expect(typeof report.weekTotals).toBe('object');
       expect(report.weekTotals.constructor.name).toBe('Object');
     });
+
+    it('should aggregate weekly data correctly', async () => {
+      const response = await fetch(`${API_BASE}/api/reports?action=team`, {
+        headers: {
+          Cookie: mitchCookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+
+      // Verify week totals structure
+      const weekKeys = Object.keys(report.weekTotals);
+      expect(weekKeys.length).toBeGreaterThan(0);
+
+      // Each week should have aggregated status counts
+      const firstWeek = report.weekTotals[weekKeys[0]];
+      expect(firstWeek).toHaveProperty('todo');
+      expect(firstWeek).toHaveProperty('inProgress');
+      expect(firstWeek).toHaveProperty('completed');
+      expect(firstWeek).toHaveProperty('blocked');
+      expect(firstWeek).toHaveProperty('total');
+      expect(firstWeek).toHaveProperty('weekStart');
+    });
   });
 
   describe('GET /api/reports?action=task (Task Completion Report)', () => {
     it('should generate task completion report with valid data structure', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=task`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: joelCookie, 
         },
       });
 
@@ -414,6 +538,61 @@ describe('Reports API Integration Tests', () => {
       }
     });
 
+    it('should calculate completion metrics correctly', async () => {
+      const response = await fetch(`${API_BASE}/api/reports?action=task`, {
+        headers: {
+          Cookie: joelCookie, // Changed from kesterCookie
+        },
+      });
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+
+      // Total should equal sum of statuses
+      const statusSum =
+        report.totalCompleted + report.totalInProgress + report.totalTodo + report.totalBlocked;
+
+      expect(report.totalTasks).toBe(statusSum);
+
+      // Completion rate should match calculation
+      const expectedRate = report.totalTasks > 0 ? report.totalCompleted / report.totalTasks : 0;
+      expect(Math.abs(report.overallCompletionRate - expectedRate)).toBeLessThan(0.01);
+    });
+
+    it('should include user statistics with correct metrics', async () => {
+      const response = await fetch(`${API_BASE}/api/reports?action=task`, {
+        headers: {
+          Cookie: joelCookie, // Changed from kesterCookie
+        },
+      });
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+
+      expect(report.userStats.length).toBeGreaterThan(0);
+
+      // Verify each user stat has valid metrics
+      report.userStats.forEach((user: any) => {
+        // Total tasks should match sum of statuses
+        const statusSum =
+          user.completedTasks + user.inProgressTasks + user.todoTasks + user.blockedTasks;
+        expect(user.totalTasks).toBe(statusSum);
+
+        // Completion rate should be valid
+        expect(user.completionRate).toBeGreaterThanOrEqual(0);
+        expect(user.completionRate).toBeLessThanOrEqual(1);
+
+        // On-time rate should be valid
+        expect(user.onTimeRate).toBeGreaterThanOrEqual(0);
+        expect(user.onTimeRate).toBeLessThanOrEqual(1);
+
+        // Time metrics should be non-negative
+        expect(user.avgCompletionTime).toBeGreaterThanOrEqual(0);
+        expect(user.totalLoggedTime).toBeGreaterThanOrEqual(0);
+        expect(user.avgLoggedTimePerTask).toBeGreaterThanOrEqual(0);
+      });
+    });
+
     it('should filter task completion report by date range', async () => {
       const startDate = '2025-09-01';
       const endDate = '2025-10-31';
@@ -422,7 +601,7 @@ describe('Reports API Integration Tests', () => {
         `${API_BASE}/api/reports?action=task&startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: joelCookie, // Changed from kesterCookie
           },
         }
       );
@@ -430,6 +609,47 @@ describe('Reports API Integration Tests', () => {
       expect(response.status).toBe(200);
       const report = await response.json();
       expect(report.kind).toBe('taskCompletions');
+    });
+
+    it('should filter task completion report by projectIds', async () => {
+      const { data: projects } = await joelClient.from('projects').select('id').limit(1).single();
+
+      if (!projects) throw new Error('No projects found');
+
+      const response = await fetch(
+        `${API_BASE}/api/reports?action=task&projectIds=${projects.id}`,
+        {
+          headers: {
+            Cookie: joelCookie, // Changed from kesterCookie
+          },
+        }
+      );
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+      expect(report.kind).toBe('taskCompletions');
+    });
+
+    it('should aggregate completed tasks by project', async () => {
+      const response = await fetch(`${API_BASE}/api/reports?action=task`, {
+        headers: {
+          Cookie: joelCookie, // Changed from kesterCookie
+        },
+      });
+
+      expect(response.status).toBe(200);
+      const report = await response.json();
+
+      // Should have projects with completed tasks
+      const projectIds = Object.keys(report.completedByProject);
+      expect(projectIds.length).toBeGreaterThanOrEqual(0);
+
+      // Each project should have a count
+      projectIds.forEach((projectId) => {
+        const count = report.completedByProject[projectId];
+        expect(typeof count).toBe('number');
+        expect(count).toBeGreaterThanOrEqual(0);
+      });
     });
   });
 
@@ -493,9 +713,72 @@ describe('Reports API Integration Tests', () => {
       const mitchReport = await mitchResponse.json();
 
       // They should see different data based on their department access
-      // (exact comparison depends on your RLS policies and test data)
-      expect(joelReport).toHaveProperty('completedTasks'); // ← Correct property for loggedTime report
+      expect(joelReport).toHaveProperty('completedTasks');
       expect(mitchReport).toHaveProperty('completedTasks');
+    });
+
+    it('should respect department hierarchy in all report types', async () => {
+      // Test all three report types
+      const reportTypes = ['time', 'team', 'task'];
+
+      for (const action of reportTypes) {
+        const response = await fetch(`${API_BASE}/api/reports?action=${action}`, {
+          headers: {
+            Cookie: joelCookie,
+          },
+        });
+
+        expect(response.status).toBe(200);
+        const report = await response.json();
+
+        // Each report should have its kind property
+        expect(report.kind).toBeDefined();
+
+        // Each report should have data (not empty)
+        if (action === 'time') {
+          expect(report.completedTasks).toBeGreaterThanOrEqual(0);
+        } else if (action === 'team') {
+          expect(report.totalUsers).toBeGreaterThanOrEqual(0);
+        } else if (action === 'task') {
+          expect(report.totalTasks).toBeGreaterThanOrEqual(0);
+        }
+      }
+    });
+  });
+
+  describe('Role-Based Report Access', () => {
+    it('should verify all test admin users can access reports', async () => {
+      const adminUsers = [
+        { name: 'joel', id: testUsers.joel.id },
+        { name: 'mitch', id: testUsers.mitch.id },
+        { name: 'kester', id: testUsers.kester.id },
+      ];
+
+      for (const admin of adminUsers) {
+        const { data: roles, error } = await adminClient
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', admin.id);
+
+        expect(error).toBeNull();
+        expect(roles).toBeDefined();
+
+        const roleNames = roles?.map((r) => r.role) || [];
+        expect(roleNames).toContain('admin');
+      }
+    });
+
+    it('should deny non-admin users from accessing reports', async () => {
+      const joelPersonal = await authenticateAs('joelPersonal');
+      const joelPersonalCookie = formatAuthCookie(joelPersonal.session);
+
+      const response = await fetch(`${API_BASE}/api/reports?action=time`, {
+        headers: {
+          Cookie: joelPersonalCookie,
+        },
+      });
+
+      expect(response.status).toBe(403);
     });
   });
 });

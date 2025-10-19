@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, CheckCheck, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -19,9 +19,11 @@ export function NotificationPanel() {
     notifications,
     unreadCount,
     isLoading,
+    isDeleting,
     handleMarkAsRead,
     handleMarkAllAsRead,
     handleDelete,
+    handleDeleteAll,
   } = useNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -51,23 +53,46 @@ export function NotificationPanel() {
       </SheetTrigger>
       <SheetContent className="w-full sm:w-[400px] p-0">
         <SheetHeader className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <SheetTitle>Notifications</SheetTitle>
+          <SheetTitle>Notifications</SheetTitle>
+        </SheetHeader>
+
+        {/* Action buttons below header, above notifications */}
+        {notifications.length > 0 && !isDeleting && (
+          <div className="flex items-center justify-between gap-2 px-4 py-2 border-b bg-muted/30">
             {unreadCount > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleMarkAllAsRead}
-                className="text-xs"
+                disabled={isDeleting}
+                className="text-xs flex-1"
               >
                 <CheckCheck className="h-4 w-4 mr-1" />
                 Mark all read
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDeleteAll}
+              disabled={isDeleting}
+              className="text-xs flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete all
+            </Button>
           </div>
-        </SheetHeader>
+        )}
 
-        <div className="flex-1 overflow-y-auto max-h-[calc(100vh-80px)]">
+        {/* Loading state for delete all */}
+        {isDeleting && (
+          <div className="flex items-center justify-center gap-2 px-4 py-3 border-b bg-muted/30">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm text-muted-foreground">Deleting all notifications...</span>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto max-h-[calc(100vh-140px)]">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

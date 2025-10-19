@@ -29,9 +29,17 @@ async function teardownSchema(sql: postgres.Sql) {
   // Drop triggers first (wrapped in try-catch since tables might not exist)
   const triggersToDrop = [
     'DROP TRIGGER IF EXISTS trg_notify_new_comment ON task_comments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_comment_removal ON task_comments CASCADE',
     'DROP TRIGGER IF EXISTS trg_notify_task_assignment ON task_assignments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_assignment_removal ON task_assignments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_update ON tasks CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_creation ON tasks CASCADE',
     'DROP TRIGGER IF EXISTS trg_update_project_departments ON task_assignments CASCADE',
     'DROP TRIGGER IF EXISTS trg_validate_task_assignee_count ON tasks CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_attachment ON task_attachments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_attachment_removal ON task_attachments CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_tag_add ON task_tags CASCADE',
+    'DROP TRIGGER IF EXISTS trg_notify_task_tag_remove ON task_tags CASCADE',
   ];
 
   for (const triggerSql of triggersToDrop) {
@@ -45,9 +53,17 @@ async function teardownSchema(sql: postgres.Sql) {
 
   // Drop functions
   await sql`DROP FUNCTION IF EXISTS notify_new_comment() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_comment_removal() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS notify_task_assignment() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_assignment_removal() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_update() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_creation() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS update_project_departments() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS validate_task_assignee_count() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_attachment() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_attachment_removal() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_tag_add() CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS notify_task_tag_remove() CASCADE`;
   await sql`DROP FUNCTION IF EXISTS get_department_hierarchy(BIGINT) CASCADE`;
   await sql`DROP FUNCTION IF EXISTS get_department_colleagues(uuid) CASCADE`;
   await sql`DROP FUNCTION IF EXISTS can_view_user(uuid, uuid) CASCADE`;
@@ -95,11 +111,10 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
       const depId = nameToDeptId.get(ui.department_name);
       if (!depId) throw new Error(`Unknown department: ${ui.department_name}`);
 
+      const defaultView = (ui.default_view === 'calendar') ? 'schedule' : (ui.default_view ?? 'tasks');
       return sql`
         INSERT INTO user_info (id, first_name, last_name, default_view, department_id)
-        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${
-        ui.default_view ?? 'tasks'
-      }, ${depId})
+        VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${defaultView}, ${depId})
         ON CONFLICT (id) DO UPDATE
           SET first_name = EXCLUDED.first_name,
               last_name  = EXCLUDED.last_name,
@@ -496,11 +511,42 @@ async function seedNotifications(sql: postgres.Sql) {
       message TEXT NOT NULL,
       type VARCHAR(50) NOT NULL,
       read BOOLEAN NOT NULL DEFAULT FALSE,
+      is_archived BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `;
+
+  // Add is_archived column if it doesn't exist (idempotent)
+  await sql`
+    DO $do$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'notifications'
+        AND column_name = 'is_archived'
+      ) THEN
+        ALTER TABLE notifications ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT FALSE;
+      END IF;
+    END $do$;
+  `;
+
   await sql`TRUNCATE TABLE notifications RESTART IDENTITY CASCADE;`;
+
+  // Enable realtime for notifications table
+  try {
+    await sql`
+      ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+    `;
+    console.log('Enabled realtime for notifications table');
+  } catch (error: any) {
+    // If table is already in publication, ignore the error
+    if (error.message?.includes('already exists')) {
+      console.log('Notifications table already in realtime publication');
+    } else {
+      console.warn('Could not enable realtime for notifications:', error.message);
+    }
+  }
 
   if (!notifications.length) return;
 
@@ -508,8 +554,8 @@ async function seedNotifications(sql: postgres.Sql) {
     notifications.map(
       (n) =>
         sql`
-        INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
-        VALUES (${n.user_id}, ${n.title}, ${n.message}, ${n.type}, ${n.read}, ${n.created_at}, ${n.updated_at})
+        INSERT INTO notifications (user_id, title, message, type, read, is_archived, created_at, updated_at)
+        VALUES (${n.user_id}, ${n.title}, ${n.message}, ${n.type}, ${n.read}, ${n.is_archived ?? false}, ${n.created_at}, ${n.updated_at})
         ON CONFLICT DO NOTHING
       `
     )
@@ -739,9 +785,9 @@ async function enableRLS(sql: postgres.Sql) {
   `;
 
   //User Info: Users can see colleagues in their department
-  await sql`
-  DROP POLICY IF EXISTS "Users can view colleagues in their department" ON user_info;
-  `;
+  await sql`DROP POLICY IF EXISTS "Users can view colleagues in their department" ON user_info;`;
+  await sql`DROP POLICY IF EXISTS "Users can view colleagues, descendants, and shared task assignees" ON user_info;`;
+  await sql`DROP POLICY IF EXISTS "Users can update own settings" ON user_info;`;
 
   await sql`
     CREATE POLICY "Users can view colleagues, descendants, and shared task assignees"
@@ -752,6 +798,13 @@ USING (
 );
 
 `;
+  // Allow a user to view and update their own settings row
+  await sql`
+    CREATE POLICY "Users can update own settings" ON user_info
+    FOR UPDATE
+    USING (id = auth.uid())
+    WITH CHECK (id = auth.uid());
+  `;
 
   /* ---------------- USER ROLES ---------------- */
 
@@ -841,12 +894,29 @@ USING (
     WITH CHECK (auth.uid() = creator_id);
   `;
 
-  // Users can update their own tasks (details, status, priority_bucket, recurrence_interval)
+  // Drop users can update task policy
+  await sql`DROP POLICY IF EXISTS "Users can update their own tasks" ON tasks;`;
+
+  // Task creators and assignees can update tasks (details, status, priority_bucket, recurrence_interval)
   await sql`
-    CREATE POLICY "Users can update their own tasks" ON tasks
+    CREATE POLICY "Task creators and assignees can update tasks" ON tasks
     FOR UPDATE
-    USING (auth.uid() = creator_id)
-    WITH CHECK (auth.uid() = creator_id)
+    USING (
+      auth.uid() = creator_id
+      OR EXISTS (
+        SELECT 1 FROM task_assignments
+        WHERE task_id = tasks.id
+        AND assignee_id = auth.uid()
+      )
+    )
+    WITH CHECK (
+      auth.uid() = creator_id
+      OR EXISTS (
+        SELECT 1 FROM task_assignments
+        WHERE task_id = tasks.id
+        AND assignee_id = auth.uid()
+      )
+    )
   `;
 
   // Tasks: Users can see tasks in their department
@@ -914,17 +984,19 @@ USING (
 
   // Drop any existing notification policies to avoid duplicates when reseeding
   await sql`DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;`;
+  await sql`DROP POLICY IF EXISTS "Users can view own non-archived notifications" ON notifications;`;
   await sql`DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;`;
   await sql`DROP POLICY IF EXISTS "Users can delete own notifications" ON notifications;`;
   await sql`DROP POLICY IF EXISTS "System can create notifications" ON notifications;`;
 
-  // Notifications: Users can only see their own notifications
+  // Notifications: Users can see all their own notifications (archived and non-archived)
+  // Application code filters is_archived = false when listing notifications
   await sql`
     CREATE POLICY "Users can view own notifications" ON notifications
     FOR SELECT USING (auth.uid() = user_id)
   `;
 
-  // Notifications: Users can update (mark as read) their own notifications
+  // Notifications: Users can update (mark as read, archive, unarchive) their own notifications
   await sql`
     CREATE POLICY "Users can update own notifications" ON notifications
     FOR UPDATE
@@ -1101,6 +1173,22 @@ USING (
     )
   `;
 
+  // Task Assignments: Users can remove assignments from tasks in their department
+  await sql`
+    CREATE POLICY "Users can remove assignments from tasks in their department"
+    ON task_assignments
+    FOR DELETE
+    USING (
+      EXISTS (
+        SELECT 1
+        FROM tasks t
+        JOIN project_departments pd ON pd.project_id = t.project_id
+        WHERE t.id = task_assignments.task_id
+          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
+      )
+    )
+  `;
+
   /* ---------------- TASK ATTACHMENTS ---------------- */
   // Select: assignees of the task can view
   await sql`
@@ -1125,6 +1213,21 @@ USING (
     WITH CHECK (
       uploaded_by = auth.uid()
       AND EXISTS (
+        SELECT 1
+        FROM task_assignments ta
+        WHERE ta.task_id = task_attachments.task_id
+          AND ta.assignee_id = auth.uid()
+      )
+    )
+  `;
+
+  // Delete: assignees of the task can remove attachments
+  await sql`
+    CREATE POLICY "Assignees can remove task attachments"
+    ON task_attachments
+    FOR DELETE
+    USING (
+      EXISTS (
         SELECT 1
         FROM task_assignments ta
         WHERE ta.task_id = task_attachments.task_id
@@ -1336,6 +1439,10 @@ async function createTriggers(sql: postgres.Sql) {
         assignor_first_name TEXT;
         assignor_last_name TEXT;
         assignor_full_name TEXT;
+        new_assignee_first_name TEXT;
+        new_assignee_last_name TEXT;
+        new_assignee_full_name TEXT;
+        existing_assignee_record RECORD;
     BEGIN
         -- Skip notification if assignee is the same as assignor (self-assignment)
         IF NEW.assignee_id = NEW.assignor_id THEN
@@ -1358,17 +1465,44 @@ async function createTriggers(sql: postgres.Sql) {
             assignor_full_name := 'Someone';
         END IF;
 
-        -- Insert notification (bypass RLS)
+        -- Get new assignee name (bypass RLS)
+        SELECT first_name, last_name INTO new_assignee_first_name, new_assignee_last_name
+        FROM user_info
+        WHERE id = NEW.assignee_id;
+
+        new_assignee_full_name := new_assignee_first_name || ' ' || new_assignee_last_name;
+
+        -- Insert notification for the new assignee (bypass RLS)
         INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
         VALUES (
             NEW.assignee_id,
             'New Task Assignment',
             assignor_full_name || ' assigned you to task: "' || task_title_var || '"',
-            'task_assigned',
+            'task_updated',
             false,
             NOW(),
             NOW()
         );
+
+        -- Create notifications for existing assignees about the new task assignee
+        FOR existing_assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = NEW.task_id
+              AND assignee_id != NEW.assignee_id  -- Skip the new assignee
+              AND assignee_id != NEW.assignor_id      -- Skip the assignor if they're also an assignee
+        LOOP
+            INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+            VALUES (
+                existing_assignee_record.assignee_id,
+                'Task Assignee Added',
+                assignor_full_name || ' assigned ' || new_assignee_full_name || ' to task: "' || task_title_var || '"',
+                'task_updated',
+                false,
+                NOW(),
+                NOW()
+            );
+        END LOOP;
 
         RETURN NEW;
     END;
@@ -1428,7 +1562,7 @@ async function createTriggers(sql: postgres.Sql) {
                     assignee_record.assignee_id,
                     'New Comment',
                     commenter_full_name || ' commented on task: "' || task_title_var || '"',
-                    'comment_added',
+                    'task_updated',
                     false,
                     NOW(),
                     NOW()
@@ -1447,6 +1581,791 @@ async function createTriggers(sql: postgres.Sql) {
     AFTER INSERT ON task_comments
     FOR EACH ROW
     EXECUTE FUNCTION notify_new_comment();
+  `;
+
+  // Trigger function for comment deletion notifications
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_comment_removal()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        remover_first_name TEXT;
+        remover_last_name TEXT;
+        remover_full_name TEXT;
+        commenter_first_name TEXT;
+        commenter_last_name TEXT;
+        commenter_full_name TEXT;
+        assignee_record RECORD;
+    BEGIN
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = OLD.task_id;
+
+        -- Get commenter name (bypass RLS)
+        SELECT first_name, last_name INTO commenter_first_name, commenter_last_name
+        FROM user_info
+        WHERE id = OLD.user_id;
+
+        IF commenter_first_name IS NOT NULL AND commenter_last_name IS NOT NULL THEN
+            commenter_full_name := commenter_first_name || ' ' || commenter_last_name;
+        ELSE
+            commenter_full_name := 'Admin';
+        END IF;
+
+        -- Get remover name from auth context (admin who deleted)
+        SELECT first_name, last_name INTO remover_first_name, remover_last_name
+        FROM user_info
+        WHERE id = auth.uid();
+
+        IF remover_first_name IS NOT NULL AND remover_last_name IS NOT NULL THEN
+            remover_full_name := remover_first_name || ' ' || remover_last_name;
+        ELSE
+            remover_full_name := 'An admin';
+        END IF;
+
+        -- Create notifications for all assignees about the comment deletion
+        FOR assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = OLD.task_id
+              AND assignee_id != auth.uid()  -- Skip the admin who deleted
+        LOOP
+            INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+            VALUES (
+                assignee_record.assignee_id,
+                'Comment Removed',
+                remover_full_name || ' removed a comment from task: "' || task_title_var || '"',
+                'task_updated',
+                false,
+                NOW(),
+                NOW()
+            );
+        END LOOP;
+
+        RETURN OLD;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_comments table for removal notifications
+    CREATE TRIGGER trg_notify_comment_removal
+    AFTER DELETE ON task_comments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_comment_removal();
+  `;
+
+  await sql`
+    -- Trigger function to create notifications when a task is updated
+    -- SECURITY DEFINER allows it to bypass RLS policies
+    -- Uses auth.uid() to identify the actual user making the update
+    CREATE OR REPLACE FUNCTION notify_task_update()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        updater_id UUID;
+        updater_first_name TEXT;
+        updater_last_name TEXT;
+        updater_full_name TEXT;
+        assignee_record RECORD;
+        message_text TEXT;
+        changed_fields TEXT[] := ARRAY[]::TEXT[];
+        field_label TEXT;
+        parent_title TEXT;
+    BEGIN
+        -- Get the user who made the update from auth context
+        updater_id := auth.uid();
+
+        RAISE NOTICE 'notify_task_update triggered for task % by user %', NEW.id, updater_id;
+
+        -- If no authenticated user (e.g., system update), skip notifications
+        IF updater_id IS NULL THEN
+            RAISE NOTICE 'No authenticated user, skipping notifications';
+            RETURN NEW;
+        END IF;
+
+        -- Get updater name (bypass RLS - SECURITY DEFINER allows this)
+        SELECT first_name, last_name INTO updater_first_name, updater_last_name
+        FROM user_info
+        WHERE id = updater_id;
+
+        IF updater_first_name IS NOT NULL AND updater_last_name IS NOT NULL THEN
+            updater_full_name := updater_first_name || ' ' || updater_last_name;
+        ELSE
+            updater_full_name := 'Someone';
+        END IF;
+
+        -- Collect all changed fields
+        IF OLD.title IS DISTINCT FROM NEW.title THEN
+            changed_fields := array_append(changed_fields, 'title');
+        END IF;
+
+        IF OLD.status IS DISTINCT FROM NEW.status THEN
+            changed_fields := array_append(changed_fields, 'status');
+        END IF;
+
+        IF OLD.priority_bucket IS DISTINCT FROM NEW.priority_bucket THEN
+            changed_fields := array_append(changed_fields, 'priority_bucket');
+        END IF;
+
+        IF OLD.description IS DISTINCT FROM NEW.description THEN
+            changed_fields := array_append(changed_fields, 'description');
+        END IF;
+
+        IF OLD.deadline IS DISTINCT FROM NEW.deadline THEN
+            changed_fields := array_append(changed_fields, 'deadline');
+        END IF;
+
+        IF OLD.notes IS DISTINCT FROM NEW.notes THEN
+            changed_fields := array_append(changed_fields, 'notes');
+        END IF;
+
+        IF OLD.recurrence_date IS DISTINCT FROM NEW.recurrence_date THEN
+            changed_fields := array_append(changed_fields, 'recurrence_date');
+        END IF;
+
+        IF OLD.is_archived IS DISTINCT FROM NEW.is_archived THEN
+            changed_fields := array_append(changed_fields, 'is_archived');
+        END IF;
+
+        -- TODO: Uncomment when teammate finalizes subtask process
+        -- IF OLD.parent_task_id IS DISTINCT FROM NEW.parent_task_id THEN
+        --     changed_fields := array_append(changed_fields, 'parent_task_id');
+        -- END IF;
+
+        -- If no fields changed, skip notification
+        IF array_length(changed_fields, 1) IS NULL THEN
+            RAISE NOTICE 'No fields changed, skipping notification';
+            RETURN NEW;
+        END IF;
+
+        RAISE NOTICE 'Changed fields: %, count: %', changed_fields, array_length(changed_fields, 1);
+
+        -- Generate message based on number of changed fields
+        IF array_length(changed_fields, 1) = 1 THEN
+            -- Single field - detailed message with from/to
+            CASE changed_fields[1]
+                WHEN 'title' THEN
+                    message_text := updater_full_name || ' updated the title of task "' || OLD.title || '" to "' || NEW.title || '"';
+                WHEN 'status' THEN
+                    message_text := updater_full_name || ' changed the status of task "' || NEW.title || '" from "' || OLD.status || '" to "' || NEW.status || '"';
+                WHEN 'priority_bucket' THEN
+                    message_text := updater_full_name || ' changed the priority of task "' || NEW.title || '" from ' || OLD.priority_bucket || ' to ' || NEW.priority_bucket;
+                WHEN 'description' THEN
+                    message_text := updater_full_name || ' changed the description of task "' || NEW.title || '" from "' || COALESCE(OLD.description, '(empty)') || '" to "' || COALESCE(NEW.description, '(empty)') || '"';
+                WHEN 'deadline' THEN
+                    message_text := updater_full_name || ' changed the deadline of task "' || NEW.title || '" from ' || COALESCE(TO_CHAR(OLD.deadline, 'MM/DD/YYYY'), '(none)') || ' to ' || COALESCE(TO_CHAR(NEW.deadline, 'MM/DD/YYYY'), '(none)');
+                WHEN 'notes' THEN
+                    message_text := updater_full_name || ' changed the notes of task "' || NEW.title || '" from "' || COALESCE(OLD.notes, '(empty)') || '" to "' || COALESCE(NEW.notes, '(empty)') || '"';
+                WHEN 'recurrence_date' THEN
+                    IF OLD.recurrence_date IS NULL THEN
+                        message_text := updater_full_name || ' set a recurrence date for task "' || NEW.title || '"';
+                    ELSEIF NEW.recurrence_date IS NULL THEN
+                        message_text := updater_full_name || ' removed the recurrence date from task "' || NEW.title || '"';
+                    ELSE
+                        message_text := updater_full_name || ' changed the recurrence date for task "' || NEW.title || '"';
+                    END IF;
+                WHEN 'is_archived' THEN
+                    IF NEW.is_archived = true THEN
+                        message_text := updater_full_name || ' archived task "' || NEW.title || '"';
+                    ELSE
+                        message_text := updater_full_name || ' unarchived task "' || NEW.title || '"';
+                    END IF;
+                -- TODO: Uncomment when teammate finalizes subtask process
+                -- WHEN 'parent_task_id' THEN
+                --     IF OLD.parent_task_id IS NULL THEN
+                --         -- Task became a subtask - notify parent task assignees
+                --         -- Get parent task title (bypass RLS)
+                --         SELECT title INTO parent_title
+                --         FROM tasks
+                --         WHERE id = NEW.parent_task_id;
+
+                --         message_text := 'Sub-task "' || NEW.title || '" was added to "' || COALESCE(parent_title, 'Unknown Parent') || '"';
+                --     ELSEIF NEW.parent_task_id IS NULL THEN
+                --         -- Task is no longer a subtask
+                --         message_text := updater_full_name || ' removed "' || NEW.title || '" from being a subtask';
+                --     ELSE
+                --         -- Parent task changed (unlikely case)
+                --         message_text := updater_full_name || ' changed the parent task of "' || NEW.title || '" to task ID ' || NEW.parent_task_id;
+                --     END IF;
+                ELSE
+                    message_text := updater_full_name || ' updated ' || changed_fields[1] || ' of task "' || NEW.title || '"';
+            END CASE;
+        ELSE
+            -- Multiple fields - compact format listing all fields
+            message_text := updater_full_name || ' updated the following fields in task "' || NEW.title || '": ';
+            FOR i IN 1..array_length(changed_fields, 1) LOOP
+                CASE changed_fields[i]
+                    WHEN 'title' THEN field_label := 'title';
+                    WHEN 'status' THEN field_label := 'status';
+                    WHEN 'priority_bucket' THEN field_label := 'priority';
+                    WHEN 'description' THEN field_label := 'description';
+                    WHEN 'deadline' THEN field_label := 'deadline';
+                    WHEN 'notes' THEN field_label := 'notes';
+                    WHEN 'recurrence_date' THEN field_label := 'recurrence date';
+                    WHEN 'is_archived' THEN field_label := 'archive status';
+                    -- TODO: Uncomment when teammate finalizes subtask process
+                    -- WHEN 'parent_task_id' THEN field_label := 'parent task';
+                    ELSE field_label := changed_fields[i];
+                END CASE;
+
+                IF i = 1 THEN
+                    message_text := message_text || field_label;
+                ELSE
+                    message_text := message_text || ', ' || field_label;
+                END IF;
+            END LOOP;
+        END IF;
+
+        -- Create notifications for all assignees except the updater
+        RAISE NOTICE 'Looking for assignees for task %', NEW.id;
+        FOR assignee_record IN
+            SELECT assignee_id FROM task_assignments WHERE task_id = NEW.id
+        LOOP
+            RAISE NOTICE 'Found assignee: %, updater: %', assignee_record.assignee_id, updater_id;
+            -- Skip the updater
+            IF assignee_record.assignee_id != updater_id THEN
+                RAISE NOTICE 'Creating notification for assignee %', assignee_record.assignee_id;
+                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                VALUES (assignee_record.assignee_id, 'Task Updated', message_text, 'task_updated', false, NOW(), NOW());
+                RAISE NOTICE 'Notification created successfully';
+            ELSE
+                RAISE NOTICE 'Skipping updater %', assignee_record.assignee_id;
+            END IF;
+        END LOOP;
+
+        RAISE NOTICE 'Finished creating notifications for task %', NEW.id;
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on tasks table for notifications
+    CREATE TRIGGER trg_notify_task_update
+    AFTER UPDATE ON tasks
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_update();
+  `;
+
+  // Trigger function for task assignment removal notifications
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_task_assignment_removal()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        remover_first_name TEXT;
+        remover_last_name TEXT;
+        remover_full_name TEXT;
+        removed_assignee_first_name TEXT;
+        removed_assignee_last_name TEXT;
+        removed_assignee_full_name TEXT;
+        assignee_record RECORD;
+    BEGIN
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = OLD.task_id;
+
+        -- Get removed assignee name (bypass RLS)
+        SELECT first_name, last_name INTO removed_assignee_first_name, removed_assignee_last_name
+        FROM user_info
+        WHERE id = OLD.assignee_id;
+
+        IF removed_assignee_first_name IS NOT NULL AND removed_assignee_last_name IS NOT NULL THEN
+            removed_assignee_full_name := removed_assignee_first_name || ' ' || removed_assignee_last_name;
+        ELSE
+            removed_assignee_full_name := 'Someone';
+        END IF;
+
+        -- Get remover name from auth context
+        SELECT first_name, last_name INTO remover_first_name, remover_last_name
+        FROM user_info
+        WHERE id = auth.uid();
+
+        IF remover_first_name IS NOT NULL AND remover_last_name IS NOT NULL THEN
+            remover_full_name := remover_first_name || ' ' || remover_last_name;
+        ELSE
+            remover_full_name := 'Someone';
+        END IF;
+
+        -- Create notification for the removed assignee
+        IF OLD.assignee_id != auth.uid() THEN  -- Skip if they removed themselves
+            INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+            VALUES (
+                OLD.assignee_id,
+                'Task Assignee Removed',
+                remover_full_name || ' removed you from task: "' || task_title_var || '"',
+                'task_updated',
+                false,
+                NOW(),
+                NOW()
+            );
+        END IF;
+
+        -- Create notifications for remaining assignees about the removal
+        FOR assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = OLD.task_id
+              AND assignee_id != OLD.assignee_id  -- Skip the removed assignee
+              AND assignee_id != auth.uid()      -- Skip the remover if they're an assignee
+        LOOP
+            INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+            VALUES (
+                assignee_record.assignee_id,
+                'Task Assignee Removed',
+                remover_full_name || ' removed ' || removed_assignee_full_name || ' from task: "' || task_title_var || '"',
+                'task_updated',
+                false,
+                NOW(),
+                NOW()
+            );
+        END LOOP;
+
+        RETURN OLD;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_assignments table for removal notifications
+    CREATE TRIGGER trg_notify_task_assignment_removal
+    AFTER DELETE ON task_assignments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_assignment_removal();
+  `;
+
+  // Trigger function for task attachment notifications
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_task_attachment()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        uploader_first_name TEXT;
+        uploader_last_name TEXT;
+        uploader_full_name TEXT;
+        assignee_record RECORD;
+        file_name TEXT;
+    BEGIN
+        -- Extract file name from storage path
+        file_name := substring(NEW.storage_path from length('task-attachments/') + 1);
+
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = NEW.task_id;
+
+        -- Get uploader name (bypass RLS)
+        SELECT first_name, last_name INTO uploader_first_name, uploader_last_name
+        FROM user_info
+        WHERE id = NEW.uploaded_by;
+
+        IF uploader_first_name IS NOT NULL AND uploader_last_name IS NOT NULL THEN
+            uploader_full_name := uploader_first_name || ' ' || uploader_last_name;
+        ELSE
+            uploader_full_name := 'Someone';
+        END IF;
+
+        -- Create notifications for all assignees except the uploader
+        FOR assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = NEW.task_id
+        LOOP
+            -- Skip the uploader
+            IF assignee_record.assignee_id != NEW.uploaded_by THEN
+                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                VALUES (
+                    assignee_record.assignee_id,
+                    'Attachment Added',
+                    uploader_full_name || ' attached a file "' || file_name || '" to task: "' || task_title_var || '"',
+                    'task_updated',
+                    false,
+                    NOW(),
+                    NOW()
+                );
+            END IF;
+        END LOOP;
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_attachments table for notifications
+    CREATE TRIGGER trg_notify_task_attachment
+    AFTER INSERT ON task_attachments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_attachment();
+  `;
+
+  // Trigger function for task attachment removal notifications
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_task_attachment_removal()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        remover_first_name TEXT;
+        remover_last_name TEXT;
+        remover_full_name TEXT;
+        assignee_record RECORD;
+        file_name TEXT;
+    BEGIN
+        -- Extract file name from storage path
+        file_name := substring(OLD.storage_path from length('task-attachments/') + 1);
+
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = OLD.task_id;
+
+        -- Get remover name from auth context
+        SELECT first_name, last_name INTO remover_first_name, remover_last_name
+        FROM user_info
+        WHERE id = auth.uid();
+
+        IF remover_first_name IS NOT NULL AND remover_last_name IS NOT NULL THEN
+            remover_full_name := remover_first_name || ' ' || remover_last_name;
+        ELSE
+            remover_full_name := 'Someone';
+        END IF;
+
+        -- Create notifications for all assignees except the remover
+        FOR assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = OLD.task_id
+        LOOP
+            -- Skip the remover
+            IF assignee_record.assignee_id != auth.uid() THEN
+                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                VALUES (
+                    assignee_record.assignee_id,
+                    'Attachment Removed',
+                    remover_full_name || ' removed a file "' || file_name || '" from task: "' || task_title_var || '"',
+                    'task_updated',
+                    false,
+                    NOW(),
+                    NOW()
+                );
+            END IF;
+        END LOOP;
+
+        RETURN OLD;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_attachments table for removal notifications
+    CREATE TRIGGER trg_notify_task_attachment_removal
+    AFTER DELETE ON task_attachments
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_attachment_removal();
+  `;
+
+  // Trigger function for task tag addition notifications
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_task_tag_add()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        adder_first_name TEXT;
+        adder_last_name TEXT;
+        adder_full_name TEXT;
+        tag_name_var TEXT;
+        assignee_record RECORD;
+    BEGIN
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = NEW.task_id;
+
+        -- Get tag name (bypass RLS)
+        SELECT name INTO tag_name_var
+        FROM tags
+        WHERE id = NEW.tag_id;
+
+        -- Get adder name from auth context
+        SELECT first_name, last_name INTO adder_first_name, adder_last_name
+        FROM user_info
+        WHERE id = auth.uid();
+
+        IF adder_first_name IS NOT NULL AND adder_last_name IS NOT NULL THEN
+            adder_full_name := adder_first_name || ' ' || adder_last_name;
+        ELSE
+            adder_full_name := 'Someone';
+        END IF;
+
+        -- Create notifications for all assignees except the adder
+        FOR assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = NEW.task_id
+        LOOP
+            -- Skip the adder
+            IF assignee_record.assignee_id != auth.uid() THEN
+                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                VALUES (
+                    assignee_record.assignee_id,
+                    'Tag Added',
+                    adder_full_name || ' added tag "' || tag_name_var || '" to task: "' || task_title_var || '"',
+                    'task_updated',
+                    false,
+                    NOW(),
+                    NOW()
+                );
+            END IF;
+        END LOOP;
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_tags table for tag addition notifications
+    CREATE TRIGGER trg_notify_task_tag_add
+    AFTER INSERT ON task_tags
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_tag_add();
+  `;
+
+  // Trigger function for task tag removal notifications
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_task_tag_remove()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        task_title_var TEXT;
+        remover_first_name TEXT;
+        remover_last_name TEXT;
+        remover_full_name TEXT;
+        tag_name_var TEXT;
+        assignee_record RECORD;
+    BEGIN
+        -- Get task title (bypass RLS)
+        SELECT title INTO task_title_var
+        FROM tasks
+        WHERE id = OLD.task_id;
+
+        -- Get tag name (bypass RLS)
+        SELECT name INTO tag_name_var
+        FROM tags
+        WHERE id = OLD.tag_id;
+
+        -- Get remover name from auth context
+        SELECT first_name, last_name INTO remover_first_name, remover_last_name
+        FROM user_info
+        WHERE id = auth.uid();
+
+        IF remover_first_name IS NOT NULL AND remover_last_name IS NOT NULL THEN
+            remover_full_name := remover_first_name || ' ' || remover_last_name;
+        ELSE
+            remover_full_name := 'Someone';
+        END IF;
+
+        -- Create notifications for all assignees except the remover
+        FOR assignee_record IN
+            SELECT assignee_id
+            FROM task_assignments
+            WHERE task_id = OLD.task_id
+        LOOP
+            -- Skip the remover
+            IF assignee_record.assignee_id != auth.uid() THEN
+                INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                VALUES (
+                    assignee_record.assignee_id,
+                    'Tag Removed',
+                    remover_full_name || ' removed tag "' || tag_name_var || '" from task: "' || task_title_var || '"',
+                    'task_updated',
+                    false,
+                    NOW(),
+                    NOW()
+                );
+            END IF;
+        END LOOP;
+
+        RETURN OLD;
+    END;
+    $$;
+  `;
+
+  await sql`
+    -- Create the trigger on task_tags table for tag removal notifications
+    CREATE TRIGGER trg_notify_task_tag_remove
+    AFTER DELETE ON task_tags
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_tag_remove();
+  `;
+
+  // Trigger function for task creation notifications (including subtasks)
+  await sql`
+    CREATE OR REPLACE FUNCTION notify_task_creation()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+        creator_first_name TEXT;
+        creator_last_name TEXT;
+        creator_full_name TEXT;
+        parent_task_title TEXT;
+        parent_task_exists BOOLEAN;
+        assignee_record RECORD;
+    BEGIN
+        -- Check if we should create notifications:
+        -- 1. On INSERT when parent_task_id is not null
+        -- 2. On UPDATE when parent_task_id changes from null to not null
+        -- 3. On UPDATE when parent_task_id changes from one value to another
+
+        IF TG_OP = 'INSERT' AND NEW.parent_task_id IS NOT NULL THEN
+            -- INSERT case: creating a task as a subtask
+            NULL; -- Continue with notification creation
+        ELSIF TG_OP = 'UPDATE' AND OLD.parent_task_id IS NULL AND NEW.parent_task_id IS NOT NULL THEN
+            -- UPDATE case: task becomes a subtask
+            NULL; -- Continue with notification creation
+        ELSIF TG_OP = 'UPDATE' AND OLD.parent_task_id IS NOT NULL AND NEW.parent_task_id IS NOT NULL AND OLD.parent_task_id != NEW.parent_task_id THEN
+            -- UPDATE case: parent task changes
+            NULL; -- Continue with notification creation
+        ELSE
+            -- No notification needed
+            RETURN NEW;
+        END IF;
+
+        -- Get creator name (bypass RLS)
+        SELECT first_name, last_name INTO creator_first_name, creator_last_name
+        FROM user_info
+        WHERE id = NEW.creator_id;
+
+        IF creator_first_name IS NOT NULL AND creator_last_name IS NOT NULL THEN
+            creator_full_name := creator_first_name || ' ' || creator_last_name;
+        ELSE
+            creator_full_name := 'Someone';
+        END IF;
+
+        -- Check if this is a subtask (has parent_task_id) AND parent task exists
+        IF NEW.parent_task_id IS NOT NULL THEN
+            -- Verify that the parent task actually exists
+            SELECT EXISTS(SELECT 1 FROM tasks WHERE id = NEW.parent_task_id) INTO parent_task_exists;
+
+            -- Only create notifications if parent task exists
+            IF parent_task_exists = TRUE THEN
+                -- Get parent task title (bypass RLS)
+                SELECT title INTO parent_task_title
+                FROM tasks
+                WHERE id = NEW.parent_task_id;
+
+                -- Create notifications for all assignees of the parent task
+                FOR assignee_record IN
+                    SELECT assignee_id
+                    FROM task_assignments
+                    WHERE task_id = NEW.parent_task_id
+                LOOP
+                    -- Skip the creator if they're also an assignee on the parent task
+                    IF assignee_record.assignee_id != NEW.creator_id THEN
+                        INSERT INTO notifications (user_id, title, message, type, read, created_at, updated_at)
+                        VALUES (
+                            assignee_record.assignee_id,
+                            'Sub-task Created',
+                            'Sub-task "' || NEW.title || '" was added to "' || COALESCE(parent_task_title, 'Unknown Parent') || '"',
+                            'task_updated',
+                            false,
+                            NOW(),
+                            NOW()
+                        );
+                    END IF;
+                END LOOP;
+            END IF;
+        END IF;
+
+        RETURN NEW;
+    END;
+    $$;
+  `;
+
+  // Create the trigger on tasks table for creation notifications (including subtasks)
+  await sql`DROP TRIGGER IF EXISTS trg_notify_task_creation ON tasks`;
+
+  await sql`
+    CREATE TRIGGER trg_notify_task_creation
+    AFTER INSERT OR UPDATE ON tasks
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_task_creation();
+  `;
+
+  // Drop existing function first, then recreate it
+  await sql`DROP FUNCTION IF EXISTS create_task_with_assignment CASCADE`;
+
+  // Create RPC function to create task with assignment in a single transaction
+  await sql`
+    CREATE FUNCTION create_task_with_assignment(
+      p_task_title TEXT,
+      p_creator_id UUID,
+      p_project_id BIGINT,
+      p_assignee_id UUID,
+      p_task_description TEXT DEFAULT NULL,
+      p_priority_bucket INT DEFAULT 5,
+      p_assignor_id UUID DEFAULT NULL
+    )
+    RETURNS TABLE(task_id BIGINT, task_title TEXT)
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+      new_task_id BIGINT;
+      task_title_param TEXT := p_task_title;
+      task_description_param TEXT := p_task_description;
+      creator_id_param UUID := p_creator_id;
+      project_id_param BIGINT := p_project_id;
+      priority_bucket_param INT := p_priority_bucket;
+      assignee_id_param UUID := p_assignee_id;
+      assignor_id_param UUID := COALESCE(p_assignor_id, p_assignee_id);
+    BEGIN
+      -- Insert the task first
+      INSERT INTO tasks (title, description, creator_id, project_id, priority_bucket, status)
+      VALUES (task_title_param, task_description_param, creator_id_param, project_id_param, priority_bucket_param, 'To Do')
+      RETURNING tasks.id INTO new_task_id;
+
+      -- Then insert the assignment
+      INSERT INTO task_assignments (task_id, assignee_id, assignor_id)
+      VALUES (new_task_id, assignee_id_param, assignor_id_param);
+
+      -- Return the created task info
+      RETURN QUERY SELECT new_task_id as task_id, task_title_param as task_title;
+    END;
+    $$;
   `;
 }
 

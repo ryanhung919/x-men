@@ -18,7 +18,7 @@ vi.mock("@/lib/db/notifs", () => ({
   getUnreadCount: vi.fn(),
   markNotificationAsRead: vi.fn(),
   markAllAsRead: vi.fn(),
-  deleteNotification: vi.fn(),
+  archiveNotification: vi.fn(),
 }));
 
 let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
@@ -166,18 +166,23 @@ describe("app/actions/notifs", () => {
   });
 
   describe("deleteNotificationAction", () => {
-    it("should delete notification for authenticated user", async () => {
+    it("should archive notification for authenticated user", async () => {
+      const archivedNotification = {
+        ...notificationsFixtures.aliceTaskAssigned,
+        is_archived: true,
+      };
+
       mockSupabaseClient.auth.getUser = vi.fn().mockResolvedValue({
         data: { user: { id: authUsersFixtures.alice.id } },
         error: null,
       });
 
-      vi.spyOn(notifsDb, "deleteNotification").mockResolvedValue(true);
+      vi.spyOn(notifsDb, "archiveNotification").mockResolvedValue(archivedNotification);
 
       const result = await deleteNotificationAction(1);
 
-      expect(notifsDb.deleteNotification).toHaveBeenCalledWith(1);
-      expect(result).toBe(true);
+      expect(notifsDb.archiveNotification).toHaveBeenCalledWith(1);
+      expect(result).toEqual(archivedNotification);
     });
 
     it("should throw error when user is not authenticated", async () => {
@@ -187,7 +192,7 @@ describe("app/actions/notifs", () => {
       });
 
       await expect(deleteNotificationAction(1)).rejects.toThrow("Unauthorized");
-      expect(notifsDb.deleteNotification).not.toHaveBeenCalled();
+      expect(notifsDb.archiveNotification).not.toHaveBeenCalled();
     });
   });
 });

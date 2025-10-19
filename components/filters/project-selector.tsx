@@ -63,7 +63,7 @@ export function ProjectSelector({
             WebkitBackdropFilter: 'none',
           }}
         >
-          <div className="max-h-[300px] overflow-y-auto">
+          <div className="max-h-[500px] overflow-y-auto">
             {projects.length === 0 ? (
               <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                 {loading ? 'Loading projects...' : 'No projects available'}
