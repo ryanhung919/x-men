@@ -8,11 +8,17 @@ if (typeof File === 'undefined') {
   global.File = class File extends Blob {
     name: string;
     lastModified: number;
+    type: string;
 
     constructor(bits: BlobPart[], name: string, options?: FilePropertyBag) {
       super(bits, options);
       this.name = name;
+      this.type = options?.type || '';
       this.lastModified = options?.lastModified ?? Date.now();
+    }
+
+    get [Symbol.toStringTag]() {
+      return 'File';
     }
   } as any;
 }

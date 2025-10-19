@@ -90,9 +90,14 @@ export async function POST(request: NextRequest) {
     const maxTotalSize = 50 * 1024 * 1024; // 50MB in bytes
 
     for (const [key, value] of formData.entries()) {
-      if (key.startsWith('file_') && value instanceof File) {
-        files.push(value);
-        totalSize += value.size;
+      // Check for File-like objects (works with both native File and polyfills)
+      const isFile = value instanceof File ||
+                     (typeof value === 'object' && value !== null &&
+                      'name' in value && 'size' in value && 'type' in value);
+
+      if (key.startsWith('file_') && isFile) {
+        files.push(value as File);
+        totalSize += (value as File).size;
       }
     }
 
