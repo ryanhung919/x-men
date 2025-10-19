@@ -355,12 +355,23 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(201);
     expect(data.success).toBe(true);
+
+    // Verify createTask was called with correct arguments
     expect(createTask).toHaveBeenCalledWith(
       mockSupabaseClient,
       expect.anything(),
       mockUser.id,
-      expect.arrayContaining([mockFile1, mockFile2])
+      expect.any(Array)
     );
+
+    // Verify the files array has correct properties
+    const callArgs = (createTask as any).mock.calls[0];
+    const filesArray = callArgs[3];
+    expect(filesArray).toHaveLength(2);
+    expect(filesArray[0]).toHaveProperty('name', 'test1.pdf');
+    expect(filesArray[0]).toHaveProperty('type', 'application/pdf');
+    expect(filesArray[1]).toHaveProperty('name', 'test2.pdf');
+    expect(filesArray[1]).toHaveProperty('type', 'application/pdf');
   });
 
   it('should return 400 if total file size exceeds 50MB', async () => {
