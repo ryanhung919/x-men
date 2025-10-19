@@ -5,6 +5,20 @@ import { authUsersFixtures } from '@/__tests__/fixtures/database.fixtures';
 import { CreateTaskPayload } from '@/lib/types/task-creation';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+// Polyfill File API for Node.js environment
+if (typeof File === 'undefined') {
+  global.File = class File extends Blob {
+    name: string;
+    lastModified: number;
+
+    constructor(bits: BlobPart[], name: string, options?: FilePropertyBag) {
+      super(bits, options);
+      this.name = name;
+      this.lastModified = options?.lastModified ?? Date.now();
+    }
+  } as any;
+}
+
 // Mock the Supabase client module
 let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 

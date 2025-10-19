@@ -3,6 +3,20 @@ import { POST, GET } from '@/app/api/tasks/route';
 import { createTask, getAllUsers, getAllProjects } from '@/lib/db/tasks';
 import { NextRequest } from 'next/server';
 
+// Polyfill File API for Node.js environment
+if (typeof File === 'undefined') {
+  global.File = class File extends Blob {
+    name: string;
+    lastModified: number;
+
+    constructor(bits: BlobPart[], name: string, options?: FilePropertyBag) {
+      super(bits, options);
+      this.name = name;
+      this.lastModified = options?.lastModified ?? Date.now();
+    }
+  } as any;
+}
+
 // Mock the database functions
 vi.mock('@/lib/db/tasks', () => ({
   createTask: vi.fn(),
