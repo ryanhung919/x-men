@@ -950,7 +950,7 @@ export const task_assignments = [
 export const task_attachments = [
   {
     task_title: 'Design budget dashboard layout',
-    storage_path: 'task-attachments/1/design_doc.pdf',
+    storage_path: 'design_doc.pdf',
     uploaded_by: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     uploaded_at: new Date('2025-09-19T10:30:00+08:00'),
   },
@@ -962,7 +962,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Connect sales data source',
-    storage_path: 'task-attachments/3/etl_mapping.xlsx',
+    storage_path: 'etl_mapping.xlsx',
     uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     uploaded_at: new Date('2025-09-20T09:30:00+08:00'),
   },
@@ -974,7 +974,7 @@ export const task_attachments = [
   },
   {
     task_title: 'Design client onboarding forms',
-    storage_path: 'task-attachments/5/onboarding_forms.xlsx',
+    storage_path: 'onboarding_forms.xlsx',
     uploaded_by: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
     uploaded_at: new Date('2025-09-22T10:15:00+08:00'),
   },

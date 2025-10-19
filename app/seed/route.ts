@@ -686,6 +686,16 @@ async function enableRLS(sql: postgres.Sql) {
         RETURN TRUE;
       END IF;
 
+      -- 4. Users who are creators of tasks visible to me
+      IF EXISTS (
+        SELECT 1
+        FROM tasks t
+        WHERE t.creator_id = target_user_id
+          AND is_task_visible_to_user(t.id, user_uuid)
+      ) THEN
+        RETURN TRUE;
+      END IF;
+
       RETURN FALSE;
     END;
     $$;
