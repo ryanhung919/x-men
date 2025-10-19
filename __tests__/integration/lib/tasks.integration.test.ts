@@ -1,10 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integration.setup';
-import { getUserTasks, getTaskById } from '@/lib/db/tasks';
+import { getUserTasks, getTaskById, createTask, getAllUsers, getAllProjects } from '@/lib/db/tasks';
+import { CreateTaskPayload } from '@/lib/types/task-creation';
 
 // Mock the Supabase server client to use the admin client
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => adminClient),
+}));
+
+// Mock service role client (used in createTask)
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(() => adminClient),
 }));
 
 /**
@@ -719,6 +725,374 @@ describe('Tasks Integration Tests', () => {
         // Cleanup
         await adminClient.from('tasks').delete().eq('id', task.id);
       }
+    });
+  });
+
+  describe('Task Creation', () => {
+    let createdTaskIds: number[] = [];
+
+    beforeEach(() => {
+      createdTaskIds = [];
+    });
+
+    // Cleanup after each test
+    afterEach(async () => {
+      for (const taskId of createdTaskIds) {
+        try {
+          await adminClient.from('tasks').delete().eq('id', taskId);
+        } catch (error) {
+          console.error(`Failed to cleanup task ${taskId}:`, error);
+        }
+      }
+      createdTaskIds = [];
+    });
+
+    it('should create a task with minimum required fields', async () => {
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Integration Test Task',
+        description: 'Task created by integration test',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.mitch.id],
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      expect(taskId).toBeDefined();
+      expect(typeof taskId).toBe('number');
+
+      // Verify task was created
+      const { data: task, error } = await adminClient
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(task).toBeDefined();
+      expect(task?.title).toBe(payload.title);
+      expect(task?.description).toBe(payload.description);
+      expect(task?.priority_bucket).toBe(payload.priority_bucket);
+      expect(task?.status).toBe(payload.status);
+      expect(task?.creator_id).toBe(testUsers.joel.id);
+    });
+
+    it('should create task assignments for selected assignees only', async () => {
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Task with Multiple Assignees',
+        description: 'Testing multiple assignees',
+        priority_bucket: 6,
+        status: 'To Do',
+        assignee_ids: [testUsers.mitch.id, testUsers.garrison.id],
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      // Verify assignments
+      const { data: assignments, error } = await adminClient
+        .from('task_assignments')
+        .select('*')
+        .eq('task_id', taskId);
+
+      expect(error).toBeNull();
+      expect(assignments).toBeDefined();
+      expect(assignments?.length).toBe(2); // Only selected assignees, creator NOT auto-added
+
+      const assigneeIds = assignments?.map((a) => a.assignee_id) || [];
+      expect(assigneeIds).toContain(testUsers.mitch.id);
+      expect(assigneeIds).toContain(testUsers.garrison.id);
+      expect(assigneeIds).not.toContain(testUsers.joel.id); // Creator NOT auto-added
+    });
+
+    it('should not duplicate creator if already in assignees', async () => {
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Task with Creator as Assignee',
+        description: 'Creator is in assignees list',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.joel.id, testUsers.mitch.id], // Creator already included
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      const { data: assignments, error } = await adminClient
+        .from('task_assignments')
+        .select('*')
+        .eq('task_id', taskId);
+
+      expect(error).toBeNull();
+      expect(assignments?.length).toBe(2); // Creator should not be duplicated
+
+      const joelAssignments = assignments?.filter((a) => a.assignee_id === testUsers.joel.id);
+      expect(joelAssignments?.length).toBe(1);
+    });
+
+    it('should create task with tags', async () => {
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Task with Tags',
+        description: 'Testing tag creation',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.mitch.id],
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+        tags: ['integration-test', 'automated', 'temporary'],
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      // Verify tags were created
+      const { data: taskTags, error } = await adminClient
+        .from('task_tags')
+        .select('tags(name)')
+        .eq('task_id', taskId);
+
+      expect(error).toBeNull();
+      expect(taskTags).toBeDefined();
+      expect(taskTags?.length).toBe(3);
+
+      const tagNames = taskTags?.map((tt: any) => tt.tags.name) || [];
+      expect(tagNames).toContain('integration-test');
+      expect(tagNames).toContain('automated');
+      expect(tagNames).toContain('temporary');
+    });
+
+    it('should create recurring task', async () => {
+      const recurrenceDate = new Date('2025-10-20T00:00:00Z').toISOString();
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Recurring Integration Test Task',
+        description: 'This task recurs every 7 days',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.mitch.id],
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+        recurrence_interval: 7,
+        recurrence_date: recurrenceDate,
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      const { data: task, error } = await adminClient
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(task?.recurrence_interval).toBe(7);
+      // PostgreSQL may return timestamps in different formats (+00:00 vs .000Z)
+      expect(new Date(task?.recurrence_date || '').getTime()).toBe(new Date(recurrenceDate).getTime());
+    });
+
+    it('should enforce maximum 5 assignees', async () => {
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Task with Too Many Assignees',
+        description: 'Should fail validation',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [
+          testUsers.joel.id,
+          testUsers.mitch.id,
+          testUsers.garrison.id,
+          testUsers.ryan.id,
+          testUsers.kester.id,
+          testUsers.joelPersonal.id, // 6th assignee to exceed the limit
+        ],
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+      };
+
+      await expect(createTask(adminClient, payload, testUsers.joelPersonal.id)).rejects.toThrow(
+        'Cannot assign more than 5 users to a task'
+      );
+    });
+
+    it('should trigger project_departments update after task creation', async () => {
+      // Get a project and department that don't have a link yet
+      const { data: project } = await adminClient
+        .from('projects')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (!project) {
+        return;
+      }
+
+      const payload: CreateTaskPayload = {
+        project_id: project.id,
+        title: 'Task to Test Department Link',
+        description: 'Testing automatic project-department linking',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.mitch.id], // Mitch is in Finance Director department
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      // Verify project_departments link was created
+      const { data: userInfo } = await adminClient
+        .from('user_info')
+        .select('department_id')
+        .eq('id', testUsers.mitch.id)
+        .single();
+
+      const { data: projectDept, error } = await adminClient
+        .from('project_departments')
+        .select('*')
+        .eq('project_id', project.id)
+        .eq('department_id', userInfo?.department_id);
+
+      expect(error).toBeNull();
+      expect(projectDept).toBeDefined();
+      expect(projectDept?.length).toBeGreaterThan(0);
+    });
+
+    it('should validate task has at least 1 assignee (trigger test)', async () => {
+      // This test verifies the DEFERRABLE trigger works correctly
+      // The trigger should NOT fire during the stored procedure execution
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Task for Trigger Validation',
+        description: 'Should pass trigger validation',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.mitch.id],
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      expect(taskId).toBeDefined();
+
+      // Verify task and assignments exist
+      const { data: assignments } = await adminClient
+        .from('task_assignments')
+        .select('*')
+        .eq('task_id', taskId);
+
+      expect(assignments?.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should handle optional fields (notes, recurrence)', async () => {
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'Task with Optional Fields',
+        description: 'Testing optional fields',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.mitch.id],
+        deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
+        notes: 'These are some notes',
+        recurrence_interval: undefined,
+        recurrence_date: undefined,
+      };
+
+      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      createdTaskIds.push(taskId);
+
+      const { data: task, error } = await adminClient
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single();
+
+      expect(error).toBeNull();
+      expect(task?.notes).toBe('These are some notes');
+      expect(task?.recurrence_interval).toBe(0);
+      expect(task?.recurrence_date).toBeNull();
+    });
+  });
+
+  describe('getAllUsers', () => {
+    it('should return all users ordered by first name', async () => {
+      const users = await getAllUsers();
+
+      expect(users).toBeDefined();
+      expect(Array.isArray(users)).toBe(true);
+      expect(users.length).toBeGreaterThan(0);
+
+      // Verify structure
+      const firstUser = users[0];
+      expect(firstUser).toHaveProperty('id');
+      expect(firstUser).toHaveProperty('first_name');
+      expect(firstUser).toHaveProperty('last_name');
+
+      // Verify ordering
+      for (let i = 0; i < users.length - 1; i++) {
+        const current = users[i].first_name.toLowerCase();
+        const next = users[i + 1].first_name.toLowerCase();
+        expect(current <= next).toBe(true);
+      }
+    });
+
+    it('should include test users', async () => {
+      const users = await getAllUsers();
+      const userIds = users.map((u) => u.id);
+
+      expect(userIds).toContain(testUsers.joel.id);
+      expect(userIds).toContain(testUsers.mitch.id);
+    });
+  });
+
+  describe('getAllProjects', () => {
+    it('should return all non-archived projects ordered by name', async () => {
+      const projects = await getAllProjects();
+
+      expect(projects).toBeDefined();
+      expect(Array.isArray(projects)).toBe(true);
+      expect(projects.length).toBeGreaterThan(0);
+
+      // Verify structure
+      const firstProject = projects[0];
+      expect(firstProject).toHaveProperty('id');
+      expect(firstProject).toHaveProperty('name');
+
+      // Verify ordering
+      for (let i = 0; i < projects.length - 1; i++) {
+        const current = projects[i].name.toLowerCase();
+        const next = projects[i + 1].name.toLowerCase();
+        expect(current <= next).toBe(true);
+      }
+    });
+
+    it('should not include archived projects', async () => {
+      // Create an archived project
+      const { data: archivedProject } = await adminClient
+        .from('projects')
+        .insert({
+          name: 'Archived Integration Test Project',
+          is_archived: true,
+        })
+        .select()
+        .single();
+
+      if (!archivedProject) {
+        return;
+      }
+
+      const projects = await getAllProjects();
+      const projectIds = projects.map((p) => p.id);
+
+      expect(projectIds).not.toContain(archivedProject.id);
+
+      // Cleanup
+      await adminClient.from('projects').delete().eq('id', archivedProject.id);
     });
   });
 });

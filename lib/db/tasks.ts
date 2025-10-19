@@ -270,6 +270,9 @@ export async function getTaskById(taskId: number): Promise<{
  * The database trigger `update_project_departments` will automatically link
  * the task's project to the departments of the assignees.
  *
+ * NOTE: Only the users specified in assignee_ids will be assigned to the task.
+ * The creator is NOT automatically added as an assignee.
+ *
  * @param supabase - Authenticated Supabase client with user context (not currently used)
  * @param payload - The task creation payload with all task details
  * @param creatorId - The UUID of the user creating the task
@@ -288,7 +291,7 @@ export async function getTaskById(taskId: number): Promise<{
  *   assignee_ids: ["user-123", "user-456"],
  *   deadline: "2025-12-31T23:59:59Z",
  *   tags: ["frontend", "urgent"]
- * }, "user-123");
+ * }, "creator-user-id");
  */
 export async function createTask(
   supabase: SupabaseClient,
@@ -304,8 +307,8 @@ export async function createTask(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Prepare assignments (ensure creator is included)
-  const uniqueAssigneeIds = Array.from(new Set([creatorId, ...payload.assignee_ids]));
+  // Prepare assignments (use only the selected assignees)
+  const uniqueAssigneeIds = Array.from(new Set(payload.assignee_ids));
 
   // Validate assignee count (1-5)
   if (uniqueAssigneeIds.length > 5) {
@@ -412,13 +415,19 @@ export async function createTask(
  * Fetches all users from the database with their basic information.
  * Used for populating assignee selection dropdowns.
  *
+ * Uses service role client to bypass RLS and return all users in the organization.
+ *
  * @returns Array of user objects with id, first_name, and last_name
  * @throws {Error} If there's a database error
  */
 export async function getAllUsers(): Promise<RawAssignee[]> {
-  const supabase = await createClient();
+  // Use service role client to bypass RLS and get all users
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
-  const { data, error } = await supabase
+  const { data, error } = await serviceClient
     .from('user_info')
     .select('id, first_name, last_name')
     .order('first_name', { ascending: true });
@@ -434,13 +443,19 @@ export async function getAllUsers(): Promise<RawAssignee[]> {
  * Fetches all non-archived projects from the database.
  * Used for populating project selection dropdowns.
  *
+ * Uses service role client to bypass RLS and return all projects in the organization.
+ *
  * @returns Array of project objects with id and name
  * @throws {Error} If there's a database error
  */
 export async function getAllProjects(): Promise<{ id: number; name: string }[]> {
-  const supabase = await createClient();
+  // Use service role client to bypass RLS and get all projects
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
-  const { data, error } = await supabase
+  const { data, error } = await serviceClient
     .from('projects')
     .select('id, name')
     .eq('is_archived', false)
