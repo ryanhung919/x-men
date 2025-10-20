@@ -1,13 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getUserTasks, getTaskById } from '@/lib/db/tasks';
+import { getUserTasks, getTaskById, createTask, getAllUsers, getAllProjects } from '@/lib/db/tasks';
 import { createMockSupabaseClient } from '@/__tests__/mocks/supabase.mock';
 import { authUsersFixtures } from '@/__tests__/fixtures/database.fixtures';
+import { CreateTaskPayload } from '@/lib/types/task-creation';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+// Polyfill File API for Node.js environment
+if (typeof File === 'undefined') {
+  global.File = class File extends Blob {
+    name: string;
+    lastModified: number;
+    type: string;
+
+    constructor(bits: BlobPart[], name: string, options?: FilePropertyBag) {
+      super(bits, options);
+      this.name = name;
+      this.type = options?.type || '';
+      this.lastModified = options?.lastModified ?? Date.now();
+    }
+
+    get [Symbol.toStringTag]() {
+      return 'File';
+    }
+  } as any;
+}
 
 // Mock the Supabase client module
 let mockSupabaseClient: ReturnType<typeof createMockSupabaseClient>;
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => mockSupabaseClient),
+}));
+
+// Mock the service role client
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(() => mockSupabaseClient),
 }));
 
 describe('lib/db/tasks', () => {
@@ -31,6 +58,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [{ assignee_id: 'user1' }],
           tags: [{ tags: { name: 'urgent' } }],
         },
@@ -124,6 +152,16 @@ describe('lib/db/tasks', () => {
             select: attachmentsSelectMock,
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -159,6 +197,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -209,6 +248,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -236,6 +285,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -277,6 +327,16 @@ describe('lib/db/tasks', () => {
           }
         }
         if (table === 'task_attachments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === 'user_info') {
           return {
             select: vi.fn().mockReturnValue({
               in: vi.fn().mockResolvedValue({
@@ -345,6 +405,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -392,6 +462,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -462,6 +533,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -581,6 +653,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -605,6 +687,7 @@ describe('lib/db/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 7,
           recurrence_date: '2025-10-16T00:00:00.000Z',
+          creator_id: 'creator-1',
           task_assignments: [],
           tags: [],
         },
@@ -657,6 +740,16 @@ describe('lib/db/tasks', () => {
             }),
           };
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -686,6 +779,7 @@ describe('lib/db/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 7,
         recurrence_date: '2025-10-16T00:00:00.000Z',
+        creator_id: 'creator-1',
         task_assignments: [{ assignee_id: 'user1' }],
         tags: [{ tags: { name: 'urgent' } }],
       };
@@ -1016,6 +1110,16 @@ describe('lib/db/tasks', () => {
         if (table === 'task_comments') {
           return commentsFromMock();
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -1149,6 +1253,16 @@ describe('lib/db/tasks', () => {
         if (table === 'task_comments') {
           return commentsFromMock();
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -1265,6 +1379,16 @@ describe('lib/db/tasks', () => {
         if (table === 'task_comments') {
           return commentsFromMock();
         }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            }),
+          };
+        }
         return {};
       });
 
@@ -1275,6 +1399,527 @@ describe('lib/db/tasks', () => {
         expect(result.task.recurrence_interval).toBe(14);
         expect(result.task.recurrence_date).toBe('2025-10-16T00:00:00.000Z');
       }
+    });
+  });
+
+  describe('createTask', () => {
+    it('should create a task with assignments using stored procedure', async () => {
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+        notes: 'Some notes',
+        tags: ['tag1', 'tag2'],
+        recurrence_interval: 7,
+        recurrence_date: '2025-10-20T00:00:00Z',
+      };
+
+      // Mock RPC call for create_task_with_assignments
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      // Mock tags insert and select
+      const tagsInsertSelectMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      });
+
+      const tagsInsertMock = vi.fn().mockReturnValue({
+        select: tagsInsertSelectMock,
+      });
+
+      const tagsInMock = vi.fn().mockResolvedValue({
+        data: [
+          { id: 1, name: 'tag1' },
+          { id: 2, name: 'tag2' },
+        ],
+        error: null,
+      });
+
+      const tagsSelectMock = vi.fn().mockReturnValue({
+        in: tagsInMock,
+      });
+
+      const taskTagsInsertMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tags') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tags'
+          ).length;
+          if (callCount === 1 || callCount === 2) {
+            return {
+              insert: tagsInsertMock,
+            };
+          } else {
+            return {
+              select: tagsSelectMock,
+            };
+          }
+        }
+        if (table === 'task_tags') {
+          return {
+            insert: taskTagsInsertMock,
+          };
+        }
+        return {};
+      });
+
+      const result = await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId);
+
+      expect(result).toBe(taskId);
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'create_task_with_assignments',
+        expect.objectContaining({
+          p_title: payload.title,
+          p_description: payload.description,
+          p_priority_bucket: payload.priority_bucket,
+          p_status: payload.status,
+          p_deadline: payload.deadline,
+          p_notes: payload.notes,
+          p_project_id: payload.project_id,
+          p_creator_id: creatorId,
+          p_recurrence_interval: 7,
+          p_recurrence_date: payload.recurrence_date,
+          p_assignee_ids: ['user-456'], // Only the selected assignees
+        })
+      );
+    });
+
+    it('should use only selected assignees, not including creator', async () => {
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456', 'user-789'],
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId);
+
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'create_task_with_assignments',
+        expect.objectContaining({
+          p_assignee_ids: ['user-456', 'user-789'], // Only selected assignees, no creator
+        })
+      );
+    });
+
+    it('should deduplicate assignees if same user selected multiple times', async () => {
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456', 'user-456', 'user-789'], // Duplicate user-456
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId);
+
+      const call = (mockSupabaseClient.rpc as any).mock.calls[0][1];
+      const assigneeIds = call.p_assignee_ids;
+
+      expect(assigneeIds).toHaveLength(2); // Only 2 unique assignees
+      expect(assigneeIds.filter((id: string) => id === 'user-456')).toHaveLength(1);
+    });
+
+    it('should throw error if more than 5 assignees', async () => {
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-1', 'user-2', 'user-3', 'user-4', 'user-5', 'user-6'],
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      await expect(createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId)).rejects.toThrow(
+        'Cannot assign more than 5 users to a task'
+      );
+    });
+
+    it('should handle task creation without tags', async () => {
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      const result = await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId);
+
+      expect(result).toBe(taskId);
+      expect(mockSupabaseClient.from).not.toHaveBeenCalledWith('tags');
+    });
+
+    it('should handle task creation with null notes and recurrence_date', async () => {
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+        notes: undefined,
+        recurrence_date: undefined,
+      };
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId);
+
+      expect(mockSupabaseClient.rpc).toHaveBeenCalledWith(
+        'create_task_with_assignments',
+        expect.objectContaining({
+          p_notes: null,
+          p_recurrence_date: null,
+        })
+      );
+    });
+
+    it('should throw error if RPC call fails', async () => {
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Database error' },
+      });
+
+      await expect(createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId)).rejects.toThrow(
+        'Failed to create task: Database error'
+      );
+    });
+
+    it('should upload file attachments to storage', async () => {
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      const uploadMock = vi.fn().mockResolvedValue({ error: null });
+      const attachmentInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+      (mockSupabaseClient as any).storage = {
+        from: vi.fn().mockReturnValue({
+          upload: uploadMock,
+        }),
+      };
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'task_attachments') {
+          return {
+            insert: attachmentInsertMock,
+          };
+        }
+        return {};
+      });
+
+      const result = await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId, [mockFile]);
+
+      expect(result).toBe(taskId);
+      expect(uploadMock).toHaveBeenCalled();
+      expect(attachmentInsertMock).toHaveBeenCalledWith({
+        task_id: taskId,
+        storage_path: expect.stringContaining('tasks/123/'),
+        uploaded_by: creatorId,
+      });
+    });
+
+    it('should continue with other files if one upload fails', async () => {
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      const mockFile1 = new File(['test content 1'], 'test1.pdf', { type: 'application/pdf' });
+      const mockFile2 = new File(['test content 2'], 'test2.pdf', { type: 'application/pdf' });
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      const uploadMock = vi
+        .fn()
+        .mockResolvedValueOnce({ error: { message: 'Upload failed' } })
+        .mockResolvedValueOnce({ error: null });
+
+      const attachmentInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+      (mockSupabaseClient as any).storage = {
+        from: vi.fn().mockReturnValue({
+          upload: uploadMock,
+        }),
+      };
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'task_attachments') {
+          return {
+            insert: attachmentInsertMock,
+          };
+        }
+        return {};
+      });
+
+      const result = await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId, [mockFile1, mockFile2]);
+
+      expect(result).toBe(taskId);
+      expect(uploadMock).toHaveBeenCalledTimes(2);
+      expect(attachmentInsertMock).toHaveBeenCalledTimes(1); // Only second file succeeded
+    });
+  });
+
+  describe('getAllUsers', () => {
+    it('should fetch all users ordered by first name', async () => {
+      const mockUsers = [
+        { id: 'user-1', first_name: 'Alice', last_name: 'Smith' },
+        { id: 'user-2', first_name: 'Bob', last_name: 'Jones' },
+        { id: 'user-3', first_name: 'Charlie', last_name: 'Brown' },
+      ];
+
+      const orderMock = vi.fn().mockResolvedValue({
+        data: mockUsers,
+        error: null,
+      });
+
+      const selectMock = vi.fn().mockReturnValue({
+        order: orderMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: selectMock,
+      });
+
+      const result = await getAllUsers();
+
+      expect(result).toEqual(mockUsers);
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('user_info');
+      expect(selectMock).toHaveBeenCalledWith('id, first_name, last_name');
+      expect(orderMock).toHaveBeenCalledWith('first_name', { ascending: true });
+    });
+
+    it('should throw error when fetch fails', async () => {
+      const mockError = { message: 'Database connection failed' };
+
+      const orderMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: mockError,
+      });
+
+      const selectMock = vi.fn().mockReturnValue({
+        order: orderMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: selectMock,
+      });
+
+      await expect(getAllUsers()).rejects.toThrow('Failed to fetch users: Database connection failed');
+    });
+
+    it('should handle empty user list', async () => {
+      const orderMock = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+
+      const selectMock = vi.fn().mockReturnValue({
+        order: orderMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: selectMock,
+      });
+
+      const result = await getAllUsers();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getAllProjects', () => {
+    it('should fetch all non-archived projects ordered by name', async () => {
+      const mockProjects = [
+        { id: 1, name: 'Project A' },
+        { id: 2, name: 'Project B' },
+        { id: 3, name: 'Project C' },
+      ];
+
+      const orderMock = vi.fn().mockResolvedValue({
+        data: mockProjects,
+        error: null,
+      });
+
+      const eqMock = vi.fn().mockReturnValue({
+        order: orderMock,
+      });
+
+      const selectMock = vi.fn().mockReturnValue({
+        eq: eqMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: selectMock,
+      });
+
+      const result = await getAllProjects();
+
+      expect(result).toEqual(mockProjects);
+      expect(mockSupabaseClient.from).toHaveBeenCalledWith('projects');
+      expect(selectMock).toHaveBeenCalledWith('id, name');
+      expect(eqMock).toHaveBeenCalledWith('is_archived', false);
+      expect(orderMock).toHaveBeenCalledWith('name', { ascending: true });
+    });
+
+    it('should exclude archived projects', async () => {
+      const mockProjects = [
+        { id: 1, name: 'Active Project' },
+        { id: 2, name: 'Another Active Project' },
+      ];
+
+      const orderMock = vi.fn().mockResolvedValue({
+        data: mockProjects,
+        error: null,
+      });
+
+      const eqMock = vi.fn().mockReturnValue({
+        order: orderMock,
+      });
+
+      const selectMock = vi.fn().mockReturnValue({
+        eq: eqMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: selectMock,
+      });
+
+      await getAllProjects();
+
+      expect(eqMock).toHaveBeenCalledWith('is_archived', false);
+    });
+
+    it('should throw error when fetch fails', async () => {
+      const mockError = { message: 'Database connection failed' };
+
+      const orderMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: mockError,
+      });
+
+      const eqMock = vi.fn().mockReturnValue({
+        order: orderMock,
+      });
+
+      const selectMock = vi.fn().mockReturnValue({
+        eq: eqMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: selectMock,
+      });
+
+      await expect(getAllProjects()).rejects.toThrow('Failed to fetch projects: Database connection failed');
+    });
+
+    it('should handle empty projects list', async () => {
+      const orderMock = vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      });
+
+      const eqMock = vi.fn().mockReturnValue({
+        order: orderMock,
+      });
+
+      const selectMock = vi.fn().mockReturnValue({
+        eq: eqMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockReturnValue({
+        select: selectMock,
+      });
+
+      const result = await getAllProjects();
+
+      expect(result).toEqual([]);
     });
   });
 });

@@ -10,6 +10,7 @@ export type RawTask = {
   parent_task_id: number | null;
   recurrence_interval: number;
   recurrence_date: string | null;
+  creator_id: string;
   task_assignments: { assignee_id: string }[];
   tags: { tags: { name: string } }[];
 };
@@ -52,6 +53,7 @@ export type Task = {
   recurrence_interval: number;
   recurrence_date: string | null;
   project: { id: number; name: string };
+  creator: { creator_id: string; user_info: { first_name: string; last_name: string } };
   subtasks: { id: number; title: string; status: string; deadline: string | null }[];
   assignees: { assignee_id: string; user_info: { first_name: string; last_name: string } }[];
   tags: string[];
@@ -88,7 +90,7 @@ export type DetailedTask = Omit<Task, 'attachments'> & {
  * const mappedTask = mapTaskAttributes(rawTask);
  * console.log(`Priority: ${mappedTask.priority}, Overdue: ${mappedTask.isOverdue}`);
  */
-export function mapTaskAttributes(task: RawTask): Omit<Task, 'subtasks' | 'assignees' | 'attachments'> {
+export function mapTaskAttributes(task: RawTask): Omit<Task, 'subtasks' | 'assignees' | 'attachments' | 'creator'> {
   const isOverdue = task.deadline ? new Date(task.deadline) < new Date() && task.status !== 'Completed' : false;
 
   return {
@@ -215,6 +217,16 @@ export function formatTasks(
 
   return rawData.tasks.map((task) => {
     const mappedTask = mapTaskAttributes(task);
+
+    // Map creator info
+    const creatorUser = userInfoMap.get(task.creator_id);
+    const creator = {
+      creator_id: task.creator_id,
+      user_info: creatorUser
+        ? { first_name: creatorUser.first_name, last_name: creatorUser.last_name }
+        : { first_name: 'Unknown', last_name: 'User' },
+    };
+
     const assignees = task.task_assignments.map((a) => {
       const user = userInfoMap.get(a.assignee_id);
       return {
@@ -234,6 +246,7 @@ export function formatTasks(
 
     return {
       ...mappedTask,
+      creator,
       subtasks: formattedSubtasks,
       assignees,
       attachments: (attachmentsMap.get(task.id) || []).map((a) => a.storage_path),
@@ -287,6 +300,15 @@ export function formatTaskDetails(
     rawData.assignees.map((user) => [user.id, user])
   );
 
+  // Map creator info
+  const creatorUser = userInfoMap.get(rawData.task.creator_id);
+  const creator = {
+    creator_id: rawData.task.creator_id,
+    user_info: creatorUser
+      ? { first_name: creatorUser.first_name, last_name: creatorUser.last_name }
+      : { first_name: 'Unknown', last_name: 'User' },
+  };
+
   const assignees = rawData.task.task_assignments.map((a) => ({
     assignee_id: a.assignee_id,
     user_info: userInfoMap.get(a.assignee_id) || {
@@ -317,6 +339,7 @@ export function formatTaskDetails(
 
   return {
     ...mappedTask,
+    creator,
     subtasks: formattedSubtasks,
     assignees,
     attachments: rawData.attachments,

@@ -71,6 +71,7 @@ async function teardownSchema(sql: postgres.Sql) {
   await sql`DROP FUNCTION IF EXISTS get_task_assignees_info(bigint[]) CASCADE`;
   await sql`DROP FUNCTION IF EXISTS user_has_role(uuid, text) CASCADE`;
   await sql`DROP FUNCTION IF EXISTS is_admin(uuid) CASCADE`;
+  await sql`DROP FUNCTION IF EXISTS create_task_with_assignments(VARCHAR, TEXT, INT, VARCHAR, TIMESTAMPTZ, TEXT, BIGINT, UUID, INT, TIMESTAMPTZ, UUID[]) CASCADE`;
 
   // Order matters: drop dependent tables first
   await sql`DROP TABLE IF EXISTS task_comments CASCADE`;
@@ -685,6 +686,16 @@ async function enableRLS(sql: postgres.Sql) {
         RETURN TRUE;
       END IF;
 
+      -- 4. Users who are creators of tasks visible to me
+      IF EXISTS (
+        SELECT 1
+        FROM tasks t
+        WHERE t.creator_id = target_user_id
+          AND is_task_visible_to_user(t.id, user_uuid)
+      ) THEN
+        RETURN TRUE;
+      END IF;
+
       RETURN FALSE;
     END;
     $$;
@@ -733,6 +744,54 @@ async function enableRLS(sql: postgres.Sql) {
         WHERE ta.task_id = ANY(task_ids)
           AND is_task_visible_to_user(ta.task_id, auth.uid());
       $$;
+  `;
+
+  // Create stored procedure to create a task with assignments in a single transaction
+  // This ensures the deferred trigger waits for all inserts before checking
+  await sql`
+    CREATE OR REPLACE FUNCTION create_task_with_assignments(
+      p_title VARCHAR(255),
+      p_description TEXT,
+      p_priority_bucket INT,
+      p_status VARCHAR(15),
+      p_deadline TIMESTAMPTZ,
+      p_notes TEXT,
+      p_project_id BIGINT,
+      p_creator_id UUID,
+      p_recurrence_interval INT,
+      p_recurrence_date TIMESTAMPTZ,
+      p_assignee_ids UUID[]
+    )
+    RETURNS BIGINT
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    AS $$
+    DECLARE
+      v_task_id BIGINT;
+      v_assignee_id UUID;
+    BEGIN
+      -- Insert the task
+      INSERT INTO tasks (
+        title, description, priority_bucket, status, deadline, notes,
+        project_id, creator_id, recurrence_interval, recurrence_date
+      )
+      VALUES (
+        p_title, p_description, p_priority_bucket, p_status, p_deadline, p_notes,
+        p_project_id, p_creator_id, p_recurrence_interval, p_recurrence_date
+      )
+      RETURNING id INTO v_task_id;
+
+      -- Insert task assignments
+      FOREACH v_assignee_id IN ARRAY p_assignee_ids
+      LOOP
+        INSERT INTO task_assignments (task_id, assignee_id, assignor_id)
+        VALUES (v_task_id, v_assignee_id, p_creator_id);
+      END LOOP;
+
+      -- Return the task ID
+      RETURN v_task_id;
+    END;
+    $$;
   `;
 
   //User Info: Users can see colleagues in their department
@@ -1096,18 +1155,30 @@ USING (
   `;
 
   // Task Assignments: Users can assign assignees to tasks
+  // Allows task creators to add assignments (for NEW tasks) OR users to add assignments to existing tasks in their department
   await sql`
     CREATE POLICY "Users can assign other users for tasks in their department"
     ON task_assignments
     FOR INSERT
     WITH CHECK (
       assignor_id = auth.uid()
-      AND EXISTS (
-        SELECT 1
-        FROM tasks t
-        JOIN project_departments pd ON pd.project_id = t.project_id
-        WHERE t.id = task_assignments.task_id
-          AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
+      AND (
+        -- Allow task creator to add assignments (they own the task)
+        EXISTS (
+          SELECT 1
+          FROM tasks t
+          WHERE t.id = task_assignments.task_id
+            AND t.creator_id = auth.uid()
+        )
+        OR
+        -- Allow users to add assignments if project is already linked to their department
+        EXISTS (
+          SELECT 1
+          FROM tasks t
+          JOIN project_departments pd ON pd.project_id = t.project_id
+          WHERE t.id = task_assignments.task_id
+            AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
+        )
       )
     )
   `;

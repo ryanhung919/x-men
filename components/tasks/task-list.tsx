@@ -235,6 +235,7 @@ export default function TasksList({ tasks }: TasksListProps) {
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
+              <TableHead>Creator</TableHead>
               <TableHead>
                 <Button
                   variant="ghost"
@@ -263,7 +264,7 @@ export default function TasksList({ tasks }: TasksListProps) {
           <TableBody>
             {tasksWithNextDue.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No tasks match the current filters.
                 </TableCell>
               </TableRow>
@@ -322,6 +323,18 @@ export default function TasksList({ tasks }: TasksListProps) {
                           </AvatarFallback>
                         </Avatar>
                       )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6 border-2 border-background">
+                        <AvatarFallback className="text-xs bg-secondary/50 text-secondary-foreground">
+                          {`${task.creator.user_info.first_name[0]}${task.creator.user_info.last_name[0]}`.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">
+                        {task.creator.user_info.first_name} {task.creator.user_info.last_name}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className={task.isOverdue ? 'text-destructive' : ''}>
