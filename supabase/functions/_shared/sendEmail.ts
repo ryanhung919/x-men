@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck: SendGrid API types not fully typed in Deno environment
 export async function sendEmail({ to, from, subject, content, isHtml}: {
   to: string
   from: string
