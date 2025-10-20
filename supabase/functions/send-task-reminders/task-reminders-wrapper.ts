@@ -43,19 +43,19 @@ async function getUserEmail(
   supabaseUrl: string,
   serviceRoleKey: string
 ): Promise<string | null> {
-  // ✅ Validate config before using
+  // Validate config before using
   if (!supabaseUrl || supabaseUrl === "undefined") {
-    console.error("❌ Invalid supabaseUrl:", supabaseUrl);
+    console.error("Invalid supabaseUrl:", supabaseUrl);
     return null;
   }
 
   if (!serviceRoleKey || serviceRoleKey === "undefined") {
-    console.error("❌ Invalid serviceRoleKey");
+    console.error("Invalid serviceRoleKey");
     return null;
   }
 
   const url = `${supabaseUrl}/auth/v1/admin/users/${userId}`;
-  console.log(`📧 Fetching email for user ${userId}`);
+  console.log(`Fetching email for user ${userId}`);
 
   try {
     const res = await fetch(url, {
@@ -100,7 +100,7 @@ export async function sendTaskReminders(
   supabaseConfig: SupabaseConfig
 ): Promise<SendTaskRemindersResult> {
   try {
-    // ✅ Validate config is provided
+    // Validate config is provided
     if (!supabaseConfig) {
       throw new Error(
         "supabaseConfig is required - must include url and serviceRoleKey"
@@ -151,7 +151,7 @@ export async function sendTaskReminders(
     for (const task of tasks as Task[]) {
       // Skip invalid tasks
       if (task.is_archived) {
-        console.log(`⏭️  Skipping archived task: ${task.title}`);
+        console.log(`Skipping archived task: ${task.title}`);
         continue;
       }
 
@@ -159,12 +159,12 @@ export async function sendTaskReminders(
         task.status?.toLowerCase() === "completed" ||
         task.status?.toLowerCase() === "done"
       ) {
-        console.log(`⏭️  Skipping completed task: ${task.title}`);
+        console.log(`Skipping completed task: ${task.title}`);
         continue;
       }
 
       if (!task.deadline) {
-        console.log(`⏭️  Skipping task with no deadline: ${task.title}`);
+        console.log(`Skipping task with no deadline: ${task.title}`);
         continue;
       }
 
@@ -275,12 +275,12 @@ export async function sendTaskReminders(
       );
 
       if (taskAssignees.length === 0) {
-        console.log(`⏭️  No assignees for task: ${task.title}`);
+        console.log(`No assignees for task: ${task.title}`);
         continue;
       }
 
       for (const assignment of taskAssignees) {
-        // ✅ Use passed config (required, not optional)
+        // Use passed config (required, not optional)
         const email = await getUserEmail(
           assignment.assignee_id,
           supabaseConfig.url,
@@ -289,7 +289,7 @@ export async function sendTaskReminders(
 
         if (!email) {
           console.warn(
-            `⚠️  Could not fetch email for assignee ${assignment.assignee_id} on task ${task.id}`
+            `Could not fetch email for assignee ${assignment.assignee_id} on task ${task.id}`
           );
           continue;
         }
@@ -314,11 +314,11 @@ export async function sendTaskReminders(
           });
 
           console.log(
-            `✅ Email sent to ${email} for task "${task.title}" (${reminderType})`
+            `Email sent to ${email} for task "${task.title}" (${reminderType})`
           );
         } catch (emailErr) {
           console.error(
-            `❌ Failed to send email to ${email} for task ${task.id}:`,
+            `Failed to send email to ${email} for task ${task.id}:`,
             emailErr instanceof Error ? emailErr.message : emailErr
           );
           // Continue to next assignment even if this one fails
@@ -326,10 +326,10 @@ export async function sendTaskReminders(
       }
     }
 
-    console.log(`\n📊 Task Reminder Summary: ${sentCount} reminders sent`);
+    console.log(`\nTask Reminder Summary: ${sentCount} reminders sent`);
     return { success: true, sent: sentCount, emailsSent };
   } catch (err) {
-    console.error("❌ Error in sendTaskReminders:", err);
+    console.error("Error in sendTaskReminders:", err);
     throw err;
   }
 }

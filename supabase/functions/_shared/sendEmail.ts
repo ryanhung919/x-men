@@ -26,11 +26,11 @@ export async function sendEmail({ to, from, subject, content, isHtml}: {
   });
 
   const text = await res.text();
-  console.log("📨 SendGrid response:", res.status, text);
+  console.log("SendGrid response:", res.status, text);
 
   if (!res.ok) {
     throw new Error(`SendGrid error ${res.status}: ${text}`);
   }
 
-  return `✅ SendGrid accepted (status ${res.status})`;
+  return `SendGrid accepted (status ${res.status})`;
 }
