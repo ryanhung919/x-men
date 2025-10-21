@@ -21,7 +21,7 @@ export default defineConfig({
       '__tests__/unit/components/**', // Exclude component tests from unit config
       '__tests__/integration/**',
       '__tests__/e2e/**',
-      "__tests__/deno/**",
+      "__tests__/unit/supabase/**",
     ],
     coverage: {
       provider: 'v8',

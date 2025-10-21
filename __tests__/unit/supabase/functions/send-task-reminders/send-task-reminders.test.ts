@@ -1,7 +1,7 @@
 //@ts-ignore
 import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.208.0/assert/mod.ts";
 //@ts-ignore
-import { sendTaskReminders } from "../../../supabase/functions/send-task-reminders/task-reminders-wrapper.ts";
+import { sendTaskReminders } from "../../../../../supabase/functions/send-task-reminders/task-reminders-wrapper.js";
 
 // Helper to create mock Supabase client
 function createMockSupabase(tasks: any[], assignments: any[]) {
