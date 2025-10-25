@@ -50,6 +50,7 @@ export default defineConfig({
         'supabase/functions/',
         'components/ui',
       ],
+      reportsDirectory: 'coverage/component',
     },
     testTimeout: 10000,
     hookTimeout: 10000,

@@ -46,8 +46,8 @@ export default defineConfig({
         'app/(dashboard)/',
         'components/',
         'supabase/functions/',
-
       ],
+      reportsDirectory: 'coverage/integration',
     },
     testTimeout: 30000, // 30 second timeout for integration tests
     hookTimeout: 120000, // 2 minute timeout for setup/teardown hooks

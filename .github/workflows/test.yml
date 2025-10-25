@@ -76,11 +76,11 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v2.5.4  
+          deno-version: v2.5.4
 
       - name: Run Deno unit tests
         run: pnpm test:unit:deno
-      
+
       - name: Upload Deno test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -88,6 +88,7 @@ jobs:
           name: deno-test-results
           path: coverage/deno
           retention-days: 7
+          if-no-files-found: warn
 
   component-tests:
     name: Component Tests (happy-dom)
