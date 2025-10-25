@@ -266,7 +266,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [unit-tests, component-tests, integration-tests]
+    needs: [unit-tests, deno-unit-tests, component-tests, integration-tests]
     if: always()
 
     steps:
@@ -279,6 +279,12 @@ jobs:
             echo "**Unit Tests (Node)**: Passed" >> $GITHUB_STEP_SUMMARY
           else
             echo "**Unit Tests (Node)**: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.deno-unit-tests.result }}" == "success" ]; then
+            echo "**Unit Tests (Deno)**: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Unit Tests (Deno)**: Failed" >> $GITHUB_STEP_SUMMARY
           fi
 
           if [ "${{ needs.component-tests.result }}" == "success" ]; then
@@ -299,6 +305,11 @@ jobs:
         run: |
           if [ "${{ needs.unit-tests.result }}" != "success" ]; then
             echo "Unit tests (Node) failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.deno-unit-tests.result }}" != "success" ]; then
+            echo "Unit tests (Deno) failed"
             exit 1
           fi
 
