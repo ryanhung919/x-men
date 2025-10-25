@@ -6,7 +6,7 @@ View our deployed website using Vercel -here-
 
 ## Prerequisites
 
-- Node.js 18+ (LTS recommended)
+- Node.js 20+ (LTS recommended)
 - pnpm 10+ (repo is pinned to pnpm and uses a lockfile)
 - A Supabase project with the following environment variables configured locally:
 	- NEXT_PUBLIC_SUPABASE_URL
