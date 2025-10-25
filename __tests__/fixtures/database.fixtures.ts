@@ -1,3 +1,5 @@
+import { createSGTDateRange } from './helpers/timezone-helper';
+
 /* --------------------- AUTH USERS --------------------- */
 export const authUsersFixtures = {
   alice: { 
@@ -19,6 +21,14 @@ export const authUsersFixtures = {
   eve: { 
     id: '55555555-5555-5555-5555-555555555555', 
     email: 'eve@example.com' 
+  },
+  frank: { 
+    id: '66666666-6666-6666-6666-666666666666', 
+    email: null 
+  },
+  grace: { 
+    id: '77777777-7777-7777-7777-777777777777', 
+    email: 'grace@example.com' 
   },
 };
 
@@ -105,6 +115,22 @@ export const user_info = [
     default_view: 'tasks', 
     department_id: departmentsFixtures.hr.id 
   },
+  { 
+    id: authUsersFixtures.frank.id, 
+    first_name: 'Frank', 
+    last_name: 'Miller', 
+    mode: 'light', 
+    default_view: 'tasks', 
+    department_id: departmentsFixtures.engineering.id 
+  },
+  { 
+    id: authUsersFixtures.grace.id, 
+    first_name: 'Grace', 
+    last_name: 'Lee', 
+    mode: 'light', 
+    default_view: 'tasks', 
+    department_id: departmentsFixtures.finance.id 
+  },
 ];
 
 /* --------------------- ROLES --------------------- */
@@ -121,6 +147,8 @@ export const user_roles = [
   { user_id: authUsersFixtures.carol.id, role: 'staff' },
   { user_id: authUsersFixtures.dave.id, role: 'staff' },
   { user_id: authUsersFixtures.eve.id, role: 'staff' },
+  { user_id: authUsersFixtures.frank.id, role: 'staff' }, 
+  { user_id: authUsersFixtures.grace.id, role: 'staff' }, 
 ];
 
 /* --------------------- PROJECTS --------------------- */
@@ -195,7 +223,7 @@ export const tasksFixtures = {
     status: 'To Do',
     creator_id: authUsersFixtures.alice.id,
     project_id: projectsFixtures.alpha.id,
-    deadline: new Date('2024-02-01'),
+    deadline: createSGTDateRange().yesterday,
     notes: '',
     parent_task_id: null,
     recurrence_interval: 0,
@@ -213,7 +241,7 @@ export const tasksFixtures = {
     status: 'In Progress',
     creator_id: authUsersFixtures.bob.id,
     project_id: projectsFixtures.alpha.id,
-    deadline: new Date('2024-02-05'),
+    deadline: createSGTDateRange().today,
     notes: '',
     parent_task_id: null,
     recurrence_interval: 0,
@@ -231,7 +259,7 @@ export const tasksFixtures = {
     status: 'Completed',
     creator_id: authUsersFixtures.carol.id,
     project_id: projectsFixtures.beta.id,
-    deadline: new Date('2024-02-10'),
+    deadline: createSGTDateRange().tomorrow,
     notes: '',
     parent_task_id: null,
     recurrence_interval: 7,
@@ -249,7 +277,7 @@ export const tasksFixtures = {
     status: 'To Do',
     creator_id: authUsersFixtures.dave.id,
     project_id: projectsFixtures.beta.id,
-    deadline: new Date('2024-02-15'),
+    deadline: createSGTDateRange().in14Days,
     notes: '',
     parent_task_id: null,
     recurrence_interval: 0,
@@ -267,7 +295,7 @@ export const tasksFixtures = {
     status: 'In Progress',
     creator_id: authUsersFixtures.eve.id,
     project_id: projectsFixtures.epsilon.id,
-    deadline: new Date('2024-02-20'),
+    deadline: createSGTDateRange().in15Days,
     notes: '',
     parent_task_id: null,
     recurrence_interval: 0,
@@ -276,6 +304,101 @@ export const tasksFixtures = {
     is_archived: false,
     created_at: new Date('2024-01-14'),
     updated_at: new Date('2024-01-14'),
+  },
+  // ARCHIVED TASK - should NOT appear in reminders
+  clientPortalMigration: {
+    id: 6,
+    title: 'Migrate client portal to new platform',
+    description: 'Move all client data and configurations to new system',
+    priority_bucket: 5,
+    status: 'To Do',
+    creator_id: authUsersFixtures.alice.id,
+    project_id: projectsFixtures.gamma.id,
+    deadline: createSGTDateRange().today,
+    notes: '',
+    parent_task_id: null,
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 0,
+    is_archived: true, // ARCHIVED - should be skipped
+    created_at: new Date('2024-01-15'),
+    updated_at: new Date('2024-01-15'),
+  },
+  // COMPLETED TASK - should NOT send reminders
+  apiDocumentation: {
+    id: 7,
+    title: 'Write API documentation',
+    description: 'Create comprehensive API reference guide',
+    priority_bucket: 5,
+    status: 'Completed',
+    creator_id: authUsersFixtures.bob.id,
+    project_id: projectsFixtures.delta.id,
+    deadline: createSGTDateRange().today,
+    notes: '',
+    parent_task_id: null,
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 0,
+    is_archived: false,
+    created_at: new Date('2024-01-16'),
+    updated_at: new Date('2024-01-16'),
+  },
+  // NO DEADLINE - should be skipped
+  performanceReview: {
+    id: 8,
+    title: 'Conduct team performance reviews',
+    description: 'Annual performance evaluation for all team members',
+    priority_bucket: 5,
+    status: 'In Progress',
+    creator_id: authUsersFixtures.carol.id,
+    project_id: projectsFixtures.epsilon.id,
+    deadline: null, // NO DEADLINE - should be skipped
+    notes: '',
+    parent_task_id: null,
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 0,
+    is_archived: false,
+    created_at: new Date('2024-01-17'),
+    updated_at: new Date('2024-01-17'),
+  },
+  // TASK FOR MULTI-ASSIGNEE TESTING
+  dataIntegration: {
+    id: 9,
+    title: 'Integrate third-party data sources',
+    description: 'Connect analytics, CRM, and accounting platforms',
+    priority_bucket: 9,
+    status: 'In Progress',
+    creator_id: authUsersFixtures.alice.id,
+    project_id: projectsFixtures.alpha.id,
+    deadline: createSGTDateRange().tomorrow,
+    notes: '',
+    parent_task_id: null,
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 0,
+    is_archived: false,
+    created_at: new Date('2024-01-18'),
+    updated_at: new Date('2024-01-18'),
+  },
+  // NEW: Task due tomorrow with active status (for reminder testing)
+  designReview: {
+    id: 10,
+    title: 'Review and approve design specifications',
+    description: 'Validate design mockups and approve for development',
+    priority_bucket: 5,
+    status: 'In Progress', 
+    creator_id: authUsersFixtures.dave.id,
+    project_id: projectsFixtures.alpha.id,
+    deadline: createSGTDateRange().tomorrow,
+    notes: '',
+    parent_task_id: null,
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 0,
+    is_archived: false,
+    created_at: new Date('2024-01-18'),
+    updated_at: new Date('2024-01-18'),
   },
 };
 
@@ -326,6 +449,43 @@ export const task_assignments = [
     assignee_id: authUsersFixtures.alice.id, 
     assignor_id: authUsersFixtures.eve.id, 
     created_at: new Date('2024-01-14') 
+  },
+  // NEW: Assignment to user with no email (frank)
+  { 
+    id: 6, 
+    task_id: tasksFixtures.clientPortalMigration.id, 
+    assignee_id: authUsersFixtures.frank.id, 
+    assignor_id: authUsersFixtures.bob.id, 
+    created_at: new Date('2024-01-16') 
+  },
+  // NEW: Multi-assignee for team project
+  { 
+    id: 7, 
+    task_id: tasksFixtures.apiDocumentation.id, 
+    assignee_id: authUsersFixtures.alice.id, 
+    assignor_id: authUsersFixtures.alice.id, 
+    created_at: new Date('2024-01-18') 
+  },
+  { 
+    id: 8, 
+    task_id: tasksFixtures.performanceReview.id, 
+    assignee_id: authUsersFixtures.grace.id, 
+    assignor_id: authUsersFixtures.alice.id, 
+    created_at: new Date('2024-01-18') 
+  },
+  { 
+    id: 9, 
+    task_id: tasksFixtures.dataIntegration.id, 
+    assignee_id: authUsersFixtures.bob.id, 
+    assignor_id: authUsersFixtures.alice.id, 
+    created_at: new Date('2024-01-18') 
+  },
+  { 
+    id: 10, 
+    task_id: tasksFixtures.designReview.id, 
+    assignee_id: authUsersFixtures.dave.id, 
+    assignor_id: authUsersFixtures.alice.id, 
+    created_at: new Date('2024-01-18') 
   },
 ];
 

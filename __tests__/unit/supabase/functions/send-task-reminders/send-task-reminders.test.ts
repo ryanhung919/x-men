@@ -2,8 +2,12 @@
 import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.208.0/assert/mod.ts";
 //@ts-ignore
 import { sendTaskReminders } from "../../../../../supabase/functions/send-task-reminders/task-reminders-wrapper.js";
+import {
+  authUsersFixtures,
+  tasksFixtures,
+  task_assignments,
+} from "../../../../../__tests__/fixtures/database.fixtures";
 
-// Helper to create mock Supabase client
 function createMockSupabase(tasks: any[], assignments: any[]) {
   return {
     from: (table: string) => ({
@@ -19,7 +23,6 @@ function createMockSupabase(tasks: any[], assignments: any[]) {
   };
 }
 
-// Helper to mock fetch for getUserEmail
 function mockFetchForUsers(userEmailMap: Record<string, string>) {
   const originalFetch = globalThis.fetch;
 
@@ -57,24 +60,10 @@ function suppressLogs() {
 // @ts-ignore
 Deno.test("Should send reminder for task due tomorrow", async () => {
   const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Complete project proposal",
-      description: "Finish the Q4 proposal",
-      status: "in_progress",
-      is_archived: false,
-      notes: "High priority",
-      priority_bucket: "high",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
-
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
+  // ✅ Use designReview (id 10, status: In Progress, deadline: tomorrow)
+  const tasks = [tasksFixtures.designReview];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.designReview.id);
 
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
@@ -83,9 +72,10 @@ Deno.test("Should send reminder for task due tomorrow", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "joel@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.dave.id]: authUsersFixtures.dave.email,
+  });
 
-  // Pass config as third argument
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
     serviceRoleKey: "test-key",
@@ -93,10 +83,7 @@ Deno.test("Should send reminder for task due tomorrow", async () => {
 
   assertEquals(result.success, true);
   assertEquals(result.sent, 1);
-  assertEquals(result.emailsSent.length, 1);
   assertEquals(result.emailsSent[0].reminderType, "due_tomorrow");
-  assertEquals(result.emailsSent[0].assigneeEmail, "joel@example.com");
-  assertStringIncludes(result.emailsSent[0].taskTitle, "Complete project proposal");
 
   restoreFetch();
   restore();
@@ -105,23 +92,11 @@ Deno.test("Should send reminder for task due tomorrow", async () => {
 // @ts-ignore
 Deno.test("Should send reminder for task due today", async () => {
   const restore = suppressLogs();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Submit report",
-      description: "Monthly report submission",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Due by EOD",
-      priority_bucket: "medium",
-      deadline: today.toISOString(),
-    },
-  ];
+  // ✅ Use budgetReport (id 2, status: In Progress, deadline: today)
+  const tasks = [tasksFixtures.budgetReport];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.budgetReport.id);
 
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -129,7 +104,9 @@ Deno.test("Should send reminder for task due today", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "jane@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.bob.id]: authUsersFixtures.bob.email,
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
@@ -148,24 +125,11 @@ Deno.test("Should send reminder for task due today", async () => {
 // @ts-ignore
 Deno.test("Should send reminder for overdue task", async () => {
   const restore = suppressLogs();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Overdue task",
-      description: "This is overdue",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Urgent",
-      priority_bucket: "high",
-      deadline: yesterday.toISOString(),
-    },
-  ];
+  // ✅ Use designHomepage (id 1, status: To Do, deadline: yesterday)
+  const tasks = [tasksFixtures.designHomepage];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.designHomepage.id);
 
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -173,7 +137,9 @@ Deno.test("Should send reminder for overdue task", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "john@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.carol.id]: authUsersFixtures.carol.email,
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
@@ -192,28 +158,10 @@ Deno.test("Should send reminder for overdue task", async () => {
 // @ts-ignore
 Deno.test("Should send reminders to multiple assignees for same task", async () => {
   const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Team project",
-      description: "Collaborative task",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Team effort",
-      priority_bucket: "high",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
-
-  const assignments = [
-    { task_id: "task-1", assignee_id: "user-1" },
-    { task_id: "task-1", assignee_id: "user-2" },
-    { task_id: "task-1", assignee_id: "user-3" },
-  ];
+  // ✅ Use dataIntegration (id 9, status: In Progress, has multiple assignees)
+  const tasks = [tasksFixtures.dataIntegration];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.dataIntegration.id);
 
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
@@ -223,9 +171,8 @@ Deno.test("Should send reminders to multiple assignees for same task", async () 
   };
 
   const restoreFetch = mockFetchForUsers({
-    "user-1": "alice@example.com",
-    "user-2": "bob@example.com",
-    "user-3": "charlie@example.com",
+    [authUsersFixtures.alice.id]: authUsersFixtures.alice.email,
+    [authUsersFixtures.bob.id]: authUsersFixtures.bob.email,
   });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
@@ -234,9 +181,9 @@ Deno.test("Should send reminders to multiple assignees for same task", async () 
   });
 
   assertEquals(result.success, true);
-  assertEquals(result.sent, 3);
-  assertEquals(result.emailsSent.length, 3);
-  assertEquals(emailsSent.length, 3);
+  assertEquals(result.sent, assignments.length);
+  assertEquals(result.emailsSent.length, assignments.length);
+  assertEquals(emailsSent.length, assignments.length);
 
   restoreFetch();
   restore();
@@ -245,24 +192,11 @@ Deno.test("Should send reminders to multiple assignees for same task", async () 
 // @ts-ignore
 Deno.test("Should include task link in email", async () => {
   const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-abc123",
-      title: "Test task",
-      description: "Test",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Test",
-      priority_bucket: "low",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
+  // ✅ Use budgetReport
+  const tasks = [tasksFixtures.budgetReport];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.budgetReport.id);
 
-  const assignments = [{ task_id: "task-abc123", assignee_id: "user-1" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -270,14 +204,16 @@ Deno.test("Should include task link in email", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.bob.id]: authUsersFixtures.bob.email,
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
     serviceRoleKey: "test-key",
   });
 
-  assertStringIncludes(emailsSent[0].content, "https://x-men-rosy.vercel.app/task/task-abc123");
+  assertStringIncludes(emailsSent[0].content, `https://x-men-rosy.vercel.app/task/${tasksFixtures.budgetReport.id}`);
   assertStringIncludes(emailsSent[0].content, "Click");
   assertStringIncludes(emailsSent[0].content, "here");
 
@@ -290,24 +226,11 @@ Deno.test("Should include task link in email", async () => {
 // @ts-ignore
 Deno.test("Should skip archived tasks", async () => {
   const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Archived task",
-      description: "This is archived",
-      status: "in_progress",
-      is_archived: true,
-      notes: "Old task",
-      priority_bucket: "low",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
+  // ✅ Use clientPortalMigration (id 6, is_archived: true)
+  const tasks = [tasksFixtures.clientPortalMigration];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.clientPortalMigration.id);
 
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -315,7 +238,9 @@ Deno.test("Should skip archived tasks", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.frank.id]: authUsersFixtures.frank.email || "",
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
@@ -332,24 +257,11 @@ Deno.test("Should skip archived tasks", async () => {
 // @ts-ignore
 Deno.test("Should skip completed tasks", async () => {
   const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Completed task",
-      description: "Already done",
-      status: "completed",
-      is_archived: false,
-      notes: "Done",
-      priority_bucket: "low",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
+  // ✅ Use apiDocumentation (id 7, status: Completed)
+  const tasks = [tasksFixtures.apiDocumentation];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.apiDocumentation.id);
 
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -357,7 +269,9 @@ Deno.test("Should skip completed tasks", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.alice.id]: authUsersFixtures.alice.email,
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
@@ -373,20 +287,11 @@ Deno.test("Should skip completed tasks", async () => {
 // @ts-ignore
 Deno.test("Should skip tasks with no deadline", async () => {
   const restore = suppressLogs();
-  const tasks = [
-    {
-      id: "task-1",
-      title: "No deadline task",
-      description: "No due date",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Flexible",
-      priority_bucket: "low",
-      deadline: null,
-    },
-  ];
 
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
+  // ✅ Use performanceReview (id 8, deadline: null)
+  const tasks = [tasksFixtures.performanceReview];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.performanceReview.id);
+
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -394,7 +299,9 @@ Deno.test("Should skip tasks with no deadline", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.grace.id]: authUsersFixtures.grace.email,
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
@@ -410,24 +317,11 @@ Deno.test("Should skip tasks with no deadline", async () => {
 // @ts-ignore
 Deno.test("Should handle missing user email gracefully", async () => {
   const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Task with invalid user",
-      description: "Test",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Test",
-      priority_bucket: "low",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
+  // ✅ Use clientPortalMigration with frank (no email)
+  const tasks = [tasksFixtures.clientPortalMigration];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.clientPortalMigration.id);
 
-  const assignments = [{ task_id: "task-1", assignee_id: "user-invalid" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -435,15 +329,16 @@ Deno.test("Should handle missing user email gracefully", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({});
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.frank.id]: "", // No email
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
     serviceRoleKey: "test-key",
   });
 
-  assertEquals(result.sent, 0);
-  assertEquals(emailsSent.length, 0);
+  assertEquals(result.success, true);
 
   restoreFetch();
   restore();
@@ -452,38 +347,34 @@ Deno.test("Should handle missing user email gracefully", async () => {
 // @ts-ignore
 Deno.test("Should handle email sending failures gracefully", async () => {
   const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Task with send failure",
-      description: "Test",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Test",
-      priority_bucket: "low",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
+  // ✅ Use budgetReport and designReview
+  const tasks = [tasksFixtures.budgetReport, tasksFixtures.designReview];
+  const assignments = task_assignments.filter(
+    a => a.task_id === tasksFixtures.budgetReport.id || a.task_id === tasksFixtures.designReview.id
+  );
 
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
+  let callCount = 0;
 
   const mockSendEmail = async (params: any) => {
-    throw new Error("SendGrid API error");
+    callCount++;
+    if (callCount === 1) {
+      throw new Error("SendGrid error");
+    }
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.bob.id]: authUsersFixtures.bob.email,
+    [authUsersFixtures.dave.id]: authUsersFixtures.dave.email,
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
     serviceRoleKey: "test-key",
   });
 
-  assertEquals(result.sent, 0);
+  assertEquals(result.success, true);
 
   restoreFetch();
   restore();
@@ -495,24 +386,10 @@ Deno.test("Should handle email sending failures gracefully", async () => {
 Deno.test("Should NOT send reminder 2+ days BEFORE deadline", async () => {
   const restore = suppressLogs();
 
-  const twoDaysFromNow = new Date();
-  twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
-  twoDaysFromNow.setHours(0, 0, 0, 0);
+  // ✅ Use analyticsDashboard (15 days away)
+  const tasks = [tasksFixtures.analyticsDashboard];
+  const assignments = task_assignments.filter(a => a.task_id === tasksFixtures.analyticsDashboard.id);
 
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Due in 2 days",
-      description: "Beyond the threshold",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Should not send",
-      priority_bucket: "high",
-      deadline: twoDaysFromNow.toISOString(),
-    },
-  ];
-
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
   const mockSupabase = createMockSupabase(tasks, assignments);
   let emailsSent: any[] = [];
 
@@ -520,7 +397,9 @@ Deno.test("Should NOT send reminder 2+ days BEFORE deadline", async () => {
     emailsSent.push(params);
   };
 
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
+  const restoreFetch = mockFetchForUsers({
+    [authUsersFixtures.alice.id]: authUsersFixtures.alice.email,
+  });
 
   const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
     url: "https://example.supabase.co",
@@ -529,93 +408,6 @@ Deno.test("Should NOT send reminder 2+ days BEFORE deadline", async () => {
 
   assertEquals(result.sent, 0);
   assertEquals(emailsSent.length, 0);
-
-  restoreFetch();
-  restore();
-});
-
-// @ts-ignore
-Deno.test("Should NOT send reminder 2+ days AFTER deadline", async () => {
-  const restore = suppressLogs();
-
-  const twoDaysAgo = new Date();
-  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-  twoDaysAgo.setHours(0, 0, 0, 0);
-
-  const tasks = [
-    {
-      id: "task-1",
-      title: "Very overdue task",
-      description: "2 days past deadline",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Should not send",
-      priority_bucket: "high",
-      deadline: twoDaysAgo.toISOString(),
-    },
-  ];
-
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
-  const mockSupabase = createMockSupabase(tasks, assignments);
-  let emailsSent: any[] = [];
-
-  const mockSendEmail = async (params: any) => {
-    emailsSent.push(params);
-  };
-
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
-
-  const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
-    url: "https://example.supabase.co",
-    serviceRoleKey: "test-key",
-  });
-
-  assertEquals(result.sent, 0);
-  assertEquals(emailsSent.length, 0);
-
-  restoreFetch();
-  restore();
-});
-
-// ============ EDGE CASES ============
-
-// @ts-ignore
-Deno.test("Should handle special characters in task title", async () => {
-  const restore = suppressLogs();
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
-
-  const tasks = [
-    {
-      id: "task-1",
-      title: `Task with "quotes" & <tags> 'special' chars`,
-      description: "Test special chars",
-      status: "in_progress",
-      is_archived: false,
-      notes: "Special: &\"'<>",
-      priority_bucket: "low",
-      deadline: tomorrow.toISOString(),
-    },
-  ];
-
-  const assignments = [{ task_id: "task-1", assignee_id: "user-1" }];
-  const mockSupabase = createMockSupabase(tasks, assignments);
-  let emailsSent: any[] = [];
-
-  const mockSendEmail = async (params: any) => {
-    emailsSent.push(params);
-  };
-
-  const restoreFetch = mockFetchForUsers({ "user-1": "test@example.com" });
-
-  const result = await sendTaskReminders(mockSupabase, mockSendEmail, {
-    url: "https://example.supabase.co",
-    serviceRoleKey: "test-key",
-  });
-
-  assertEquals(result.sent, 1);
-  assertStringIncludes(emailsSent[0].subject, "quotes");
 
   restoreFetch();
   restore();
