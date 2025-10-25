@@ -22,6 +22,7 @@ export default defineConfig({
       '__tests__/unit/supabase/**',
       '__tests__/integration/**',
       '__tests__/e2e/**',
+      "__tests__/unit/supabase/**",
     ],
     coverage: {
       provider: 'v8',
