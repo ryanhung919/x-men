@@ -32,7 +32,7 @@ export async function updateSession(request: NextRequest) {
 
   // Check route types
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
-  const isPublicRoute = request.nextUrl.pathname === '/'
+  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/seed'
   const isReportRoute = request.nextUrl.pathname.startsWith('/report')
 
   // Redirect to login if not authenticated (except for API, public routes)
