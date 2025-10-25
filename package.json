@@ -11,7 +11,7 @@
     "test": "pnpm test:unit && pnpm test:component && pnpm test:integration:dev",
     "test:unit": "vitest run --config vitest.config.unit.ts --coverage",
     "test:component": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' vitest run --config vitest.config.component.ts --coverage",
-    "test:unit:deno": "deno test __tests__/unit/supabase/functions/ --allow-env --allow-net --coverage",
+    "test:unit:deno": "deno test __tests__/unit/supabase/functions/ --allow-env --allow-net --coverage=coverage/deno && deno coverage coverage/deno --lcov --output=coverage/deno/lcov.info",
     "test:integration": "vitest run --config vitest.config.integration.ts --coverage",
     "test:integration:dev": "concurrently --kill-others --success first \"pnpm dev\" \"wait-on http://localhost:3000 && pnpm test:integration\"",
     "test:watch": "vitest --watch",
