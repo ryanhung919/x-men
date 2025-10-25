@@ -19,13 +19,40 @@ export default defineConfig({
       '**/dist/**',
       '**/.next/**',
       '__tests__/unit/components/**', // Exclude component tests from unit config
+      '__tests__/unit/supabase/**',
       '__tests__/integration/**',
       '__tests__/e2e/**',
     ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/', '__tests__/', '*.config.{js,ts}', '.next/'],
+      exclude: [
+        //Base
+        'node_modules/',
+        '__tests__/',
+        '.next/',
+        'scripts/',
+        'middleware.ts',
+        '**/error.tsx',
+        '**/loading.tsx',
+        '**/layout.tsx',
+        '**/page.tsx',
+
+        // Config files
+        '**/*.config.{js,ts,mjs,cjs}',
+        '**/vitest.config.*.{js,ts,mjs,cjs}',
+        '**/next-env.d.ts',
+
+        // Not meant for coverage in this testing config
+        'lib/sample-data.ts',
+        'lib/utils.ts',
+        'lib/types/',
+        'app/api/health/',
+        'app/seed/',
+        'app/(dashboard)/',
+        'components/',
+        'supabase/functions/',
+      ],
     },
     testTimeout: 8000,
   },

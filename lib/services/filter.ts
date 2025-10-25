@@ -6,7 +6,14 @@ import {
   Department,
 } from '@/lib/db/filter';
 
-// Service function: applies business rules, handles errors, and adapts results for consumers
+/**
+ * Service function: applies business rules, handles errors, and adapts results for consumers
+ * Retrieves an array of Project objects, filtered by the given department IDs.
+ * If no department IDs are provided, returns all available projects for the user (sorted alphabetically).
+ * @param {string} userId - The ID of the user to filter projects for.
+ * @param {number[]} [departmentIds] - Optional array of department IDs to filter by.
+ * @returns {Promise<Project[]>} - A promise resolving to an array of Project objects.
+ */
 export async function filterProjects(
   userId: string,
   departmentIds?: number[]
@@ -57,6 +64,14 @@ export async function filterProjects(
   }
 }
 
+/**
+ * Service function: applies business rules, handles errors, and adapts results for consumers
+ * Retrieves an array of Department objects, filtered by the given project IDs.
+ * If no project IDs are provided, returns all available departments for the user (sorted alphabetically).
+ * @param {string} userId - The ID of the user to filter departments for.
+ * @param {number[]} [projectIds] - Optional array of project IDs to filter by.
+ * @returns {Promise<Department[]>} - A promise resolving to an array of Department objects.
+ */
 export async function filterDepartments(
   userId: string,
   projectIds?: number[]
