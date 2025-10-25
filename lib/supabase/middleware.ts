@@ -33,45 +33,7 @@ export async function updateSession(request: NextRequest) {
   // Check route types
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
   const isPublicRoute = request.nextUrl.pathname === '/'
-  const isSeedRoute = request.nextUrl.pathname === '/seed'
   const isReportRoute = request.nextUrl.pathname.startsWith('/report')
-
-  // SEED ROUTE PROTECTION - Development & CI Only
-  if (isSeedRoute) {
-    const isDevelopment = process.env.NODE_ENV === 'development'
-    const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true'
-    
-    // Block access in production entirely
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('Seed route accessed in production - blocking', {
-          ip: request.headers.get('x-forwarded-for') || 'unknown',
-          timestamp: new Date().toISOString(),
-        })
-      return new NextResponse('Not Found', { status: 404 })
-    }
-    
-    // In development, require authentication
-    // In CI, allow without auth (GITHUB_ACTIONS is automatically set)
-    if (!isCI && !user) {
-      console.warn('Unauthenticated seed access attempt', {
-        path: request.nextUrl.pathname,
-        isDevelopment,
-        isCI,
-      })
-      const url = request.nextUrl.clone()
-      url.pathname = '/'
-      return NextResponse.redirect(url)
-    }
-    
-    // Log seed access for audit trail
-    console.log('Seed access granted', {
-      userId: user?.sub || 'CI/automated',
-      environment: isDevelopment ? 'development' : isCI ? 'CI' : 'unknown',
-      timestamp: new Date().toISOString(),
-    })
-    
-    return supabaseResponse
-  }
 
   // Redirect to login if not authenticated (except for API, public routes)
   if (!user && !isApiRoute && !isPublicRoute) {
