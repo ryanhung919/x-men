@@ -1,17 +1,26 @@
 /**
- * Timezone helper utilities for consistent date handling across tests
- * All dates are calculated relative to "now" but in Singapore timezone (Asia/Singapore)
- */
-
-/**
  * Get current date in Singapore timezone (without time)
- * @returns Date object representing today's date at 00:00:00 in SGT
+ * @returns Date object representing today's date at midnight SGT (as UTC timestamp)
  */
 export function getSGTToday(): Date {
   const now = new Date();
-  const sgtTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Singapore' }));
-  sgtTime.setHours(0, 0, 0, 0);
-  return sgtTime;
+  
+  // SGT is UTC+8, so add 8 hours to get SGT time
+  const sgtOffsetMs = 8 * 60 * 60 * 1000;
+  const sgtMs = now.getTime() + sgtOffsetMs;
+  const sgtDate = new Date(sgtMs);
+  
+  // Get SGT date components
+  const sgtYear = sgtDate.getUTCFullYear();
+  const sgtMonth = sgtDate.getUTCMonth();
+  const sgtDay = sgtDate.getUTCDate();
+  
+  // Midnight SGT = UTC midnight for that same calendar date
+  // Then subtract 8 hours to get the UTC time that equals SGT midnight
+  // Example: SGT Oct 25 00:00:00 = UTC Oct 24 16:00:00
+  const midnightSGTasUTC = Date.UTC(sgtYear, sgtMonth, sgtDay, 0, 0, 0) - sgtOffsetMs;
+  
+  return new Date(midnightSGTasUTC);
 }
 
 /**
@@ -24,8 +33,8 @@ export function getSGTToday(): Date {
 export function createSGTDate(daysOffset: number, hour: number = 17, minute: number = 0): Date {
   const today = getSGTToday();
   const date = new Date(today);
-  date.setDate(date.getDate() + daysOffset);
-  date.setHours(hour, minute, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysOffset);
+  date.setUTCHours(hour, minute, 0, 0);
   return date;
 }
 
@@ -41,6 +50,6 @@ export function createSGTDateRange() {
     in2Days: createSGTDate(2, 17),
     in7Days: createSGTDate(7, 17),
     in14Days: createSGTDate(14, 17),
-    in15Days: createSGTDate(15, 17), // Beyond 14 day digest window
+    in15Days: createSGTDate(15, 17),
   };
 }
