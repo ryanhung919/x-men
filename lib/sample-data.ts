@@ -669,6 +669,72 @@ export const tasks = [
     recurrence_date: null,
     logged_time: 52120,
   },
+  {
+    title: 'Write unit tests for auth module',
+    description: 'Achieve 85% code coverage for authentication flows.',
+    priority_bucket: '7',
+    status: 'In Progress',
+    creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    project_name: 'Workflow Automation Pilot',
+    deadline: (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      d.setHours(17, 0, 0, 0);
+      return d;
+    })(), // Yesterday at 5 PM SGT
+    notes: 'Use Jest + React Testing Library; mock Supabase client.',
+    parent_task_external_key: null,
+    is_archived: false,
+    created_at: new Date('2025-09-30T14:00:00+08:00'),
+    updated_at: new Date('2025-09-30T14:00:00+08:00'),
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 5400,
+  },
+  {
+    title: 'Review and merge pending PRs',
+    description: 'Review 4 open pull requests from team members.',
+    priority_bucket: '8',
+    status: 'To Do',
+    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    project_name: 'Website Redesign',
+    deadline: (() => {
+      const d = new Date();
+      d.setHours(17, 0, 0, 0);
+      return d;
+    })(), // Today at 5 PM SGT
+    notes: 'Check code quality, test coverage, and documentation.',
+    parent_task_external_key: null,
+    is_archived: false,
+    created_at: new Date('2025-10-01T09:30:00+08:00'),
+    updated_at: new Date('2025-10-01T09:30:00+08:00'),
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 0,
+  },
+  {
+    title: 'Deploy staging environment for QA',
+    description: 'Build and deploy latest code to staging for quality assurance testing.',
+    priority_bucket: '9',
+    status: 'To Do',
+    creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
+    project_name: 'Digital Collaboration Rollout',
+    deadline: (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      d.setHours(17, 0, 0, 0);
+      return d;
+    })(), // Tomorrow at 5 PM SGT
+    notes: 'Run smoke tests; document any breaking changes.',
+    parent_task_external_key: null,
+    is_archived: false,
+    created_at: new Date('2025-10-01T10:15:00+08:00'),
+    updated_at: new Date('2025-10-01T10:15:00+08:00'),
+    recurrence_interval: 0,
+    recurrence_date: null,
+    logged_time: 0,
+  },
+
 ];
 
 /* ======================== TASK TAGS ======================== */
@@ -943,6 +1009,24 @@ export const task_assignments = [
     assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
     created_at: new Date('2025-10-01T09:05:00+08:00'),
+  },
+  {
+    task_title: 'Write unit tests for auth module',
+    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-09-30T14:05:00+08:00'),
+  },
+  {
+    task_title: 'Review and merge pending PRs',
+    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-10-01T09:35:00+08:00'),
+  },
+  {
+    task_title: 'Deploy staging environment for QA',
+    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    created_at: new Date('2025-10-01T10:20:00+08:00'),
   },
 ];
 
