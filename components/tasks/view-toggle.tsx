@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { LayoutList, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -10,14 +9,9 @@ interface ViewToggleProps {
 }
 
 /**
- * Toggle component to switch between list and calendar views.
- * Persists user preference to localStorage for consistency across sessions.
+ * Toggle between list and calendar views.
  */
 export default function ViewToggle({ view, onViewChange }: ViewToggleProps) {
-  // Persist view preference to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('tasks-view-preference', view);
-  }, [view]);
 
   return (
     <div className="flex gap-2 items-center">

@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import TasksList from './task-list';
 import ViewToggle from './view-toggle';
 import type { Task } from '@/lib/services/tasks';
 
-// Dynamically import CalendarView to reduce initial bundle size
 const CalendarView = dynamic(() => import('@/components/calendar/calendar-view'), {
   loading: () => (
     <div className="flex items-center justify-center h-96">
@@ -20,26 +19,10 @@ interface TasksViewWrapperProps {
 }
 
 /**
- * Client-side wrapper for tasks page that manages view state (list vs calendar).
- * Persists user view preference to localStorage.
+ * Manages list/calendar view state, defaulting to list view.
  */
 export default function TasksViewWrapper({ tasks }: TasksViewWrapperProps) {
   const [view, setView] = useState<'list' | 'calendar'>('list');
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  // Load saved view preference from localStorage on mount
-  useEffect(() => {
-    const savedView = localStorage.getItem('tasks-view-preference') as 'list' | 'calendar';
-    if (savedView) {
-      setView(savedView);
-    }
-    setIsLoaded(true);
-  }, []);
-
-  // Prevent hydration mismatch by not rendering until loaded
-  if (!isLoaded) {
-    return <TasksList tasks={tasks} />;
-  }
 
   return (
     <div className="space-y-4">
