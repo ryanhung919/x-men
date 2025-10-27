@@ -235,7 +235,7 @@ The GitHub Actions workflow (`.github/workflows/test.yml`):
 
 1. **Runs unit tests** on every push
 2. **Runs integration tests** on main/develop branches
-3. **Tests on Node 18 and 20** (matrix)
+3. **Tests on Node 22 and 24** (matrix)
 4. **Requires environment secrets:**
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`

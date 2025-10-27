@@ -30,7 +30,7 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims
 
-  // Check if user is trying to access protected routes
+  // Check route types
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
   const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/seed'
   const isReportRoute = request.nextUrl.pathname.startsWith('/report')
