@@ -10,6 +10,8 @@ import { enUS } from 'date-fns/locale';
 import { getTaskById } from '@/lib/db/tasks';
 import { formatTaskDetails, DetailedTask } from '@/lib/services/tasks';
 import { AttachmentItem } from '@/components/tasks/attachment-item';
+import { getRolesForUserClient } from '@/lib/db/roles';
+import { ArchiveButton } from '@/components/tasks/archive-button';
 
 export default async function TaskDetailsPage({ params }: { params: Promise<{ taskId: string }> }) {
   const supabase = await createClient();
@@ -37,9 +39,16 @@ export default async function TaskDetailsPage({ params }: { params: Promise<{ ta
     notFound();
   }
 
+  // Check if user is a manager (for archive button visibility)
+  const roles = await getRolesForUserClient(supabase, user.id);
+  const isManager = roles.includes('manager');
+
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Task Details</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Task Details</h1>
+        {isManager && <ArchiveButton taskId={task.id} subtaskCount={task.subtasks.length} />}
+      </div>
       <BackButton />
       <div className="space-y-4">
         <Card>

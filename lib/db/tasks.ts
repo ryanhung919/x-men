@@ -486,3 +486,69 @@ export async function getAllProjects(): Promise<{ id: number; name: string }[]> 
 
   return data;
 }
+
+/**
+ * Archives or unarchives a task and all its subtasks (cascade).
+ *
+ * This function performs a soft delete by setting the is_archived flag.
+ * When archiving a parent task, all subtasks are automatically archived as well
+ * to maintain logical consistency.
+ *
+ * Uses service role client to ensure the operation completes regardless of RLS policies.
+ *
+ * @param taskId - The ID of the task to archive/unarchive
+ * @param isArchived - True to archive, false to restore
+ * @returns The number of tasks affected (parent + subtasks)
+ * @throws {Error} If the task doesn't exist or there's a database error
+ *
+ * @example
+ * // Archive a task and its subtasks
+ * const affectedCount = await archiveTask(123, true);
+ * console.log(`Archived ${affectedCount} tasks`);
+ */
+export async function archiveTask(
+  taskId: number,
+  isArchived: boolean
+): Promise<number> {
+  // Use service role client to bypass RLS for archive operation
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // First, verify the task exists
+  const { data: taskExists, error: checkError } = await serviceClient
+    .from('tasks')
+    .select('id')
+    .eq('id', taskId)
+    .single();
+
+  if (checkError || !taskExists) {
+    throw new Error(`Task with ID ${taskId} not found`);
+  }
+
+  // Get all subtasks recursively (in case of nested subtasks)
+  const { data: subtasks, error: subtasksError } = await serviceClient
+    .from('tasks')
+    .select('id')
+    .eq('parent_task_id', taskId);
+
+  if (subtasksError) {
+    throw new Error(`Failed to fetch subtasks: ${subtasksError.message}`);
+  }
+
+  const subtaskIds = subtasks?.map(st => st.id) || [];
+  const allTaskIds = [taskId, ...subtaskIds];
+
+  // Archive/unarchive the parent task and all subtasks
+  const { error: updateError } = await serviceClient
+    .from('tasks')
+    .update({ is_archived: isArchived })
+    .in('id', allTaskIds);
+
+  if (updateError) {
+    throw new Error(`Failed to archive tasks: ${updateError.message}`);
+  }
+
+  return allTaskIds.length;
+}

@@ -26,7 +26,11 @@ import {
 import { StatusSelector } from '@/components/filters/status-selector';
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
 import { TagSelector } from '@/components/filters/tag-selector';
-import Link from 'next/link';
+import {
+  ColumnVisibilitySelector,
+  type ColumnId,
+} from '@/components/filters/column-visibility-selector';
+import { useRouter } from 'next/navigation';
 
 type TasksListProps = {
   tasks: Task[];
@@ -38,6 +42,7 @@ type SortConfig = {
 };
 
 export default function TasksList({ tasks }: TasksListProps) {
+  const router = useRouter();
   const [showCompleted, setShowCompleted] = useState(false);
   const [filters, setFilters] = useState({
     projects: [] as number[],
@@ -45,6 +50,18 @@ export default function TasksList({ tasks }: TasksListProps) {
     tags: [] as string[],
   });
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>([
+    'status',
+    'priority',
+    'dueDate',
+    'assignees',
+    'project',
+    'recurring',
+    'creator',
+    'subtasks',
+    'attachments',
+    'tags',
+  ]);
 
   // Unique values for filters
   const statuses = ['To Do', 'In Progress', 'Completed', 'Blocked'] as const;
@@ -164,6 +181,10 @@ export default function TasksList({ tasks }: TasksListProps) {
           {showCompleted ? 'Hide Completed' : 'Show Completed'}
         </Button>
         <div className="flex flex-wrap items-center gap-2">
+          <ColumnVisibilitySelector
+            visibleColumns={visibleColumns}
+            onChange={setVisibleColumns}
+          />
           <StatusSelector
             statuses={statuses}
             selectedStatuses={filters.statuses}
@@ -205,66 +226,82 @@ export default function TasksList({ tasks }: TasksListProps) {
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort('priority')}
-                  className="flex items-center gap-1"
-                >
-                  Priority
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort('status')}
-                  className="flex items-center gap-1"
-                >
-                  Status
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort('assignees')}
-                  className="flex items-center gap-1"
-                >
-                  Assignees
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>Creator</TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort('deadline')}
-                  className="flex items-center gap-1"
-                >
-                  Due Date
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort('project.name')}
-                  className="flex items-center gap-1"
-                >
-                  Project
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>Subtasks</TableHead>
-              <TableHead>Attachments</TableHead>
-              <TableHead>Tags</TableHead>
+              {visibleColumns.includes('status') && (
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1"
+                  >
+                    Status
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                </TableHead>
+              )}
+              {visibleColumns.includes('priority') && (
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('priority')}
+                    className="flex items-center gap-1"
+                  >
+                    Priority
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                </TableHead>
+              )}
+              {visibleColumns.includes('dueDate') && (
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('deadline')}
+                    className="flex items-center gap-1"
+                  >
+                    Due Date
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                </TableHead>
+              )}
+              {visibleColumns.includes('assignees') && (
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('assignees')}
+                    className="flex items-center gap-1"
+                  >
+                    Assignees
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                </TableHead>
+              )}
+              {visibleColumns.includes('project') && (
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('project.name')}
+                    className="flex items-center gap-1"
+                  >
+                    Project
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                </TableHead>
+              )}
+              {visibleColumns.includes('recurring') && (
+                <TableHead className="w-[80px] text-center">Recurring</TableHead>
+              )}
+              {visibleColumns.includes('creator') && <TableHead>Creator</TableHead>}
+              {visibleColumns.includes('subtasks') && <TableHead>Subtasks</TableHead>}
+              {visibleColumns.includes('attachments') && <TableHead>Attachments</TableHead>}
+              {visibleColumns.includes('tags') && <TableHead>Tags</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {tasksWithNextDue.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell
+                  colSpan={visibleColumns.length + 1}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   No tasks match the current filters.
                 </TableCell>
               </TableRow>
@@ -272,120 +309,144 @@ export default function TasksList({ tasks }: TasksListProps) {
               tasksWithNextDue.map((task) => (
                 <TableRow
                   key={task.id}
-                  className={`cursor-pointer ${task.isOverdue ? 'bg-destructive/10' : ''}`}
+                  onClick={() => router.push(`/tasks/${task.id}`)}
+                  className={`cursor-pointer hover:bg-muted/50 transition-colors ${task.isOverdue ? 'bg-destructive/10 hover:bg-destructive/20' : ''}`}
                 >
-                  <TableCell className={`font-medium ${task.isOverdue ? 'text-destructive' : ''}`}>
-                    <Link href={`/tasks/${task.id}`}>
-                      <div className="flex items-center gap-2">
-                        {task.isOverdue && <AlertCircle className="h-4 w-4 text-destructive" />}
-                        {task.recurrence_interval > 0 && (
-                          <span
-                            title={`Recurring every ${task.recurrence_interval} day${
-                              task.recurrence_interval > 1 ? 's' : ''
-                            }`}
-                          >
-                            <Repeat className="h-4 w-4 text-blue-500" />
-                          </span>
-                        )}
-                        {task.title}
-                      </div>
-                    </Link>
+                  <TableCell
+                    className={`font-medium ${task.isOverdue ? 'text-destructive' : ''}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {task.isOverdue && <AlertCircle className="h-4 w-4 text-destructive" />}
+                      {task.title}
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {task.assignees.length > 0 ? (
-                        task.assignees.slice(0, 3).map((assignee) => {
-                          const { first_name, last_name } = assignee.user_info;
-                          return (
-                            <Avatar
-                              key={assignee.assignee_id}
-                              className="h-6 w-6 border-2 border-background"
-                            >
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                {`${first_name[0]}${last_name[0]}`.toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                          );
-                        })
+                  {visibleColumns.includes('status') && (
+                    <TableCell>
+                      <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('priority') && (
+                    <TableCell>
+                      <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('dueDate') && (
+                    <TableCell className={task.isOverdue ? 'text-destructive' : ''}>
+                      {task.deadline ? (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          {format(new Date(task.deadline), 'MMM d, yyyy')}
+                        </div>
                       ) : (
-                        <span className="text-muted-foreground">None</span>
+                        'None'
                       )}
-                      {task.assignees.length > 3 && (
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('assignees') && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {task.assignees.length > 0 ? (
+                          task.assignees.slice(0, 3).map((assignee) => {
+                            const { first_name, last_name } = assignee.user_info;
+                            return (
+                              <Avatar
+                                key={assignee.assignee_id}
+                                className="h-6 w-6 border-2 border-background"
+                              >
+                                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                  {`${first_name[0]}${last_name[0]}`.toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                            );
+                          })
+                        ) : (
+                          <span className="text-muted-foreground">None</span>
+                        )}
+                        {task.assignees.length > 3 && (
+                          <Avatar className="h-6 w-6 border-2 border-background">
+                            <AvatarFallback className="text-xs bg-muted">
+                              +{task.assignees.length - 3}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('project') && (
+                    <TableCell>{task.project?.name || 'None'}</TableCell>
+                  )}
+                  {visibleColumns.includes('recurring') && (
+                    <TableCell className="text-center">
+                      {task.recurrence_interval > 0 && (
+                        <span
+                          title={`Recurring every ${task.recurrence_interval} day${
+                            task.recurrence_interval > 1 ? 's' : ''
+                          }`}
+                          className="inline-flex items-center justify-center"
+                        >
+                          <Repeat className="h-4 w-4 text-muted-foreground" />
+                        </span>
+                      )}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('creator') && (
+                    <TableCell>
+                      <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6 border-2 border-background">
-                          <AvatarFallback className="text-xs bg-muted">
-                            +{task.assignees.length - 3}
+                          <AvatarFallback className="text-xs bg-secondary/50 text-secondary-foreground">
+                            {`${task.creator.user_info.first_name[0]}${task.creator.user_info.last_name[0]}`.toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
+                        <span className="text-sm">
+                          {task.creator.user_info.first_name} {task.creator.user_info.last_name}
+                        </span>
+                      </div>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('subtasks') && (
+                    <TableCell>
+                      {task.subtasks.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <CheckSquare className="h-4 w-4" />
+                          {task.subtasks.length}
+                        </div>
+                      ) : (
+                        'None'
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6 border-2 border-background">
-                        <AvatarFallback className="text-xs bg-secondary/50 text-secondary-foreground">
-                          {`${task.creator.user_info.first_name[0]}${task.creator.user_info.last_name[0]}`.toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">
-                        {task.creator.user_info.first_name} {task.creator.user_info.last_name}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className={task.isOverdue ? 'text-destructive' : ''}>
-                    {task.deadline ? (
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {format(new Date(task.deadline), 'MMM d, yyyy')}
-                      </div>
-                    ) : (
-                      'None'
-                    )}
-                  </TableCell>
-                  <TableCell>{task.project?.name || 'None'}</TableCell>
-                  <TableCell>
-                    {task.subtasks.length > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <CheckSquare className="h-4 w-4" />
-                        {task.subtasks.length}
-                      </div>
-                    ) : (
-                      'None'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {task.attachments.length > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-4 w-4" />
-                        {task.attachments.length}
-                      </div>
-                    ) : (
-                      'None'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {task.tags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {task.tags.slice(0, 2).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {task.tags.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{task.tags.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    ) : (
-                      'None'
-                    )}
-                  </TableCell>
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('attachments') && (
+                    <TableCell>
+                      {task.attachments.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <Paperclip className="h-4 w-4" />
+                          {task.attachments.length}
+                        </div>
+                      ) : (
+                        'None'
+                      )}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes('tags') && (
+                    <TableCell>
+                      {task.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {task.tags.slice(0, 2).map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {task.tags.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{task.tags.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        'None'
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
