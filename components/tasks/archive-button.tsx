@@ -60,9 +60,7 @@ export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
   };
 
   const subtaskText =
-    subtaskCount > 0
-      ? ` and ${subtaskCount} subtask${subtaskCount > 1 ? 's' : ''}`
-      : '';
+    subtaskCount > 0 ? ` and ${subtaskCount} subtask${subtaskCount > 1 ? 's' : ''}` : '';
 
   return (
     <AlertDialog>
@@ -85,8 +83,8 @@ export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will archive this task{subtaskText}. Archived tasks will no longer appear in
-            the active task list or personal dashboard.
+            This will archive this task{subtaskText}. Archived tasks will no longer appear in the
+            active task list.
             {subtaskCount > 0 && (
               <span className="block mt-2 font-semibold">
                 All subtasks will also be archived automatically.

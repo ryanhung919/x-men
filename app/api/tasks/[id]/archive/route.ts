@@ -20,7 +20,7 @@ import { getRolesForUserClient } from '@/lib/db/roles';
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const supabase = await createClient();
@@ -44,8 +44,11 @@ export async function PATCH(
       );
     }
 
-    // Parse task ID from params
-    const { id } = await params;
+    // Parse task ID from params - handle both Promise and non-Promise
+    const resolvedParams = context.params instanceof Promise
+      ? await context.params
+      : context.params;
+    const { id } = resolvedParams;
     const taskId = parseInt(id, 10);
 
     if (isNaN(taskId)) {
@@ -56,7 +59,16 @@ export async function PATCH(
     }
 
     // Parse request body
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+
     const { is_archived } = body;
 
     if (typeof is_archived !== 'boolean') {
