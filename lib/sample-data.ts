@@ -435,15 +435,15 @@ export const tasks = [
     title: 'Migrate docs to cloud platform',
     description: 'Move legacy files and folders to new cloud solution.',
     priority_bucket: 6,
-    status: 'Completed',
+    status: 'In Progress',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Cloud Doc Management',
-    deadline: new Date('2025-10-29T17:00:00+08:00'),
+    deadline: new Date('2025-10-29T17:00:00+08:00'), // Due tomorrow for reminder test
     notes: 'Maintain folder structure and access control.',
     parent_task_external_key: null,
     is_archived: false,
     created_at: new Date('2025-10-15T11:00:00+08:00'),
-    updated_at: new Date('2025-10-24T15:30:00+08:00'), // Completed on Oct 24
+    updated_at: new Date('2025-10-27T15:30:00+08:00'),
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 22000,
@@ -672,7 +672,7 @@ export const tasks = [
   {
     title: 'Write unit tests for auth module',
     description: 'Achieve 85% code coverage for authentication flows.',
-    priority_bucket: '7',
+    priority_bucket: 7,
     status: 'In Progress',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
     project_name: 'Workflow Automation Pilot',
@@ -694,7 +694,7 @@ export const tasks = [
   {
     title: 'Review and merge pending PRs',
     description: 'Review 4 open pull requests from team members.',
-    priority_bucket: '8',
+    priority_bucket: 8,
     status: 'To Do',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     project_name: 'Website Redesign',
@@ -715,7 +715,7 @@ export const tasks = [
   {
     title: 'Deploy staging environment for QA',
     description: 'Build and deploy latest code to staging for quality assurance testing.',
-    priority_bucket: '9',
+    priority_bucket: 9,
     status: 'To Do',
     creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
     project_name: 'Digital Collaboration Rollout',

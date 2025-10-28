@@ -441,7 +441,8 @@ describe('Schedule API Integration Tests', () => {
         const updatedTask = updatedTasks.find((t: any) => t.id === taskId);
 
         if (updatedTask) {
-          expect(new Date(updatedTask.deadline).toISOString()).toBe(newDeadline);
+          // Compare timestamps instead of ISO strings to avoid millisecond format differences
+          expect(new Date(updatedTask.deadline).getTime()).toBe(new Date(newDeadline).getTime());
         }
       }
     });
@@ -454,7 +455,7 @@ describe('Schedule API Integration Tests', () => {
           Cookie: joelCookie,
         },
         body: JSON.stringify({
-          deadline: '2025-11-15T00:00:00.000Z',
+          deadline: '2025-11-15T00:00:00.00Z',
         }),
       });
 
