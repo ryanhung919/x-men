@@ -259,7 +259,6 @@ jobs:
         with:
           name: integration-test-results
           path: |
-            coverage/integration
             test-results/
           retention-days: 7
 

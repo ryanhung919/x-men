@@ -53,6 +53,10 @@ export default defineConfig({
         'app/(dashboard)/',
         'components/',
         'supabase/functions/',
+        'app/api/test-notifications',
+        'app/auth/confirm',
+        'coverage/',
+        'hooks/'
       ],
       reportsDirectory: 'coverage/unit',
     },

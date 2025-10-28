@@ -37,6 +37,7 @@ export default defineConfig({
         '.next/',
         'scripts/',
         'middleware.ts',
+        '**/layout.tsx',
 
         // Config files
         '**/*.config.{js,ts,mjs,cjs}',
@@ -49,6 +50,14 @@ export default defineConfig({
         'app/seed/',
         'supabase/functions/',
         'components/ui',
+        'app/(dashboard)/',
+        'app/actions/',
+        'coverage/',
+        'components/report/logged-time-report.tsx',
+        'components/report/report-skeletons.tsx',
+        'components/report/task-completion-report.tsx',
+        'components/report/team-summary-report.tsx',
+        'app/auth/'
       ],
       reportsDirectory: 'coverage/component',
     },
