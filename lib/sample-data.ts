@@ -332,7 +332,7 @@ export const tasks = [
   {
     title: 'Design budget dashboard layout',
     description: 'Create FY25 dashboard (KPI tiles, spend vs plan).',
-    priority_bucket: '9',
+    priority_bucket: 9,
     status: 'Completed',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     project_name: 'Annual Budget FY25',
@@ -349,7 +349,7 @@ export const tasks = [
   {
     title: 'Implement task board drag/drop',
     description: 'Kanban by status with optimistic updates + Realtime.',
-    priority_bucket: '5',
+    priority_bucket: 5,
     status: 'To Do',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     project_name: 'Website Redesign',
@@ -366,7 +366,7 @@ export const tasks = [
   {
     title: 'Connect sales data source',
     description: 'ETL from SG data mart into DWH; nightly batch.',
-    priority_bucket: '7',
+    priority_bucket: 7,
     status: 'Completed',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
     project_name: 'Data Warehouse Lift',
@@ -383,7 +383,7 @@ export const tasks = [
   {
     title: 'Roll out collaboration tools to SG office',
     description: 'Deploy cloud-based document and chat tools to all SG staff.',
-    priority_bucket: '8',
+    priority_bucket: 8,
     status: 'To Do',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
     project_name: 'Digital Collaboration Rollout',
@@ -400,7 +400,7 @@ export const tasks = [
   {
     title: 'Design client onboarding forms',
     description: 'Create digital forms for MNC and SME clients.',
-    priority_bucket: '7',
+    priority_bucket: 7,
     status: 'In Progress',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Client Onboarding Portal',
@@ -417,7 +417,7 @@ export const tasks = [
   {
     title: 'Develop finance KPIs for dashboard',
     description: 'Define metrics, create dashboard mockups, link to accounting data.',
-    priority_bucket: '9',
+    priority_bucket: 9,
     status: 'Completed',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Internal Analytics Dashboard',
@@ -434,7 +434,7 @@ export const tasks = [
   {
     title: 'Migrate docs to cloud platform',
     description: 'Move legacy files and folders to new cloud solution.',
-    priority_bucket: '6',
+    priority_bucket: 6,
     status: 'Completed',
     creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
     project_name: 'Cloud Doc Management',
@@ -451,7 +451,7 @@ export const tasks = [
   {
     title: 'Plan regional training sessions',
     description: 'Schedule training for InCompletedsia and Malaysia offices.',
-    priority_bucket: '5',
+    priority_bucket: 5,
     status: 'To Do',
     creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
     project_name: 'Regional Training Program',
@@ -468,7 +468,7 @@ export const tasks = [
   {
     title: 'Automate invoice approval workflow',
     description: 'Reduce manual approvals by integrating rules engine.',
-    priority_bucket: '8',
+    priority_bucket: 8,
     status: 'To Do',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'Workflow Automation Pilot',
@@ -485,7 +485,7 @@ export const tasks = [
   {
     title: 'Review FY25 revenue forecast',
     description: 'Analyze projected revenues for SE Asia offices.',
-    priority_bucket: '9',
+    priority_bucket: 9,
     status: 'In Progress',
     creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
     project_name: 'FY25 Forecast Review',
@@ -630,7 +630,7 @@ export const tasks = [
     parent_task_external_key: null,
     is_archived: false,
     created_at: new Date('2025-10-12T09:30:00+08:00'),
-    updated_at: new Date('2025-10-26T25:20:00+08:00'), // Completed on Oct 26
+    updated_at: new Date('2025-10-26T15:20:00+08:00'), // Completed on Oct 26
     recurrence_interval: 0,
     recurrence_date: null,
     logged_time: 42180,
