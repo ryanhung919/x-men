@@ -87,7 +87,7 @@ export default function CalendarTaskCard({
       )}
 
       {/* Show assignees only on larger screens */}
-      <div className="mt-auto flex items-center gap-1 hidden sm:flex">
+      <div className="mt-auto items-center gap-1 hidden sm:flex">
         {task.assignees?.slice(0, 2).map((assignee) => {
           const initials = `${assignee.user_info.first_name.charAt(
             0
