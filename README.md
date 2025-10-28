@@ -1,8 +1,8 @@
-This is a Smart Task Management System created by XMEN for our client All-In-One.
+This is a Smart Task Management System created for our client All-In-One.
 
 It’s a Next.js application backed by Supabase (Postgres + Auth), styled with Tailwind, and deployed on Vercel.
 
-View our deployed website using Vercel -here-
+View our deployed website using Vercel [here](x-men-rosy.vercel.app)
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ View our deployed website using Vercel -here-
 	- POSTGRES_URL (direct connection string for seeding)
 	- NEXT_PUBLIC_APP_URL
 
-Create a `.env` (or `.env.local`) in the project root with values like:
+Create a `.env` in the project root using .env.example with values like:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=...        # from Supabase project settings
@@ -61,6 +61,11 @@ pnpm db:seed
 pnpm test:unit
 ```
 
+Component tests:
+```bash
+pnpm test:component
+```
+
 - Integration tests (require dev server running on port 3000 for seeding):
 
 ```bash
@@ -77,14 +82,12 @@ pnpm test:integration
 pnpm ci:test
 ```
 
-## Auth & Roles (at a glance)
+## Auth & Roles
 
 - Users log in with email + password (Supabase Auth).
 - Roles are stored in `user_roles` (staff, manager, admin) and enforced via RLS policies.
-- After login, managers are redirected to `/schedule`; others go to `/report`.
 - Passwords are never stored in plain text; Supabase handles hashing.
 
-Contact the administrators for admin access to view `/report`.
 
 ## Tech Stack
 
