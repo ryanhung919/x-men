@@ -36,24 +36,38 @@ export const presets: { label: string; range: DateRangeType }[] = [
     },
   },
   {
-    label: 'Last 7 Days',
+    label: '2 Weeks (±1 week)',
     range: {
-      startDate: startOfDay(addDays(new Date(), -6)),
-      endDate: endOfDay(new Date()),
+      startDate: startOfDay(addDays(new Date(), -7)),
+      endDate: endOfDay(addDays(new Date(), 7)),
     },
   },
   {
-    label: 'Last Month',
+    label: 'Next 7 Days',
     range: {
-      startDate: startOfMonth(subMonths(new Date(), 1)),
-      endDate: endOfMonth(subMonths(new Date(), 1)),
+      startDate: startOfDay(new Date()),
+      endDate: endOfDay(addDays(new Date(), 6)),
+    },
+  },
+  {
+    label: 'Next 30 Days',
+    range: {
+      startDate: startOfDay(new Date()),
+      endDate: endOfDay(addDays(new Date(), 29)),
+    },
+  },
+  {
+    label: 'Next 60 Days',
+    range: {
+      startDate: startOfDay(new Date()),
+      endDate: endOfDay(addDays(new Date(), 59)),
     },
   },
   {
     label: 'This Month',
     range: {
       startDate: startOfMonth(new Date()),
-      endDate: endOfDay(new Date()),
+      endDate: endOfMonth(new Date()),
     },
   },
 ];
@@ -61,7 +75,7 @@ export const presets: { label: string; range: DateRangeType }[] = [
 export function DateRangeFilter({
   value,
   onChange,
-  maxDate = new Date(),
+  maxDate,
   loading = false,
 }: DateRangePickerProps) {
   const [showCalendar, setShowCalendar] = useState(false);
@@ -169,7 +183,7 @@ export function DateRangeFilter({
               selected={dateRange}
               onSelect={handleSelect}
               numberOfMonths={2}
-              disabled={(date) => date > maxDate}
+              disabled={maxDate ? (date) => date > maxDate : undefined}
               className="rounded-md"
               defaultMonth={dateRange?.from || new Date()}
             />
