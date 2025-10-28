@@ -21,12 +21,14 @@ export async function GET(req: NextRequest) {
 
     if (rolesError) {
       console.error('Error fetching user roles:', rolesError);
-      return NextResponse.json({ roles: ['staff'] }); // Default to staff
+      return NextResponse.json({ userId: user.id, roles: ['staff'] }); // Default to staff
     }
 
-    const roles = userRoles?.map((r: any) => r.role) || ['staff'];
+    const roles = userRoles && userRoles.length > 0 
+      ? userRoles.map((r: any) => r.role) 
+      : ['staff'];
     
-    return NextResponse.json({ roles });
+    return NextResponse.json({ userId: user.id, roles });
   } catch (err) {
     console.error('Error in user role API:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
