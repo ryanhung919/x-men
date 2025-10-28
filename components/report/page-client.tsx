@@ -19,7 +19,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 
-import { XIcon } from 'lucide-react';
+import { XIcon, FilterIcon } from 'lucide-react';
 
 async function fetchDepartments(projectIds?: number[]): Promise<Department[]> {
   const query = projectIds?.length ? `&projectIds=${projectIds.join(',')}` : '';
@@ -254,8 +254,12 @@ export default function ReportsPageClient({
       {/* Report Display */}
       <div className="mt-4">
         {!selectedDepartments.length && !selectedProjects.length ? (
-          <div className="text-muted-foreground">
-            Please select department(s) and/or project(s).{' '}
+          <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-lg bg-muted/30">
+            <FilterIcon className="h-12 w-12 text-muted-foreground/40 mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">No Filters Selected</h3>
+            <p className="text-sm text-muted-foreground text-center max-w-md">
+              Please select one or more departments and/or projects from the filters above to generate your report.
+            </p>
           </div>
         ) : selectedReport === 'loggedTime' ? (
           <LoggedTimeReport

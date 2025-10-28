@@ -26,8 +26,10 @@ export async function getTasks(opts: GetTasksOpts) {
       parent_task_id,
       logged_time,
       created_at,
-      updated_at
-    `);
+      updated_at,
+      is_archived
+    `)
+    .eq("is_archived", false); 
 
   // Filter by projectIds if provided
   if (projectIds && projectIds.length > 0) {
@@ -86,8 +88,10 @@ export async function getWeeklyTaskStatsByUser(opts: GetTasksOpts): Promise<Week
       id,
       status,
       creator_id,
-      created_at
-    `);
+      created_at,
+      is_archived
+    `)
+    .eq("is_archived", false); // Only fetch non-archived tasks
 
   if (projectIds && projectIds.length > 0) {
     query = query.in("project_id", projectIds);

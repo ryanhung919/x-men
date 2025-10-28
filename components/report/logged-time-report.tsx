@@ -101,6 +101,13 @@ const delayConfig = {
   },
 } satisfies ChartConfig;
 
+const avgTimeConfig = {
+  time: {
+    label: 'Logged Hours',
+    color: 'var(--chart-2)',
+  },
+} satisfies ChartConfig;
+
 // Card groupings
 const DISPLAY_CARDS = [
   {
@@ -318,6 +325,70 @@ const DISPLAY_CARDS = [
       value: round(m.avgLoggedHours, 2),
       unit: 'h/task',
     }),
+    subMetrics: [
+      {
+        label: 'Total Tasks',
+        format: (m: Metrics) => `${Object.keys(m.timeByTask).length} tasks`,
+      },
+      {
+        label: 'Total Time',
+        format: (m: Metrics) => `${round(m.totalLoggedHours, 2)}h`,
+      },
+    ],
+    chart: (m: Metrics) => {
+      // Get top 5 tasks by time
+      const taskEntries = Object.entries(m.timeByTask)
+        .map(([id, seconds]) => ({
+          id,
+          hours: round(seconds / 3600, 2),
+        }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 5);
+
+      return {
+        type: 'bar' as const,
+        title: 'Top Tasks by Time',
+        data: taskEntries.map((t) => ({
+          label: `Task ${t.id}`,
+          value: t.hours,
+        })),
+      };
+    },
+    renderChart: (m: Metrics) => {
+      // Get top 5 tasks by logged time
+      const taskEntries = Object.entries(m.timeByTask)
+        .map(([id, seconds]) => ({
+          id: `Task ${id}`,
+          hours: round(seconds / 3600, 2),
+        }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 5);
+
+      if (taskEntries.length === 0) {
+        return (
+          <div className="flex items-center justify-center h-[140px] text-sm text-muted-foreground">
+            No task data available
+          </div>
+        );
+      }
+
+      const chartData = taskEntries.map((t) => ({
+        name: t.id,
+        value: t.hours,
+        fill: avgTimeConfig.time.color,
+      }));
+
+      return (
+        <ChartContainer config={avgTimeConfig} className="h-[140px] w-full">
+          <BarChart data={chartData}>
+            <XAxis dataKey="name" tickLine={false} axisLine={false} className="text-xs" />
+            <YAxis tickLine={false} axisLine={false} className="text-xs" />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ChartContainer>
+      );
+    },
   },
 ];
 
@@ -473,7 +544,7 @@ export function LoggedTimeReport({
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {DISPLAY_CARDS.map((card) => (
-        <Card key={card.key} className={card.renderChart ? 'md:col-span-1' : ''}>
+        <Card key={card.key} className="md:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
           </CardHeader>
