@@ -13,47 +13,47 @@ describe('DateRangeFilter', () => {
 
   describe('Component Rendering', () => {
     it('should render date range selector button', () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       expect(button).toBeInTheDocument();
     });
 
     it('should display selected date range', () => {
-      const from = new Date('2025-10-01');
-      const to = new Date('2025-10-31');
+      const startDate = new Date('2025-10-01');
+      const endDate = new Date('2025-10-31');
 
       render(
         <DateRangeFilter
-          value={{ from, to }}
+          value={{ startDate, endDate }}
           onChange={mockOnChange}
         />
       );
 
-      expect(screen.getByText(/Oct/)).toBeInTheDocument();
+      expect(screen.getByText(/01\/10\/2025/)).toBeInTheDocument();
     });
 
     it('should show placeholder when no date selected', () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
-      expect(screen.getByText(/Pick a date/)).toBeInTheDocument();
+      expect(screen.getByText(/All Time/)).toBeInTheDocument();
     });
   });
 
   describe('Preset Options', () => {
-    it('should have "This Week" preset', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+    it('should have "Today" preset', async () => {
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(screen.getByText('This Week')).toBeInTheDocument();
+        expect(screen.getByText('Today')).toBeInTheDocument();
       });
     });
 
     it('should have "2 Weeks (±1 week)" preset', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
@@ -64,7 +64,7 @@ describe('DateRangeFilter', () => {
     });
 
     it('should have "This Month" preset', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
@@ -74,38 +74,38 @@ describe('DateRangeFilter', () => {
       });
     });
 
-    it('should have "Next 3 Months" preset', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+    it('should have "Next 60 Days" preset', async () => {
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(screen.getByText('Next 3 Months')).toBeInTheDocument();
+        expect(screen.getByText('Next 60 Days')).toBeInTheDocument();
       });
     });
   });
 
   describe('Preset Functionality', () => {
-    it('should call onChange when "This Week" selected', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+    it('should call onChange when "Today" selected', async () => {
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       await waitFor(() => {
-        const thisWeekButton = screen.getByText('This Week');
-        fireEvent.click(thisWeekButton);
+        const todayButton = screen.getByText('Today');
+        fireEvent.click(todayButton);
       });
 
       expect(mockOnChange).toHaveBeenCalled();
       const callArg = mockOnChange.mock.calls[0][0];
-      expect(callArg).toHaveProperty('from');
-      expect(callArg).toHaveProperty('to');
+      expect(callArg).toHaveProperty('startDate');
+      expect(callArg).toHaveProperty('endDate');
     });
 
     it('should call onChange when "2 Weeks (±1 week)" selected', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
@@ -124,15 +124,15 @@ describe('DateRangeFilter', () => {
       const expectedTo = endOfDay(addDays(today, 7));
       
       // Allow for small time differences due to test execution time
-      const actualFrom = callArg.from;
-      const actualTo = callArg.to;
+      const actualFrom = callArg.startDate;
+      const actualTo = callArg.endDate;
       
       expect(actualFrom.getDate()).toBe(expectedFrom.getDate());
       expect(actualTo.getDate()).toBe(expectedTo.getDate());
     });
 
     it('should call onChange when "This Month" selected', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
@@ -144,31 +144,31 @@ describe('DateRangeFilter', () => {
 
       expect(mockOnChange).toHaveBeenCalled();
       const callArg = mockOnChange.mock.calls[0][0];
-      expect(callArg).toHaveProperty('from');
-      expect(callArg).toHaveProperty('to');
+      expect(callArg).toHaveProperty('startDate');
+      expect(callArg).toHaveProperty('endDate');
     });
 
-    it('should call onChange when "Next 3 Months" selected', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+    it('should call onChange when "Next 60 Days" selected', async () => {
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       await waitFor(() => {
-        const next3MonthsButton = screen.getByText('Next 3 Months');
-        fireEvent.click(next3MonthsButton);
+        const next60DaysButton = screen.getByText('Next 60 Days');
+        fireEvent.click(next60DaysButton);
       });
 
       expect(mockOnChange).toHaveBeenCalled();
       const callArg = mockOnChange.mock.calls[0][0];
-      expect(callArg).toHaveProperty('from');
-      expect(callArg).toHaveProperty('to');
+      expect(callArg).toHaveProperty('startDate');
+      expect(callArg).toHaveProperty('endDate');
     });
   });
 
   describe('Date Range Calculation', () => {
     it('should calculate correct range for "2 Weeks (±1 week)"', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
@@ -179,8 +179,8 @@ describe('DateRangeFilter', () => {
       });
 
       const callArg = mockOnChange.mock.calls[0][0];
-      const from = callArg.from;
-      const to = callArg.to;
+      const from = callArg.startDate;
+      const to = callArg.endDate;
 
       // Calculate expected dates
       const today = new Date();
@@ -194,43 +194,44 @@ describe('DateRangeFilter', () => {
     });
 
     it('should ensure from date is before to date', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       await waitFor(() => {
-        const thisWeekButton = screen.getByText('This Week');
-        fireEvent.click(thisWeekButton);
+        const todayButton = screen.getByText('Today');
+        fireEvent.click(todayButton);
       });
 
       const callArg = mockOnChange.mock.calls[0][0];
-      expect(callArg.from.getTime()).toBeLessThanOrEqual(callArg.to.getTime());
+      expect(callArg.startDate.getTime()).toBeLessThanOrEqual(callArg.endDate.getTime());
     });
   });
 
   describe('Custom Date Selection', () => {
     it('should allow custom date range selection', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       // Calendar should be visible
       await waitFor(() => {
-        expect(screen.getByRole('grid')).toBeInTheDocument();
+        const calendars = screen.getAllByRole('grid');
+        expect(calendars.length).toBeGreaterThan(0);
       });
     });
 
     it('should call onChange when custom dates selected', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       await waitFor(() => {
-        const calendar = screen.getByRole('grid');
-        expect(calendar).toBeInTheDocument();
+        const calendars = screen.getAllByRole('grid');
+        expect(calendars.length).toBeGreaterThan(0);
       });
 
       // Note: Actual date selection in calendar requires more complex interaction
@@ -240,38 +241,39 @@ describe('DateRangeFilter', () => {
 
   describe('Controlled Component', () => {
     it('should display provided value', () => {
-      const from = new Date('2025-10-15');
-      const to = new Date('2025-10-25');
+      const startDate = new Date('2025-10-15');
+      const endDate = new Date('2025-10-25');
 
       render(
         <DateRangeFilter
-          value={{ from, to }}
+          value={{ startDate, endDate }}
           onChange={mockOnChange}
         />
       );
 
       const button = screen.getByRole('button');
-      expect(button.textContent).toContain('Oct');
+      expect(button.textContent).toContain('15/10/2025');
+      expect(button.textContent).toContain('25/10/2025');
     });
 
     it('should update when value prop changes', () => {
       const { rerender } = render(
         <DateRangeFilter
-          value={{ from: new Date('2025-10-01'), to: new Date('2025-10-31') }}
+          value={{ startDate: new Date('2025-10-01'), endDate: new Date('2025-10-31') }}
           onChange={mockOnChange}
         />
       );
 
-      expect(screen.getByRole('button').textContent).toContain('Oct');
+      expect(screen.getByRole('button').textContent).toContain('01/10/2025');
 
       rerender(
         <DateRangeFilter
-          value={{ from: new Date('2025-11-01'), to: new Date('2025-11-30') }}
+          value={{ startDate: new Date('2025-11-01'), endDate: new Date('2025-11-30') }}
           onChange={mockOnChange}
         />
       );
 
-      expect(screen.getByRole('button').textContent).toContain('Nov');
+      expect(screen.getByRole('button').textContent).toContain('01/11/2025');
     });
   });
 
@@ -281,7 +283,7 @@ describe('DateRangeFilter', () => {
 
       render(
         <DateRangeFilter
-          value={{ from: sameDay, to: sameDay }}
+          value={{ startDate: sameDay, endDate: sameDay }}
           onChange={mockOnChange}
         />
       );
@@ -290,7 +292,7 @@ describe('DateRangeFilter', () => {
     });
 
     it('should handle undefined value', () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
@@ -298,7 +300,7 @@ describe('DateRangeFilter', () => {
     it('should handle partial date range (only from)', () => {
       render(
         <DateRangeFilter
-          value={{ from: new Date('2025-10-01'), to: undefined }}
+          value={{ startDate: new Date('2025-10-01'), endDate: undefined }}
           onChange={mockOnChange}
         />
       );
@@ -309,7 +311,7 @@ describe('DateRangeFilter', () => {
     it('should handle partial date range (only to)', () => {
       render(
         <DateRangeFilter
-          value={{ from: undefined, to: new Date('2025-10-31') }}
+          value={{ startDate: undefined, endDate: new Date('2025-10-31') }}
           onChange={mockOnChange}
         />
       );
@@ -320,7 +322,7 @@ describe('DateRangeFilter', () => {
 
   describe('Accessibility', () => {
     it('should have accessible button', () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       expect(button).toBeInTheDocument();
@@ -328,7 +330,7 @@ describe('DateRangeFilter', () => {
     });
 
     it('should be keyboard navigable', () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       button.focus();
@@ -339,7 +341,7 @@ describe('DateRangeFilter', () => {
 
   describe('Integration with Parent Component', () => {
     it('should work with external state management', () => {
-      let selectedRange: any = undefined;
+      let selectedRange: any = {};
 
       const TestComponent = () => {
         const [range, setRange] = React.useState(selectedRange);
@@ -349,12 +351,12 @@ describe('DateRangeFilter', () => {
             <DateRangeFilter
               value={range}
               onChange={(newRange: any) => {
-                setRange(newRange: any);
+                setRange(newRange);
                 selectedRange = newRange;
               }}
             />
             <div data-testid="selected-dates">
-              {range?.from?.toISOString() || 'No dates selected'}
+              {range?.startDate?.toISOString() || 'No dates selected'}
             </div>
           </div>
         );
@@ -367,13 +369,13 @@ describe('DateRangeFilter', () => {
 
     it('should trigger re-render in parent on change', async () => {
       const TestComponent = () => {
-        const [range, setRange] = React.useState<any>(undefined);
+        const [range, setRange] = React.useState<any>({});
         
         return (
           <div>
             <DateRangeFilter value={range} onChange={setRange} />
             <div data-testid="range-set">
-              {range ? 'Range set' : 'No range'}
+              {range?.startDate ? 'Range set' : 'No range'}
             </div>
           </div>
         );
@@ -387,7 +389,7 @@ describe('DateRangeFilter', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        const preset = screen.getByText('This Week');
+        const preset = screen.getByText('Today');
         fireEvent.click(preset);
       });
 
@@ -399,13 +401,13 @@ describe('DateRangeFilter', () => {
 
   describe('Performance', () => {
     it('should not call onChange multiple times for single selection', async () => {
-      render(<DateRangeFilter onChange={mockOnChange} />);
+      render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
 
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
       await waitFor(() => {
-        const preset = screen.getByText('This Week');
+        const preset = screen.getByText('Today');
         fireEvent.click(preset);
       });
 

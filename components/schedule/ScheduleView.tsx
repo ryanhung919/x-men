@@ -121,6 +121,8 @@ export default function ScheduleView() {
         });
       });
       setRows(Object.values(grouped));
+    } catch (error) {
+      console.error('Failed to load schedule data:', error);
     } finally {
       setLoadingData(false);
     }
@@ -132,13 +134,22 @@ export default function ScheduleView() {
   }, [date.startDate?.toISOString(), date.endDate?.toISOString(), selectedProjects.join(','), selectedStaffIds.join(',')]);
 
   const handleChangeDeadline = async (taskId: number, newDate: Date) => {
-    // optimistic UI: we simply refetch after
-    await fetch('/api/schedule', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, deadline: newDate.toISOString() }),
-    });
-    reload();
+    try {
+      const response = await fetch('/api/schedule', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, deadline: newDate.toISOString() }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to update task deadline');
+        return;
+      }
+      
+      reload();
+    } catch (error) {
+      console.error('Failed to update task deadline');
+    }
   };
 
   return (
