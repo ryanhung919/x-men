@@ -552,3 +552,114 @@ export async function archiveTask(
 
   return allTaskIds.length;
 }
+
+export async function getScheduleTasks(
+  startDate?: Date,
+  endDate?: Date,
+  projectIds?: number[],
+  staffIds?: string[]
+): Promise<{
+  id: number;
+  title: string;
+  created_at: string;
+  deadline: string;
+  status: string;
+  updated_at: string;
+  project_name: string;
+  assignees: { id: string; first_name: string; last_name: string }[];
+}[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('tasks')
+    .select(
+      `
+      id,
+      title,
+      created_at,
+      deadline,
+      status,
+      updated_at,
+      project:projects!inner(id, name),
+      task_assignments(assignee_id)
+    `
+    )
+    .neq('is_archived', true)
+    .not('deadline', 'is', null);
+
+  // Apply date filters - show tasks that overlap with the date range
+  // A task overlaps if: (task_start <= endDate) AND (task_deadline >= startDate)
+  // Since task_start is created_at, we check: created_at <= endDate AND deadline >= startDate
+  if (endDate) {
+    query = query.lte('created_at', endDate.toISOString());
+  }
+  if (startDate) {
+    query = query.gte('deadline', startDate.toISOString());
+  }
+
+  // Apply project filter
+  if (projectIds && projectIds.length > 0) {
+    query = query.in('project.id', projectIds);
+  }
+
+  query = query.order('deadline', { ascending: true });
+
+  const { data: tasksData, error: tasksError } = await query;
+
+  if (tasksError) {
+    throw new Error(`Failed to fetch schedule tasks: ${tasksError.message}`);
+  }
+
+  if (!tasksData || tasksData.length === 0) {
+    return [];
+  }
+
+  // Filter by staff if specified
+  let filteredTasksData = tasksData;
+  if (staffIds && staffIds.length > 0) {
+    filteredTasksData = tasksData.filter((task: any) => {
+      const taskAssigneeIds = ((task as any).task_assignments || []).map((a: any) => a.assignee_id);
+      // Check if any of the selected staff are assigned to this task
+      return staffIds.some((staffId: string) => taskAssigneeIds.includes(staffId));
+    });
+  }
+
+  if (filteredTasksData.length === 0) {
+    return [];
+  }
+
+  // Get all task IDs
+  const taskIds = filteredTasksData.map((task: any) => task.id);
+
+  // Fetch assignee information using the security definer function
+  const { data: assigneesData, error: assigneesError } = await supabase.rpc(
+    'get_task_assignees_info',
+    { task_ids: taskIds }
+  );
+
+  if (assigneesError) {
+    throw new Error(`Failed to fetch assignee info: ${assigneesError.message}`);
+  }
+
+  // Build a map of task_id -> assignees
+  const taskAssigneeMap = new Map<number, { id: string; first_name: string; last_name: string }[]>();
+  
+  for (const task of filteredTasksData) {
+    const taskId = (task as any).id;
+    const assigneeIds = ((task as any).task_assignments || []).map((a: any) => a.assignee_id);
+    const taskAssignees = (assigneesData || []).filter((a: any) => assigneeIds.includes(a.id));
+    taskAssigneeMap.set(taskId, taskAssignees);
+  }
+
+  // Transform and return the data
+  return filteredTasksData.map((task: any) => ({
+    id: task.id,
+    title: task.title,
+    created_at: task.created_at,
+    deadline: task.deadline,
+    status: task.status,
+    updated_at: task.updated_at,
+    project_name: Array.isArray(task.project) ? task.project[0]?.name : task.project?.name,
+    assignees: taskAssigneeMap.get(task.id) || [],
+  }));
+}
