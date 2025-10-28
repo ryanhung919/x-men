@@ -1,0 +1,67 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+AddElementTag("api", $fontColor="#ffffff", $bgColor="#1168bd")
+AddElementTag("svc", $fontColor="#ffffff", $bgColor="#6B7280")
+AddElementTag("dal", $fontColor="#111827", $bgColor="#e5e7eb")
+AddElementTag("action", $fontColor="#111827", $bgColor="#fde68a")
+AddElementTag("cron", $fontColor="#111827", $bgColor="#96e245ff")
+
+' Top-level containers to mirror container.puml relations
+Container(browser, "Browser UI", "React (Next.js client)")
+ContainerDb(db, "Supabase Postgres", "Postgres")
+Container(edge, "Supabase Edge Functions", "Deno", $tags="cron")
+Container_Ext(sendgrid, "SendGrid", "Email API")
+
+' Open up Next.js Server into components showing the specified pipelines
+Container_Boundary(next_components, "Next.js Server internals") {
+	' API layer
+	Component(api_tasks, "/api/tasks", "API Route", "Create task, helper lists", $tags="api")
+	Component(api_reports, "/api/reports/*", "API Routes", "Report endpoints", $tags="api")
+	Component(api_schedule, "/api/schedule/*", "API Routes", "Schedule endpoints", $tags="api")
+    Component(api_calendar, "/api/calendar/*", "API Routes", "Calendar endpoints", $tags="api")
+
+	' Services layer
+	Component(svc_tasks, "lib/services/tasks.ts", "Service", "Map/format task data", $tags="svc")
+	Component(svc_report, "lib/services/report.ts", "Service", "Report transforms", $tags="svc")
+	Component(svc_filter, "lib/services/filter.ts", "Service", "Filter logic", $tags="svc")
+
+	' Data access layer (DB)
+	Component(dal_tasks, "lib/db/tasks.ts", "Data Access", "Queries, RPC, storage ops", $tags="dal")
+	Component(dal_report, "lib/db/report.ts", "Data Access", "Report queries", $tags="dal")
+	Component(dal_filter, "lib/db/filter.ts", "Data Access", "Filters & lookup data", $tags="dal")
+	Component(dal_notifs, "lib/db/notifs.ts", "Data Access", "Notifications data ops", $tags="dal")
+
+	' Notifications: server actions -> DB
+	Component(sa_notifs, "actions/notifs.ts", "Server Actions", "In-app notifications", $tags="action")
+}
+
+' Browser -> Next.js Server
+Rel(browser, next_components, "Navigate / Render / Call APIs", "HTTPS")
+
+' Pipelines inside Next.js Server
+Rel(api_tasks, svc_tasks, "tasks: api -> services")
+Rel(api_reports, svc_report, "report: api -> services")
+
+Rel(api_schedule, svc_tasks, "schedule: api -> services")
+Rel(api_calendar, svc_tasks, "calendar: api -> services")
+
+
+Rel(svc_tasks, dal_tasks, "tasks: services -> db")
+Rel(svc_report, dal_report, "report: services -> db")
+Rel(api_reports, svc_filter, "report: api -> services")
+Rel(api_schedule, svc_filter, "schedule: api -> services")
+Rel(svc_filter, dal_filter, "filter: services -> db")
+Rel(sa_notifs, dal_notifs, "notif: server actions -> db")
+
+' DB relationships
+Rel(dal_tasks, db, "SQL/RPC incl. create_task_with_assignments")
+Rel(dal_report, db, "SQL queries")
+Rel(dal_filter, db, "SQL lookups")
+Rel(dal_notifs, db, "SQL inserts/selects")
+
+' Email: server -> edge function -> sendgrid
+Rel(edge, sendgrid, "Send emails")
+
+SHOW_LEGEND()
+@enduml

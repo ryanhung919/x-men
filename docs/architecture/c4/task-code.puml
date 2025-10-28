@@ -1,0 +1,131 @@
+@startuml
+' Code/Classes for Task domain (C4 level 4 – code)
+skinparam Style strictuml
+skinparam classAttributeIconSize 0
+Title "Task Domain - Code/Class Model"
+
+package "Types (lib/services/tasks.ts)" as Types {
+  class RawTask {
+    +id: number
+    +title: string
+    +description: string | null
+    +priority_bucket: number
+    +status: string
+    +deadline: string | null
+    +notes: string | null
+    +project: { id: number; name: string }
+    +parent_task_id: number | null
+    +recurrence_interval: number
+    +recurrence_date: string | null
+    +creator_id: string
+    +task_assignments: { assignee_id: string }[]
+    +tags: { tags: { name: string } }[]
+  }
+
+  class RawSubtask {
+    +id: number
+    +title: string
+    +status: string
+    +deadline: string | null
+    +parent_task_id: number
+  }
+
+  class RawAttachment {
+    +id: number
+    +storage_path: string
+    +task_id: number
+  }
+
+  class RawAssignee {
+    +id: string
+    +first_name: string
+    +last_name: string
+  }
+
+  class RawComment {
+    +id: number
+    +content: string
+    +created_at: string
+    +user_id: string
+  }
+
+  class Task {
+    +id: number
+    +title: string
+    +description: string | null
+    +priority: number
+    +status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked'
+    +deadline: string | null
+    +notes: string | null
+    +recurrence_interval: number
+    +recurrence_date: string | null
+    +project: { id: number; name: string }
+    +creator: { creator_id: string; user_info: { first_name: string; last_name: string } }
+    +subtasks: { id: number; title: string; status: string; deadline: string | null }[]
+    +assignees: { assignee_id: string; user_info: { first_name: string; last_name: string } }[]
+    +tags: string[]
+    +attachments: string[]
+    +isOverdue: boolean
+  }
+
+  class TaskComment {
+    +id: number
+    +content: string
+    +created_at: string
+    +user_id: string
+    +user_info: RawAssignee
+  }
+
+  class DetailedTask {
+    +attachments: { id: number; storage_path: string; public_url?: string }[]
+    +comments: TaskComment[]
+  }
+  DetailedTask --|> Task
+}
+
+package "Service (lib/services/tasks.ts)" as Service {
+  class TaskService {
+    +mapTaskAttributes(task: RawTask): Omit<Task, 'subtasks'|'assignees'|'attachments'|'creator'>
+    +calculateNextDueDate(task: Task): Task
+    +formatTasks(rawData: { tasks: RawTask[]; subtasks: RawSubtask[]; attachments: RawAttachment[]; assignees: RawAssignee[]; }): Task[]
+    +formatTaskDetails(rawData: { task: RawTask | null; subtasks: RawSubtask[]; attachments: { id: number; storage_path: string; public_url?: string }[]; comments: RawComment[]; assignees: RawAssignee[]; }): DetailedTask | null
+  }
+}
+
+package "Data Access (lib/db/tasks.ts)" as DAL {
+  class TaskDb {
+    +getUserTasks(userId: string): { tasks: RawTask[]; subtasks: RawSubtask[]; attachments: RawAttachment[]; assignees: RawAssignee[] }
+    +getTaskById(taskId: number): { task: RawTask | null; subtasks: RawSubtask[]; attachments: { id: number; storage_path: string; public_url?: string }[]; comments: RawComment[]; assignees: RawAssignee[] } | null
+    +createTask(supabase: SupabaseClient, payload: CreateTaskPayload, creatorId: string, attachmentFiles?: File[]): number
+    +archiveTask(taskId: number, isArchived: boolean): number
+    +getAllUsers(): RawAssignee[]
+    +getAllProjects(): { id: number; name: string }[]
+    +getScheduleTasks(start?: Date, end?: Date, projectIds?: number[], staffIds?: string[]): { id: number; title: string; created_at: string; deadline: string; status: string; updated_at: string; project_name: string; assignees: { id: string; first_name: string; last_name: string }[] }[]
+  }
+}
+
+' Relationships
+TaskService ..> RawTask
+TaskService ..> RawSubtask
+TaskService ..> RawAttachment
+TaskService ..> RawAssignee
+TaskService ..> RawComment
+TaskService ..> Task
+TaskService ..> DetailedTask
+
+TaskDb ..> RawTask
+TaskDb ..> RawSubtask
+TaskDb ..> RawAttachment
+TaskDb ..> RawAssignee
+TaskDb ..> RawComment
+TaskDb ..> DetailedTask : returns via composition with Service
+
+note right of TaskDb
+- Uses supabase-js server client
+- RPC: create_task_with_assignments
+- Storage bucket: task-attachments
+- Trigger: update_project_departments (note)
+- RLS-aware (service role for writes)
+end note
+
+@enduml
