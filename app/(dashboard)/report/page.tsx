@@ -1,9 +1,9 @@
 // app/report/page.tsx (Server Component)
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import ReportsPageClient from './page-client';
-import { filterProjects, filterDepartments } from '@/lib/services/filter';
-import { generateLoggedTimeReport } from '@/lib/services/report';
+import ReportsPageClient from '@/components/report/page-client';
+import { Suspense } from 'react';
+import { LoggedTimeReportSkeleton } from '@/components/report/report-skeletons';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 async function getUserInfo() {
   const cookieStore = await cookies();
   const userInfoCookie = cookieStore.get('user-info')?.value;
-  
+
   if (!userInfoCookie) return null;
-  
+
   try {
     return JSON.parse(userInfoCookie);
   } catch {
@@ -21,10 +21,13 @@ async function getUserInfo() {
   }
 }
 
-export default async function ReportsPage() {
+// Separate async component for data loading
+async function ReportsPageData() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     return <div>Unauthorized</div>;
   }
@@ -32,27 +35,37 @@ export default async function ReportsPage() {
   const userInfo = await getUserInfo();
   const userDepartmentId = userInfo?.departmentId || null;
 
-  // Preload all necessary data
-  let initialDepartments: Array<{id: number; name: string}> = [];
+  // Dynamically import to avoid blocking initial render
+  const { filterProjects, filterDepartments } = await import('@/lib/services/filter');
+  const { generateLoggedTimeReport } = await import('@/lib/services/report');
+
+  let initialDepartments: Array<{ id: number; name: string }> = [];
   let initialProjects: any[] = [];
   let initialReportData: any = null;
   let preselectedDepartments: number[] = [];
   let preselectedProjects: number[] = [];
 
   try {
-    // Fetch all departments available to user
-    initialDepartments = await filterDepartments(user.id);
-    
-    // If user has a department, preselect it
-    if (userDepartmentId && initialDepartments.some(d => d.id === userDepartmentId)) {
+    // Fetch departments and projects in parallel
+    const [departments, projects] = await Promise.all([
+      filterDepartments(user.id),
+      filterProjects(user.id),
+    ]);
+
+    initialDepartments = departments;
+    initialProjects = projects;
+
+    // If user has a department, preselect it and generate report
+    if (userDepartmentId && initialDepartments.some((d) => d.id === userDepartmentId)) {
       preselectedDepartments = [userDepartmentId];
-      
-      // Fetch projects for user's department
-      initialProjects = await filterProjects(user.id, preselectedDepartments);
-      
-      // Get all project IDs for the report
-      preselectedProjects = initialProjects.map(p => p.id);
-      
+
+      // Filter projects for user's department
+      const userProjects = initialProjects.filter((p) =>
+        p.departments?.some((d: any) => d.id === userDepartmentId)
+      );
+
+      preselectedProjects = userProjects.map((p) => p.id);
+
       // Generate initial report data if we have projects
       if (preselectedProjects.length > 0) {
         const reportData = await generateLoggedTimeReport({
@@ -60,8 +73,8 @@ export default async function ReportsPage() {
           startDate: undefined,
           endDate: undefined,
         });
-        
-        // Convert Map to object for JSON serialization
+
+        // Convert for JSON serialization
         initialReportData = {
           kind: reportData.kind,
           totalTime: reportData.totalTime,
@@ -73,12 +86,9 @@ export default async function ReportsPage() {
           onTimeCompletionRate: reportData.onTimeCompletionRate,
           totalDelayHours: reportData.totalDelayHours,
           overdueTime: reportData.overdueTime,
-          timeByTask: reportData.timeByTask, // Keep as Map for now
+          timeByTask: reportData.timeByTask,
         };
       }
-    } else {
-      // No department preselected, just fetch all projects
-      initialProjects = await filterProjects(user.id);
     }
   } catch (error) {
     console.error('Error preloading report data:', error);
@@ -88,10 +98,66 @@ export default async function ReportsPage() {
     <ReportsPageClient
       initialDepartmentId={userDepartmentId}
       initialDepartments={initialDepartments}
-      initialProjects={initialProjects as any}
+      initialProjects={initialProjects}
       initialReportData={initialReportData}
       preselectedDepartments={preselectedDepartments}
       preselectedProjects={preselectedProjects}
     />
+  );
+}
+
+// Skeleton that matches the exact layout of the filters and report
+function ReportsPageSkeleton() {
+  return (
+    <div className="space-y-6 p-4">
+      {/* Filter Controls Row */}
+      <div className="flex flex-wrap gap-4 items-center">
+        {/* Department Selector Skeleton */}
+        <div className="relative">
+          <div className="w-52 h-10 rounded-md border border-input bg-muted animate-pulse" />
+        </div>
+
+        {/* Project Selector Skeleton */}
+        <div className="relative">
+          <div className="w-52 h-10 rounded-md border border-input bg-muted animate-pulse" />
+        </div>
+
+        {/* Date Range Selector Skeleton */}
+        <div className="relative">
+          <div className="w-52 h-10 rounded-md border border-input bg-muted animate-pulse" />
+        </div>
+
+        {/* Report Type Selector Skeleton */}
+        <div className="relative">
+          <div className="w-52 h-10 rounded-md border border-input bg-muted animate-pulse" />
+        </div>
+
+        {/* Export Buttons Skeleton */}
+        <div className="flex gap-2">
+          <div className="h-9 w-32 rounded-md bg-muted animate-pulse" />
+          <div className="h-9 w-32 rounded-md bg-muted animate-pulse" />
+        </div>
+      </div>
+
+      {/* Active Filters Badge Skeleton - matches initial preselected state */}
+      <div className="flex items-center gap-2 mt-3">
+        <div className="h-8 w-48 rounded-full" />
+        <div className="h-5 w-20 rounded" />
+      </div>
+
+      {/* Report Content Skeleton */}
+      <div className="mt-4">
+        <LoggedTimeReportSkeleton />
+      </div>
+    </div>
+  );
+}
+
+// Main page component with Suspense boundary
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<ReportsPageSkeleton />}>
+      <ReportsPageData />
+    </Suspense>
   );
 }
