@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { archiveTask } from '@/lib/db/tasks';
-import { getRolesForUserClient } from '@/lib/db/roles';
+import { archiveTaskService } from '@/lib/services/tasks';
 
 /**
  * PATCH /api/tasks/[id]/archive - Archive or unarchive a task
@@ -33,15 +32,6 @@ export async function PATCH(
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is a manager
-    const roles = await getRolesForUserClient(supabase, user.id);
-    if (!roles.includes('manager')) {
-      return NextResponse.json(
-        { error: 'Only managers can archive tasks' },
-        { status: 403 }
-      );
     }
 
     // Parse task ID from params - handle both Promise and non-Promise
@@ -78,8 +68,8 @@ export async function PATCH(
       );
     }
 
-    // Archive or unarchive the task
-    const affectedCount = await archiveTask(taskId, is_archived);
+    // Archive or unarchive the task via service layer (handles authorization)
+    const affectedCount = await archiveTaskService(supabase, user.id, taskId, is_archived);
 
     return NextResponse.json(
       {
@@ -94,6 +84,15 @@ export async function PATCH(
     );
   } catch (error) {
     console.error('Error archiving task:', error);
+
+    // Handle authorization errors from service layer
+    if (error instanceof Error && error.message === 'Only managers can archive tasks') {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

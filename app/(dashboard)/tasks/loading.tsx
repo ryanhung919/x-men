@@ -10,20 +10,32 @@ import {
 
 export default function Loading() {
   return (
-    <div className="container mx-auto p-6 space-y-4">
-      {/* Page Title Skeleton */}
-      <Skeleton className="h-8 w-32" />
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Page Header Skeleton - matches TasksPageHeader */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          {/* Icon box */}
+          <Skeleton className="w-12 h-12 rounded-lg" />
+          {/* Title */}
+          <Skeleton className="h-9 w-32" />
+        </div>
+        {/* Create Task button */}
+        <Skeleton className="h-10 w-32" />
+      </div>
 
-      {/* Create Task Button Skeleton */}
-      <Skeleton className="h-10 w-40" />
-
-      {/* Filter Bar Skeleton */}
+      {/* Filter Bar Skeleton - matches TasksList filter bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-background p-4 rounded-lg border">
-        <Skeleton className="h-10 w-40" />
+        {/* Show Completed toggle button */}
+        <Skeleton className="h-10 w-44" />
         <div className="flex flex-wrap items-center gap-2">
+          {/* Column visibility button */}
           <Skeleton className="h-10 w-32" />
+          {/* Status filter */}
+          <Skeleton className="h-10 w-28" />
+          {/* Project filter */}
           <Skeleton className="h-10 w-32" />
-          <Skeleton className="h-10 w-32" />
+          {/* Tag filter */}
+          <Skeleton className="h-10 w-24" />
         </div>
       </div>
 

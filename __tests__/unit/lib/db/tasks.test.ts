@@ -1400,6 +1400,443 @@ describe('lib/db/tasks', () => {
         expect(result.task.recurrence_date).toBe('2025-10-16T00:00:00.000Z');
       }
     });
+
+    it('should log error and continue when subtasks query fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const mockTask = {
+        id: 1,
+        title: 'Task',
+        description: null,
+        priority_bucket: 1,
+        status: 'To Do',
+        deadline: null,
+        notes: null,
+        project: { id: 1, name: 'Project' },
+        parent_task_id: null,
+        recurrence_interval: 0,
+        recurrence_date: null,
+        creator_id: 'creator-1',
+        task_assignments: [],
+        tags: [],
+      };
+
+      const taskSingleMock = vi.fn().mockResolvedValue({
+        data: mockTask,
+        error: null,
+      });
+
+      const taskNeqMock = vi.fn().mockReturnValue({
+        single: taskSingleMock,
+      });
+
+      const taskEqMock = vi.fn().mockReturnValue({
+        neq: taskNeqMock,
+      });
+
+      const taskSelectMock = vi.fn().mockReturnValue({
+        eq: taskEqMock,
+      });
+
+      const subtasksError = { message: 'Subtasks fetch failed' };
+      const subtasksNeqMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: subtasksError,
+      });
+
+      const subtasksEqMock = vi.fn().mockReturnValue({
+        neq: subtasksNeqMock,
+      });
+
+      const subtasksSelectMock = vi.fn().mockReturnValue({
+        eq: subtasksEqMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tasks') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tasks'
+          ).length;
+          if (callCount === 1) {
+            return { select: taskSelectMock };
+          } else {
+            return { select: subtasksSelectMock };
+          }
+        }
+        if (table === 'task_attachments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        if (table === 'task_comments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({ data: [], error: null });
+
+      const result = await getTaskById(1);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching subtasks:', subtasksError);
+      expect(result).not.toBeNull();
+      expect(result?.subtasks).toEqual([]);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should log error and continue when attachments query fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const mockTask = {
+        id: 1,
+        title: 'Task',
+        description: null,
+        priority_bucket: 1,
+        status: 'To Do',
+        deadline: null,
+        notes: null,
+        project: { id: 1, name: 'Project' },
+        parent_task_id: null,
+        recurrence_interval: 0,
+        recurrence_date: null,
+        creator_id: 'creator-1',
+        task_assignments: [],
+        tags: [],
+      };
+
+      const taskSingleMock = vi.fn().mockResolvedValue({
+        data: mockTask,
+        error: null,
+      });
+
+      const attachmentsError = { message: 'Attachments fetch failed' };
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tasks') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tasks'
+          ).length;
+          if (callCount === 1) {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockReturnValue({ single: taskSingleMock }),
+                }),
+              }),
+            };
+          } else {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            };
+          }
+        }
+        if (table === 'task_attachments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: null, error: attachmentsError }),
+            }),
+          };
+        }
+        if (table === 'task_comments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({ data: [], error: null });
+
+      const result = await getTaskById(1);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching attachments:', attachmentsError);
+      expect(result).not.toBeNull();
+      expect(result?.attachments).toEqual([]);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should log error and continue when comments query fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const mockTask = {
+        id: 1,
+        title: 'Task',
+        description: null,
+        priority_bucket: 1,
+        status: 'To Do',
+        deadline: null,
+        notes: null,
+        project: { id: 1, name: 'Project' },
+        parent_task_id: null,
+        recurrence_interval: 0,
+        recurrence_date: null,
+        creator_id: 'creator-1',
+        task_assignments: [],
+        tags: [],
+      };
+
+      const commentsError = { message: 'Comments fetch failed' };
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tasks') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tasks'
+          ).length;
+          if (callCount === 1) {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({ data: mockTask, error: null }),
+                  }),
+                }),
+              }),
+            };
+          } else {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            };
+          }
+        }
+        if (table === 'task_attachments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        if (table === 'task_comments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                neq: vi.fn().mockResolvedValue({ data: null, error: commentsError }),
+              }),
+            }),
+          };
+        }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({ data: [], error: null });
+
+      const result = await getTaskById(1);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching comments:', commentsError);
+      expect(result).not.toBeNull();
+      expect(result?.comments).toEqual([]);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should log error and continue when assignee info RPC fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const mockTask = {
+        id: 1,
+        title: 'Task',
+        description: null,
+        priority_bucket: 1,
+        status: 'To Do',
+        deadline: null,
+        notes: null,
+        project: { id: 1, name: 'Project' },
+        parent_task_id: null,
+        recurrence_interval: 0,
+        recurrence_date: null,
+        creator_id: 'creator-1',
+        task_assignments: [{ assignee_id: 'user-1' }],
+        tags: [],
+      };
+
+      const assigneeError = { message: 'RPC failed' };
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tasks') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tasks'
+          ).length;
+          if (callCount === 1) {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({ data: mockTask, error: null }),
+                  }),
+                }),
+              }),
+            };
+          } else {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            };
+          }
+        }
+        if (table === 'task_attachments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        if (table === 'task_comments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({ data: null, error: assigneeError });
+
+      const result = await getTaskById(1);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching assignee user info:', assigneeError);
+      expect(result).not.toBeNull();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should log error and continue when additional user info query fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const mockTask = {
+        id: 1,
+        title: 'Task',
+        description: null,
+        priority_bucket: 1,
+        status: 'To Do',
+        deadline: null,
+        notes: null,
+        project: { id: 1, name: 'Project' },
+        parent_task_id: null,
+        recurrence_interval: 0,
+        recurrence_date: null,
+        creator_id: 'creator-1',
+        task_assignments: [{ assignee_id: 'user-1' }],
+        tags: [],
+      };
+
+      const userInfoError = { message: 'User info fetch failed' };
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tasks') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tasks'
+          ).length;
+          if (callCount === 1) {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({ data: mockTask, error: null }),
+                  }),
+                }),
+              }),
+            };
+          } else {
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            };
+          }
+        }
+        if (table === 'task_attachments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          };
+        }
+        if (table === 'task_comments') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ data: null, error: userInfoError }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      // RPC returns empty to trigger the user_info query path
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({ data: [], error: null });
+
+      const result = await getTaskById(1);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching additional user info:', userInfoError);
+      expect(result).not.toBeNull();
+
+      consoleErrorSpy.mockRestore();
+    });
   });
 
   describe('createTask', () => {
@@ -1743,6 +2180,214 @@ describe('lib/db/tasks', () => {
       expect(result).toBe(taskId);
       expect(uploadMock).toHaveBeenCalledTimes(2);
       expect(attachmentInsertMock).toHaveBeenCalledTimes(1); // Only second file succeeded
+    });
+
+    it('should log error and continue when tag fetch fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+        tags: ['tag1', 'tag2'],
+      };
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      const tagFetchError = { message: 'Tag fetch failed' };
+
+      const tagsInsertSelectMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      });
+
+      const tagsInsertMock = vi.fn().mockReturnValue({
+        select: tagsInsertSelectMock,
+      });
+
+      const tagsInMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: tagFetchError,
+      });
+
+      const tagsSelectMock = vi.fn().mockReturnValue({
+        in: tagsInMock,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tags') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tags'
+          ).length;
+          if (callCount <= 2) {
+            return {
+              insert: tagsInsertMock,
+            };
+          } else {
+            return {
+              select: tagsSelectMock,
+            };
+          }
+        }
+        return {};
+      });
+
+      const result = await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching tags:', tagFetchError);
+      expect(result).toBe(taskId);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should log error and continue when task tag linking fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+        tags: ['tag1', 'tag2'],
+      };
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      const taskTagError = { message: 'Task tag linking failed' };
+
+      const tagsInsertSelectMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      });
+
+      const tagsInsertMock = vi.fn().mockReturnValue({
+        select: tagsInsertSelectMock,
+      });
+
+      const tagsInMock = vi.fn().mockResolvedValue({
+        data: [
+          { id: 1, name: 'tag1' },
+          { id: 2, name: 'tag2' },
+        ],
+        error: null,
+      });
+
+      const tagsSelectMock = vi.fn().mockReturnValue({
+        in: tagsInMock,
+      });
+
+      const taskTagsInsertMock = vi.fn().mockResolvedValue({
+        data: null,
+        error: taskTagError,
+      });
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'tags') {
+          const callCount = (mockSupabaseClient.from as any).mock.calls.filter(
+            (call: any[]) => call[0] === 'tags'
+          ).length;
+          if (callCount <= 2) {
+            return {
+              insert: tagsInsertMock,
+            };
+          } else {
+            return {
+              select: tagsSelectMock,
+            };
+          }
+        }
+        if (table === 'task_tags') {
+          return {
+            insert: taskTagsInsertMock,
+          };
+        }
+        return {};
+      });
+
+      const result = await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error linking tags to task:', taskTagError);
+      expect(result).toBe(taskId);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should log error and cleanup storage when attachment record creation fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const taskId = 123;
+      const creatorId = 'user-123';
+      const payload: CreateTaskPayload = {
+        project_id: 1,
+        title: 'New Task',
+        description: 'Task description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: ['user-456'],
+        deadline: '2025-12-31T23:59:59Z',
+      };
+
+      const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
+
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValue({
+        data: taskId,
+        error: null,
+      });
+
+      const uploadMock = vi.fn().mockResolvedValue({ error: null });
+      const removeMock = vi.fn().mockResolvedValue({ error: null });
+
+      const attachmentError = { message: 'Attachment record creation failed' };
+      const attachmentInsertMock = vi.fn().mockResolvedValue({ error: attachmentError });
+
+      (mockSupabaseClient as any).storage = {
+        from: vi.fn().mockReturnValue({
+          upload: uploadMock,
+          remove: removeMock,
+        }),
+      };
+
+      mockSupabaseClient.from = vi.fn().mockImplementation((table: string) => {
+        if (table === 'task_attachments') {
+          return {
+            insert: attachmentInsertMock,
+          };
+        }
+        return {};
+      });
+
+      const result = await createTask(mockSupabaseClient as any as SupabaseClient, payload, creatorId, [mockFile]);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error creating attachment record for ${mockFile.name}:`,
+        expect.objectContaining({
+          error: attachmentError,
+          taskId: taskId,
+          storagePath: expect.stringContaining('tasks/123/'),
+          uploadedBy: creatorId,
+        })
+      );
+      expect(removeMock).toHaveBeenCalledWith([expect.stringContaining('tasks/123/')]);
+      expect(result).toBe(taskId);
+
+      consoleErrorSpy.mockRestore();
     });
   });
 
