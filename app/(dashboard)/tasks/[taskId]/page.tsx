@@ -7,8 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { SubtaskLink } from '@/components/tasks/subtask-link';
 import { enUS } from 'date-fns/locale';
-import { getTaskById } from '@/lib/db/tasks';
-import { formatTaskDetails, DetailedTask } from '@/lib/services/tasks';
+import { getTaskByIdService, DetailedTask } from '@/lib/services/tasks';
 import { AttachmentItem } from '@/components/tasks/attachment-item';
 import { getRolesForUserClient } from '@/lib/db/roles';
 import { ArchiveButton } from '@/components/tasks/archive-button';
@@ -29,12 +28,8 @@ export default async function TaskDetailsPage({ params }: { params: Promise<{ ta
     notFound();
   }
 
-  const rawData = await getTaskById(taskId);
-  if (!rawData) {
-    notFound();
-  }
-
-  const task = formatTaskDetails(rawData);
+  // Fetch and format task via service layer (single call)
+  const task = await getTaskByIdService(taskId);
   if (!task) {
     notFound();
   }

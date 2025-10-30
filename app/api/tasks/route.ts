@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createTask, getAllUsers, getAllProjects } from '@/lib/db/tasks';
+import { getAllUsers, getAllProjects } from '@/lib/db/tasks';
+import { createTaskService } from '@/lib/services/tasks';
 import { CreateTaskPayload } from '@/lib/types/task-creation';
 
 /**
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid task data format' }, { status: 400 });
     }
 
-    // Validate mandatory fields
+    // Basic validation (defense in depth - service layer also validates)
     const requiredFields = [
       'project_id',
       'title',
@@ -109,8 +110,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the task (pass authenticated client)
-    const taskId = await createTask(supabase, taskPayload, user.id, files);
+    // Create the task via service layer (handles validation and orchestration)
+    const taskId = await createTaskService(supabase, taskPayload, user.id, files);
 
     return NextResponse.json(
       {

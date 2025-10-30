@@ -420,9 +420,16 @@ export async function createTask(
         });
 
       if (attachmentError) {
-        console.error(`Error creating attachment record for ${file.name}:`, attachmentError);
+        console.error(`Error creating attachment record for ${file.name}:`, {
+          error: attachmentError,
+          taskId,
+          storagePath,
+          uploadedBy: creatorId,
+        });
         // Clean up the uploaded file
         await serviceClient.storage.from('task-attachments').remove([storagePath]);
+      } else {
+        console.log(`Successfully created attachment record for ${file.name} with path: ${storagePath}`);
       }
     }
   }

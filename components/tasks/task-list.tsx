@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { type Task, calculateNextDueDate } from '@/lib/services/tasks';
+import { type Task, calculateNextDueDate } from '@/lib/types/tasks';
 import {
   Calendar,
   Paperclip,

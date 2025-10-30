@@ -773,11 +773,11 @@ async function enableRLS(sql: postgres.Sql) {
       -- Insert the task
       INSERT INTO tasks (
         title, description, priority_bucket, status, deadline, notes,
-        project_id, creator_id, recurrence_interval, recurrence_date
+        project_id, creator_id, recurrence_interval, recurrence_date, is_archived
       )
       VALUES (
         p_title, p_description, p_priority_bucket, p_status, p_deadline, p_notes,
-        p_project_id, p_creator_id, p_recurrence_interval, p_recurrence_date
+        p_project_id, p_creator_id, p_recurrence_interval, p_recurrence_date, FALSE
       )
       RETURNING id INTO v_task_id;
 
@@ -1200,13 +1200,14 @@ USING (
   `;
 
   /* ---------------- TASK ATTACHMENTS ---------------- */
-  // Select: assignees of the task can view
+  // Select: assignees of the task OR the uploader can view
   await sql`
     CREATE POLICY "Assignees can view task attachments"
     ON task_attachments
     FOR SELECT
     USING (
-      EXISTS (
+      uploaded_by = auth.uid()
+      OR EXISTS (
         SELECT 1
         FROM task_assignments ta
         WHERE ta.task_id = task_attachments.task_id
