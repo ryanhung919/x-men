@@ -36,21 +36,20 @@ export async function updateSession(request: NextRequest) {
   const isSeedRoute = request.nextUrl.pathname === '/seed'
   const isReportRoute = request.nextUrl.pathname.startsWith('/report')
 
-  // Protect /seed route - allow only in development or with valid secret token
+  // Protect /seed route - allow only in local development or with valid secret token
   if (isSeedRoute) {
-    const isDevelopment = process.env.NODE_ENV === 'development'
-    const isVercelDevelopment = process.env.VERCEL_ENV === 'development' || process.env.VERCEL_ENV === 'preview'
+    const isLocalDevelopment = process.env.NODE_ENV === 'development' && !process.env.VERCEL_ENV
     
-    // Allow in local development
-    if (isDevelopment || isVercelDevelopment) {
+    // Allow in local development only (pnpm dev)
+    if (isLocalDevelopment) {
       // Continue to seed route
     } else {
-      // In production, require secret token
+      // In production/preview/any Vercel environment, require secret token
       const authHeader = request.headers.get('authorization')
       const seedSecret = process.env.SEED_SECRET
       
       if (!seedSecret) {
-        console.error('SEED_SECRET not configured in production')
+        console.error('SEED_SECRET not configured')
         return new NextResponse('Not Found', { status: 404 })
       }
       
