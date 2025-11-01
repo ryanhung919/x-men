@@ -73,8 +73,14 @@ async function seedDatabase(): Promise<void> {
   console.log('🌱 Seeding database...');
   
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Use VERCEL_URL in production/preview, localhost in development
+    const appUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000';
+    
     const seedSecret = process.env.SEED_SECRET;
+    
+    console.log('Seeding URL:', appUrl);
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -97,10 +103,10 @@ async function seedDatabase(): Promise<void> {
     }
     
     const result = await response.json();
-    console.log('Database seeded successfully');
+    console.log('✅ Database seeded successfully');
     console.log('   Message:', result.message);
   } catch (error) {
-    console.error('Error seeding database:', error);
+    console.error('❌ Error seeding database:', error);
     throw error;
   }
 }
