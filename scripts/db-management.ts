@@ -69,26 +69,38 @@ async function checkDatabaseStatus() {
   }
 }
 
-async function seedDatabase() {
-  console.log('Seeding database...\n');
-
+async function seedDatabase(): Promise<void> {
+  console.log('🌱 Seeding database...');
+  
   try {
-    const appUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const response = await fetch(`${appUrl}/seed`);
-
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const seedSecret = process.env.SEED_SECRET;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add authorization header if seed secret is configured (for production/CI)
+    if (seedSecret) {
+      headers['Authorization'] = `Bearer ${seedSecret}`;
+      console.log('Using SEED_SECRET for authentication');
+    }
+    
+    const response = await fetch(`${appUrl}/seed`, {
+      method: 'GET',
+      headers,
+    });
+    
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Seed failed: ${response.status} - ${errorText}`);
     }
-
+    
     const result = await response.json();
-    console.log('✅', result.message || 'Database seeded successfully');
-    console.log('');
-
-    // Show status after seeding
-    await checkDatabaseStatus();
+    console.log('Database seeded successfully');
+    console.log('   Message:', result.message);
   } catch (error) {
-    console.error('❌ Error seeding database:', error);
+    console.error('Error seeding database:', error);
     throw error;
   }
 }
