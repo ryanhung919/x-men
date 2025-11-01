@@ -76,6 +76,7 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
         currentDate={currentDate}
         onViewChange={setCalendarView}
         onDateChange={setCurrentDate}
+        tasks={filteredTasks}
       />
 
       <CalendarFilters filters={filters} onFiltersChange={setFilters} />
