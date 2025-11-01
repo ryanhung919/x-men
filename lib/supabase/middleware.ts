@@ -32,11 +32,50 @@ export async function updateSession(request: NextRequest) {
 
   // Check route types
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
-  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/seed'
+  const isPublicRoute = request.nextUrl.pathname === '/'
+  const isSeedRoute = request.nextUrl.pathname === '/seed'
   const isReportRoute = request.nextUrl.pathname.startsWith('/report')
 
-  // Redirect to login if not authenticated (except for API, public routes)
-  if (!user && !isApiRoute && !isPublicRoute) {
+  // Protect /seed route - allow only in local development or with valid secret token
+  if (isSeedRoute) {
+    // Allow without token only in true local development (pnpm dev on developer's machine)
+    const isLocalDevelopment = process.env.NODE_ENV === 'development' && !process.env.CI
+    
+    if (isLocalDevelopment) {
+      console.log('[Middleware] Allowing /seed access in local development')
+      // Continue to seed route
+    } else {
+      // In CI, production, or any deployed environment, require secret token
+      const authHeader = request.headers.get('authorization')
+      const seedSecret = process.env.SEED_SECRET
+      
+      console.log('[Middleware] /seed accessed in protected environment')
+      console.log('[Middleware] NODE_ENV:', process.env.NODE_ENV)
+      console.log('[Middleware] CI:', process.env.CI)
+      console.log('[Middleware] VERCEL_ENV:', process.env.VERCEL_ENV)
+      console.log('[Middleware] Has auth header:', !!authHeader)
+      console.log('[Middleware] Has SEED_SECRET:', !!seedSecret)
+      
+      if (!seedSecret) {
+        console.error('[Middleware] SEED_SECRET not configured')
+        return new NextResponse('Not Found', { status: 404 })
+      }
+      
+      if (!authHeader || authHeader !== `Bearer ${seedSecret}`) {
+        console.error('[Middleware] Invalid or missing authorization header')
+        console.error('[Middleware] Expected: Bearer [secret]')
+        console.error('[Middleware] Received:', authHeader ? 'Bearer ***' : 'none')
+        // Return 404 to hide the route's existence
+        return new NextResponse('Not Found', { status: 404 })
+      }
+      
+      console.log('[Middleware] Valid SEED_SECRET provided, allowing access')
+      // Valid token - allow access
+    }
+  }
+
+  // Redirect to login if not authenticated (except for API, public routes, seed)
+  if (!user && !isApiRoute && !isPublicRoute && !isSeedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
