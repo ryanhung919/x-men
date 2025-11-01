@@ -24,8 +24,6 @@ export type CreateNotificationInput = {
 export async function createNotification(
   input: CreateNotificationInput
 ): Promise<Notification | null> {
-  console.log('DB: createNotification called with:', input);
-
   // Use admin client to bypass RLS when creating notifications
   // Appropriate since notifications are system-generated
   const adminClient = createAdminClient(
@@ -56,7 +54,6 @@ export async function createNotification(
     throw error;
   }
 
-  console.log('DB: Notification created:', data);
   return data;
 }
 
@@ -65,12 +62,6 @@ export async function getNotificationsForUser(
   userId: string,
   includeArchived: boolean = false
 ): Promise<Notification[]> {
-  console.log(
-    'DB: getNotificationsForUser called for userId:',
-    userId,
-    'includeArchived:',
-    includeArchived
-  );
   const supabase = await createClient();
 
   let query = supabase.from('notifications').select('*').eq('user_id', userId);
@@ -87,13 +78,11 @@ export async function getNotificationsForUser(
     throw error;
   }
 
-  console.log(`DB: Found ${data?.length || 0} notifications`);
   return data || [];
 }
 
 // Get unread count
 export async function getUnreadCount(userId: string): Promise<number> {
-  console.log('DB: getUnreadCount called for userId:', userId);
   const supabase = await createClient();
 
   const { count, error } = await supabase
@@ -107,13 +96,11 @@ export async function getUnreadCount(userId: string): Promise<number> {
     throw error;
   }
 
-  console.log(`DB: Unread count: ${count}`);
   return count || 0;
 }
 
 // Mark notification as read
 export async function markNotificationAsRead(notificationId: number): Promise<Notification | null> {
-  console.log('DB: markNotificationAsRead called for id:', notificationId);
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -128,13 +115,11 @@ export async function markNotificationAsRead(notificationId: number): Promise<No
     throw error;
   }
 
-  console.log('DB: Notification marked as read:', data);
   return data;
 }
 
 // Mark all as read
 export async function markAllAsRead(userId: string): Promise<number> {
-  console.log('DB: markAllAsRead called for userId:', userId);
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -149,13 +134,11 @@ export async function markAllAsRead(userId: string): Promise<number> {
     throw error;
   }
 
-  console.log(`DB: Marked ${data?.length || 0} notifications as read`);
   return data?.length || 0;
 }
 
 // Archive notification
 export async function archiveNotification(notificationId: number): Promise<Notification | null> {
-  console.log('DB: archiveNotification called for id:', notificationId);
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -170,6 +153,5 @@ export async function archiveNotification(notificationId: number): Promise<Notif
     throw error;
   }
 
-  console.log('DB: Notification archived:', data);
   return data;
 }

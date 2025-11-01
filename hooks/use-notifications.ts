@@ -46,8 +46,6 @@ export function useNotifications() {
           table: 'notifications',
         },
         async (payload: RealtimePostgresChangesPayload<Notification>) => {
-          console.log('Notification change received:', payload);
-
           // Handle insert
           if (payload.eventType === 'INSERT') {
             const newNotification = payload.new as Notification;

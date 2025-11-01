@@ -211,6 +211,10 @@ async function verifyUserRoles(): Promise<void> {
 beforeAll(async () => {
   console.log('\n🔧 Setting up integration test environment...');
 
+  // Capture the exact timestamp when testing starts
+  // Use a small buffer to account for any setup operations
+  testStartTime = new Date(Date.now() - 1000).toISOString(); // 1 second buffer
+
   // Verify environment variables
   const requiredEnvVars = [
     'NEXT_PUBLIC_SUPABASE_URL',
@@ -246,17 +250,52 @@ beforeAll(async () => {
   console.log('Integration test environment ready\n');
 }, 120000); // 2 minute timeout for setup
 
+// Capture the exact timestamp when testing starts
+let testStartTime: string;
+
 // Clean up after all tests
 afterAll(async () => {
   console.log('\n🧹 Cleaning up integration test environment...');
-  
+
+  // Clean up ONLY notifications created during this specific test run
+  try {
+    // Get test user IDs
+    const testUserIds = Object.values(testUsers).map(user => user.id);
+
+    // Find notifications created AFTER the test started (using captured timestamp)
+    const { data: testNotifications, error: fetchError } = await adminClient
+      .from('notifications')
+      .select('id')
+      .in('user_id', testUserIds)
+      .gt('created_at', testStartTime);
+
+    if (fetchError) {
+      console.error('Error fetching test notifications for cleanup:', fetchError);
+    } else if (testNotifications && testNotifications.length > 0) {
+      const notificationIds = testNotifications.map(n => n.id);
+
+      const { error: deleteError } = await adminClient
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds);
+
+      if (deleteError) {
+        console.error('Error cleaning up test notifications:', deleteError);
+      } else {
+        console.log(`Cleaned up ${notificationIds.length} test notifications created during this test run`);
+      }
+    }
+  } catch (error) {
+    console.error('Error during notification cleanup:', error);
+  }
+
   // Sign out all sessions
   try {
     await adminClient.auth.signOut();
   } catch (error) {
     console.error('Error during cleanup:', error);
   }
-  
+
   console.log('Integration test cleanup complete\n');
 });
 
