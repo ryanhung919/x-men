@@ -156,11 +156,20 @@ async function seedDatabase(): Promise<void> {
   
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const seedSecret = process.env.SEED_SECRET;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add authorization header if seed secret is configured (for production)
+    if (seedSecret) {
+      headers['Authorization'] = `Bearer ${seedSecret}`;
+    }
+    
     const response = await fetch(`${appUrl}/seed`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
     
     if (!response.ok) {
@@ -169,7 +178,7 @@ async function seedDatabase(): Promise<void> {
     }
     
     const result = await response.json();
-    console.log('Database seeded successfully');
+    console.log('✅ Database seeded successfully');
     console.log('   Message:', result.message);
   } catch (error) {
     console.error('❌ Failed to seed database:', error);
@@ -177,6 +186,7 @@ async function seedDatabase(): Promise<void> {
     throw error;
   }
 }
+
 
 /**
  * Verify user roles are correctly seeded

@@ -36,14 +36,30 @@ export async function updateSession(request: NextRequest) {
   const isSeedRoute = request.nextUrl.pathname === '/seed'
   const isReportRoute = request.nextUrl.pathname.startsWith('/report')
 
-  // Block /seed route in production
+  // Protect /seed route - allow only in development or with valid secret token
   if (isSeedRoute) {
-    const isProduction = process.env.NODE_ENV === 'production'
-    const isVercelProduction = process.env.VERCEL_ENV === 'production'
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    const isVercelDevelopment = process.env.VERCEL_ENV === 'development' || process.env.VERCEL_ENV === 'preview'
     
-    if (isProduction || isVercelProduction) {
-      // Return 404 to hide the route's existence in production
-      return new NextResponse('Not Found', { status: 404 })
+    // Allow in local development
+    if (isDevelopment || isVercelDevelopment) {
+      // Continue to seed route
+    } else {
+      // In production, require secret token
+      const authHeader = request.headers.get('authorization')
+      const seedSecret = process.env.SEED_SECRET
+      
+      if (!seedSecret) {
+        console.error('SEED_SECRET not configured in production')
+        return new NextResponse('Not Found', { status: 404 })
+      }
+      
+      if (!authHeader || authHeader !== `Bearer ${seedSecret}`) {
+        // Return 404 to hide the route's existence
+        return new NextResponse('Not Found', { status: 404 })
+      }
+      
+      // Valid token - allow access
     }
   }
 
