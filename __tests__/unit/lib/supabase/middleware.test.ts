@@ -80,15 +80,98 @@ describe('lib/supabase/middleware', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should allow access to /seed route without authentication', async () => {
-      mockSupabase.auth.getClaims.mockResolvedValue({
-        data: { claims: null },
+    describe('seed route protection', () => {
+      it('should allow access to /seed in local development without auth header', async () => {
+        vi.stubEnv('NODE_ENV', 'development');
+        vi.stubEnv('VERCEL_ENV', '');
+
+        mockSupabase.auth.getClaims.mockResolvedValue({
+          data: { claims: null },
+        });
+
+        const request = new NextRequest('http://localhost:3000/seed');
+        const response = await updateSession(request);
+
+        expect(response.status).toBe(200);
+
+        vi.unstubAllEnvs();
       });
 
-      const request = new NextRequest('http://localhost:3000/seed');
-      const response = await updateSession(request);
+      it('should block access to /seed in production without auth header', async () => {
+        vi.stubEnv('NODE_ENV', 'production');
+        vi.stubEnv('VERCEL_ENV', 'production');
+        vi.stubEnv('SEED_SECRET', 'test-secret');
 
-      expect(response.status).toBe(200);
+        mockSupabase.auth.getClaims.mockResolvedValue({
+          data: { claims: null },
+        });
+
+        const request = new NextRequest('http://localhost:3000/seed');
+        const response = await updateSession(request);
+
+        expect(response.status).toBe(404);
+
+        vi.unstubAllEnvs();
+      });
+
+      it('should allow access to /seed in production with valid auth header', async () => {
+        vi.stubEnv('NODE_ENV', 'production');
+        vi.stubEnv('VERCEL_ENV', 'production');
+        vi.stubEnv('SEED_SECRET', 'test-secret');
+
+        mockSupabase.auth.getClaims.mockResolvedValue({
+          data: { claims: null },
+        });
+
+        const request = new NextRequest('http://localhost:3000/seed', {
+          headers: {
+            authorization: 'Bearer test-secret',
+          },
+        });
+        const response = await updateSession(request);
+
+        expect(response.status).toBe(200);
+
+        vi.unstubAllEnvs();
+      });
+
+      it('should block access to /seed in production with invalid auth header', async () => {
+        vi.stubEnv('NODE_ENV', 'production');
+        vi.stubEnv('VERCEL_ENV', 'production');
+        vi.stubEnv('SEED_SECRET', 'test-secret');
+
+        mockSupabase.auth.getClaims.mockResolvedValue({
+          data: { claims: null },
+        });
+
+        const request = new NextRequest('http://localhost:3000/seed', {
+          headers: {
+            authorization: 'Bearer wrong-secret',
+          },
+        });
+        const response = await updateSession(request);
+
+        expect(response.status).toBe(404);
+
+        vi.unstubAllEnvs();
+      });
+
+      it('should block access to /seed in Vercel preview without auth header', async () => {
+        vi.stubEnv('NODE_ENV', 'production');
+        vi.stubEnv('VERCEL_ENV', 'preview');
+        vi.stubEnv('SEED_SECRET', 'test-secret');
+
+        mockSupabase.auth.getClaims.mockResolvedValue({
+          data: { claims: null },
+        });
+
+        const request = new NextRequest('http://localhost:3000/seed');
+        const response = await updateSession(request);
+
+        expect(response.status).toBe(404);
+
+        vi.unstubAllEnvs();
+      });
     });
 
     it('should allow API routes without authentication checks', async () => {
