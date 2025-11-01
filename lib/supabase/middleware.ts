@@ -32,11 +32,23 @@ export async function updateSession(request: NextRequest) {
 
   // Check route types
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
-  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/seed'
+  const isPublicRoute = request.nextUrl.pathname === '/'
+  const isSeedRoute = request.nextUrl.pathname === '/seed'
   const isReportRoute = request.nextUrl.pathname.startsWith('/report')
 
-  // Redirect to login if not authenticated (except for API, public routes)
-  if (!user && !isApiRoute && !isPublicRoute) {
+  // Block /seed route in production
+  if (isSeedRoute) {
+    const isProduction = process.env.NODE_ENV === 'production'
+    const isVercelProduction = process.env.VERCEL_ENV === 'production'
+    
+    if (isProduction || isVercelProduction) {
+      // Return 404 to hide the route's existence in production
+      return new NextResponse('Not Found', { status: 404 })
+    }
+  }
+
+  // Redirect to login if not authenticated (except for API, public routes, seed)
+  if (!user && !isApiRoute && !isPublicRoute && !isSeedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
