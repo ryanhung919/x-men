@@ -83,7 +83,7 @@ describe('lib/supabase/middleware', () => {
     describe('seed route protection', () => {
       it('should allow access to /seed in local development without auth header', async () => {
         vi.stubEnv('NODE_ENV', 'development');
-        // Don't set CI env var (simulates local dev)
+        vi.stubEnv('CI', '');
 
         mockSupabase.auth.getClaims.mockResolvedValue({
           data: { claims: null },
