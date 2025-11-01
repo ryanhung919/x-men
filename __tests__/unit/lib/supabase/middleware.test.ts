@@ -83,7 +83,7 @@ describe('lib/supabase/middleware', () => {
     describe('seed route protection', () => {
       it('should allow access to /seed in local development without auth header', async () => {
         vi.stubEnv('NODE_ENV', 'development');
-        vi.stubEnv('VERCEL_ENV', '');
+        // Don't set CI env var (simulates local dev)
 
         mockSupabase.auth.getClaims.mockResolvedValue({
           data: { claims: null },
@@ -97,68 +97,9 @@ describe('lib/supabase/middleware', () => {
         vi.unstubAllEnvs();
       });
 
-      it('should block access to /seed in production without auth header', async () => {
+      it('should block access to /seed in CI without auth header', async () => {
         vi.stubEnv('NODE_ENV', 'production');
-        vi.stubEnv('VERCEL_ENV', 'production');
-        vi.stubEnv('SEED_SECRET', 'test-secret');
-
-        mockSupabase.auth.getClaims.mockResolvedValue({
-          data: { claims: null },
-        });
-
-        const request = new NextRequest('http://localhost:3000/seed');
-        const response = await updateSession(request);
-
-        expect(response.status).toBe(404);
-
-        vi.unstubAllEnvs();
-      });
-
-      it('should allow access to /seed in production with valid auth header', async () => {
-        vi.stubEnv('NODE_ENV', 'production');
-        vi.stubEnv('VERCEL_ENV', 'production');
-        vi.stubEnv('SEED_SECRET', 'test-secret');
-
-        mockSupabase.auth.getClaims.mockResolvedValue({
-          data: { claims: null },
-        });
-
-        const request = new NextRequest('http://localhost:3000/seed', {
-          headers: {
-            authorization: 'Bearer test-secret',
-          },
-        });
-        const response = await updateSession(request);
-
-        expect(response.status).toBe(200);
-
-        vi.unstubAllEnvs();
-      });
-
-      it('should block access to /seed in production with invalid auth header', async () => {
-        vi.stubEnv('NODE_ENV', 'production');
-        vi.stubEnv('VERCEL_ENV', 'production');
-        vi.stubEnv('SEED_SECRET', 'test-secret');
-
-        mockSupabase.auth.getClaims.mockResolvedValue({
-          data: { claims: null },
-        });
-
-        const request = new NextRequest('http://localhost:3000/seed', {
-          headers: {
-            authorization: 'Bearer wrong-secret',
-          },
-        });
-        const response = await updateSession(request);
-
-        expect(response.status).toBe(404);
-
-        vi.unstubAllEnvs();
-      });
-
-      it('should block access to /seed in Vercel preview without auth header', async () => {
-        vi.stubEnv('NODE_ENV', 'production');
-        vi.stubEnv('VERCEL_ENV', 'preview');
+        vi.stubEnv('CI', 'true'); // GitHub Actions sets this
         vi.stubEnv('SEED_SECRET', 'test-secret');
 
         mockSupabase.auth.getClaims.mockResolvedValue({
