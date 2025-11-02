@@ -1,14 +1,17 @@
 'use client';
 
 import { format, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { downloadICalFile } from '@/lib/utils/ical';
+import type { Task } from '@/lib/services/tasks';
 
 interface CalendarHeaderProps {
   view: 'day' | 'week' | 'month';
   currentDate: Date;
   onViewChange: (view: 'day' | 'week' | 'month') => void;
   onDateChange: (date: Date) => void;
+  tasks: Task[];
 }
 
 /**
@@ -20,6 +23,7 @@ export default function CalendarHeader({
   currentDate,
   onViewChange,
   onDateChange,
+  tasks,
 }: CalendarHeaderProps) {
   const handlePrevious = () => {
     switch (view) {
@@ -51,6 +55,10 @@ export default function CalendarHeader({
 
   const handleToday = () => {
     onDateChange(new Date());
+  };
+
+  const handleExportICal = () => {
+    downloadICalFile(tasks, `x-men-tasks-${format(new Date(), 'yyyy-MM-dd')}.ics`);
   };
 
   const getDateDisplay = () => {
@@ -99,6 +107,17 @@ export default function CalendarHeader({
 
       {/* View toggle */}
       <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportICal}
+          className="text-xs sm:text-sm gap-1 h-8 sm:h-9"
+          aria-label="Export to iCal"
+        >
+          <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">Export</span>
+        </Button>
+        
         <div className="flex rounded-md border overflow-hidden">
           <Button
             variant={view === 'day' ? 'default' : 'ghost'}
