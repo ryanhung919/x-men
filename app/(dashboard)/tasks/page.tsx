@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import TasksList from '@/components/tasks/task-list';
-import { getUserTasks } from '@/lib/db/tasks';
-import { formatTasks } from '@/lib/services/tasks';
+import { getUserTasksService } from '@/lib/services/tasks';
 import TasksPageHeader from '@/components/tasks/tasks-page-header';
+import TasksViewWrapper from '@/components/tasks/tasks-view-wrapper';
 
 export default async function TasksPage() {
   const supabase = await createClient();
@@ -15,16 +15,13 @@ export default async function TasksPage() {
     redirect('/');
   }
 
-  // Fetch raw tasks data
-  const rawData = await getUserTasks(user.id);
-
-  // Format the raw data into Task[]
-  const tasks = formatTasks(rawData);
+  // Fetch and format tasks via service layer (single call)
+  const tasks = await getUserTasksService(user.id);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <TasksPageHeader tasksCount={tasks.length} />
-      <TasksList tasks={tasks} />
+      <TasksViewWrapper tasks={tasks} />
     </div>
   );
 }

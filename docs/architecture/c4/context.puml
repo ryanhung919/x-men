@@ -1,0 +1,20 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+
+
+Person(user, "User", "Staff/Manager/Admin using the web app to manage tasks, schedules, and reports")
+
+System_Boundary(xmen, "X-Men Task Management System") {
+  System(webapp, "Task Management System", "TypeScript, React, Next.js App Router")
+}
+
+' External systems (Supabase as a platform broken down)
+System_Ext(sendgrid, "SendGrid", "Email delivery for reminders & digests")
+
+Rel(user, webapp, "Uses", "HTTPS")
+Rel(webapp, sendgrid, "Send emails", "HTTPS API")
+
+
+SHOW_LEGEND()
+@enduml

@@ -1086,6 +1086,161 @@ export const notifications = [
     created_at: new Date('2025-09-19T10:00:00+08:00'),
     updated_at: new Date('2025-09-19T10:00:00+08:00'),
   },
+  // Group 1: Comment Notifications (4)
+  {
+    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
+    title: 'New Comment',
+    message: 'Ryan commented on "Design budget dashboard layout": "Add KPI tiles (spend, forecast, burn rate)."',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-19T10:40:05+08:00'),
+    updated_at: new Date('2025-09-19T10:40:05+08:00'),
+  },
+  {
+    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
+    title: 'New Comment',
+    message: 'Kester commented on "Refactor data pipelines": "Added retry logic with exponential backoff."',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-10-26T15:15:05+08:00'),
+    updated_at: new Date('2025-10-26T15:15:05+08:00'),
+  },
+  {
+    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
+    title: 'New Comment',
+    message: 'Joel commented on "Create onboarding video": "Should we include a section on regional compliance requirements?"',
+    type: 'task_updated',
+    read: true,
+    is_archived: false,
+    created_at: new Date('2025-09-27T11:00:05+08:00'),
+    updated_at: new Date('2025-09-27T12:00:00+08:00'),
+  },
+  {
+    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
+    title: 'New Comment',
+    message: 'Mitch commented on "Setup analytics dashboards": "Connected to 3 data sources so far, working on CRM integration."',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-30T14:25:05+08:00'),
+    updated_at: new Date('2025-09-30T14:25:05+08:00'),
+  },
+  // Group 2: Attachment Notifications (3)
+  {
+    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
+    title: 'Attachment Added',
+    message: 'Mitch uploaded "wireframe.png" to "Design budget dashboard layout".',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-19T11:10:05+08:00'),
+    updated_at: new Date('2025-09-19T11:10:05+08:00'),
+  },
+  {
+    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester
+    title: 'Attachment Added',
+    message: 'Garrison uploaded "etl_mapping.xlsx" to "Connect sales data source".',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-20T09:20:05+08:00'),
+    updated_at: new Date('2025-09-20T09:20:05+08:00'),
+  },
+  {
+    user_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
+    title: 'Attachment Added',
+    message: 'Joel uploaded "onboarding_forms.xlsx" to "Design client onboarding forms".',
+    type: 'task_updated',
+    read: true,
+    is_archived: false,
+    created_at: new Date('2025-09-22T10:10:05+08:00'),
+    updated_at: new Date('2025-09-22T11:00:00+08:00'),
+  },
+  // Group 3: Task Assignment Notifications (3)
+  {
+    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
+    title: 'New Task Assignment',
+    message: 'Joel assigned you to "Design budget dashboard layout".',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-19T10:20:05+08:00'),
+    updated_at: new Date('2025-09-19T10:20:05+08:00'),
+  },
+  {
+    user_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
+    title: 'New Task Assignment',
+    message: 'Joel assigned you to "Design client onboarding forms".',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-22T10:06:05+08:00'),
+    updated_at: new Date('2025-09-22T10:06:05+08:00'),
+  },
+  {
+    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester
+    title: 'New Task Assignment',
+    message: 'Ryan assigned you to "Refactor data pipelines".',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-10-26T15:10:05+08:00'),
+    updated_at: new Date('2025-10-26T15:10:05+08:00'),
+  },
+  // Group 4: Task Completion Notifications (3)
+  {
+    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
+    title: 'Task Completed',
+    message: 'Ryan completed "Setup CI/CD pipeline".',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-10-27T09:15:05+08:00'),
+    updated_at: new Date('2025-10-27T09:15:05+08:00'),
+  },
+  {
+    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester
+    title: 'Task Completed',
+    message: 'Ryan completed "Refactor data pipelines".',
+    type: 'task_updated',
+    read: true,
+    is_archived: false,
+    created_at: new Date('2025-10-26T15:20:05+08:00'),
+    updated_at: new Date('2025-10-26T16:00:00+08:00'),
+  },
+  {
+    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
+    title: 'Task Completed',
+    message: 'Garrison completed "Connect sales data source".',
+    type: 'task_updated',
+    read: false,
+    is_archived: false,
+    created_at: new Date('2025-09-20T10:00:05+08:00'),
+    updated_at: new Date('2025-09-20T10:00:05+08:00'),
+  },
+  // Group 5: Additional Variety (2)
+  {
+    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
+    title: 'Task Updated',
+    message: 'Ryan changed the status of "Automate invoice approval workflow" from "To Do" to "In Progress".',
+    type: 'task_updated',
+    read: true,
+    is_archived: false,
+    created_at: new Date('2025-09-24T10:30:05+08:00'),
+    updated_at: new Date('2025-09-24T11:00:00+08:00'),
+  },
+  {
+    user_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
+    title: 'Tag Added',
+    message: 'Joel added tag "Onboarding" to "Design client onboarding forms".',
+    type: 'task_updated',
+    read: true,
+    is_archived: false,
+    created_at: new Date('2025-09-22T10:20:05+08:00'),
+    updated_at: new Date('2025-09-22T11:00:00+08:00'),
+  },
 ];
 
 /* ======================== COMMENTS ======================== */

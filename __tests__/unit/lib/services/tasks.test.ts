@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   mapTaskAttributes,
   calculateNextDueDate,
@@ -27,6 +27,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [{ tags: { name: 'urgent' } }, { tags: { name: 'backend' } }],
       };
@@ -63,6 +64,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -86,6 +88,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -108,6 +111,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -131,6 +135,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 7,
         recurrence_date: '2025-10-16T00:00:00.000Z',
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -154,6 +159,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -187,6 +193,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 1, // daily
         recurrence_date: '2025-10-10T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -213,6 +220,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 7, // weekly
         recurrence_date: '2025-10-01T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -238,6 +246,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 30, // monthly
         recurrence_date: '2025-09-10T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -264,6 +273,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 1, // daily recurrence
         recurrence_date: '2025-09-29T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -290,6 +300,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 0,
         recurrence_date: null,
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -315,6 +326,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 7,
         recurrence_date: '2025-10-01T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -341,6 +353,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 7,
         recurrence_date: '2025-10-01T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -367,6 +380,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 7,
         recurrence_date: '2025-10-01T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -392,6 +406,7 @@ describe('lib/services/tasks', () => {
         recurrence_interval: 14, // bi-weekly
         recurrence_date: '2025-10-02T00:00:00.000Z',
         project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
         subtasks: [],
         assignees: [],
         tags: [],
@@ -421,6 +436,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [{ assignee_id: 'user1' }, { assignee_id: 'user2' }],
           tags: [{ tags: { name: 'urgent' } }],
         },
@@ -494,6 +510,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [],
           tags: [],
         },
@@ -527,6 +544,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [{ assignee_id: 'unknown-user' }],
           tags: [],
         },
@@ -560,6 +578,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [],
           tags: [],
         },
@@ -575,6 +594,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [],
           tags: [],
         },
@@ -614,6 +634,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [],
           tags: [],
         },
@@ -629,6 +650,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [],
           tags: [],
         },
@@ -668,6 +690,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 7,
           recurrence_date: '2025-10-01T00:00:00.000Z',
+          creator_id: 'user1',
           task_assignments: [],
           tags: [],
         },
@@ -683,6 +706,7 @@ describe('lib/services/tasks', () => {
           parent_task_id: null,
           recurrence_interval: 0,
           recurrence_date: null,
+          creator_id: 'user1',
           task_assignments: [],
           tags: [],
         },
@@ -729,6 +753,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 7,
         recurrence_date: '2025-10-16T00:00:00.000Z',
+        creator_id: 'user1',
         task_assignments: [{ assignee_id: 'user1' }],
         tags: [{ tags: { name: 'urgent' } }, { tags: { name: 'backend' } }],
       };
@@ -804,6 +829,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -832,6 +858,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -873,6 +900,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [],
         tags: [],
       };
@@ -911,6 +939,7 @@ describe('lib/services/tasks', () => {
         parent_task_id: null,
         recurrence_interval: 0,
         recurrence_date: null,
+        creator_id: 'user1',
         task_assignments: [{ assignee_id: 'unknown-user' }],
         tags: [],
       };

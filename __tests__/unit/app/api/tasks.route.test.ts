@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { POST, GET } from '@/app/api/tasks/route';
-import { createTask, getAllUsers, getAllProjects } from '@/lib/db/tasks';
+import { getAllUsers, getAllProjects } from '@/lib/db/tasks';
+import { createTaskService } from '@/lib/services/tasks';
 import { NextRequest } from 'next/server';
 
-// Mock the database functions
+// Mock the service layer
+vi.mock('@/lib/services/tasks', () => ({
+  createTaskService: vi.fn(),
+}));
+
+// Mock the database functions (for GET endpoint)
 vi.mock('@/lib/db/tasks', () => ({
-  createTask: vi.fn(),
   getAllUsers: vi.fn(),
   getAllProjects: vi.fn(),
 }));
@@ -35,7 +40,7 @@ describe('POST /api/tasks', () => {
       error: null,
     });
 
-    (createTask as any).mockResolvedValue(taskId);
+    (createTaskService as any).mockResolvedValue(taskId);
 
     const taskData = {
       project_id: 1,
@@ -62,7 +67,7 @@ describe('POST /api/tasks', () => {
     expect(data.success).toBe(true);
     expect(data.taskId).toBe(taskId);
     expect(data.message).toBe('Task created successfully');
-    expect(createTask).toHaveBeenCalledWith(
+    expect(createTaskService).toHaveBeenCalledWith(
       mockSupabaseClient,
       taskData,
       mockUser.id,
@@ -79,7 +84,7 @@ describe('POST /api/tasks', () => {
       error: null,
     });
 
-    (createTask as any).mockResolvedValue(taskId);
+    (createTaskService as any).mockResolvedValue(taskId);
 
     const taskData = {
       project_id: 1,
@@ -108,7 +113,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(201);
     expect(data.success).toBe(true);
-    expect(createTask).toHaveBeenCalled();
+    expect(createTaskService).toHaveBeenCalled();
   });
 
   it('should return 401 if user is not authenticated', async () => {
@@ -130,7 +135,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if task data is missing', async () => {
@@ -153,7 +158,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Missing task data');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if task data is invalid JSON', async () => {
@@ -177,7 +182,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid task data format');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if required field is missing (project_id)', async () => {
@@ -210,7 +215,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Missing required field: project_id');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if required field is missing (title)', async () => {
@@ -243,7 +248,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Missing required field: title');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if required field is missing (assignee_ids)', async () => {
@@ -276,7 +281,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Missing required field: assignee_ids');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if priority bucket is too low', async () => {
@@ -310,7 +315,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Priority bucket must be between 1 and 10');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if priority bucket is too high', async () => {
@@ -344,7 +349,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Priority bucket must be between 1 and 10');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if assignee_ids is empty array', async () => {
@@ -378,7 +383,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('At least one assignee is required');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if assignee_ids is not an array', async () => {
@@ -412,7 +417,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('At least one assignee is required');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if assignee_ids exceeds maximum', async () => {
@@ -446,7 +451,7 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Maximum 5 assignees allowed');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if total file size exceeds 50MB', async () => {
@@ -485,10 +490,10 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Total file size exceeds 50MB limit');
-    expect(createTask).not.toHaveBeenCalled();
+    expect(createTaskService).not.toHaveBeenCalled();
   });
 
-  it('should return 500 if createTask throws an error', async () => {
+  it('should return 500 if createTaskService throws an error', async () => {
     const mockUser = { id: 'user-123' };
 
     mockSupabaseClient.auth.getUser.mockResolvedValue({
@@ -496,7 +501,7 @@ describe('POST /api/tasks', () => {
       error: null,
     });
 
-    (createTask as any).mockRejectedValue(new Error('Database error'));
+    (createTaskService as any).mockRejectedValue(new Error('Database error'));
 
     const taskData = {
       project_id: 1,

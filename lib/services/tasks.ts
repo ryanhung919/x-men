@@ -27,81 +27,36 @@ import {
 
 import { CreateTaskPayload } from '../types/task-creation';
 
-export type RawTask = {
-  id: number;
-  title: string;
-  description: string | null;
-  priority_bucket: number;
-  status: string;
-  deadline: string | null;
-  notes: string | null;
-  project: { id: number; name: string };
-  parent_task_id: number | null;
-  recurrence_interval: number;
-  recurrence_date: string | null;
-  creator_id: string;
-  task_assignments: { assignee_id: string }[];
-  tags: { tags: { name: string } }[];
+import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  RawTask,
+  RawSubtask,
+  RawAttachment,
+  RawAssignee,
+  RawComment,
+  Task,
+  TaskComment,
+  DetailedTask,
+} from '../types/tasks';
+
+// Re-export types for backward compatibility
+export type {
+  RawTask,
+  RawSubtask,
+  RawAttachment,
+  RawAssignee,
+  RawComment,
+  Task,
+  TaskComment,
+  DetailedTask,
 };
 
-export type RawSubtask = {
-  id: number;
-  title: string;
-  status: string;
-  deadline: string | null;
-  parent_task_id: number;
-};
+// Re-export calculateNextDueDate for backward compatibility
+export { calculateNextDueDate } from '../types/tasks';
 
-export type RawAttachment = {
-  id: number;
-  storage_path: string;
-  task_id: number;
-};
-
-export type RawAssignee = {
-  id: string;
-  first_name: string;
-  last_name: string;
-};
-
-export type RawComment = {
-  id: number;
-  content: string;
-  created_at: string;
-  user_id: string;
-};
-
-export type Task = {
-  id: number;
-  title: string;
-  description: string | null;
-  priority: number;
-  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked';
-  deadline: string | null;
-  notes: string | null;
-  recurrence_interval: number;
-  recurrence_date: string | null;
-  project: { id: number; name: string };
-  creator: { creator_id: string; user_info: { first_name: string; last_name: string } };
-  subtasks: { id: number; title: string; status: string; deadline: string | null }[];
-  assignees: { assignee_id: string; user_info: { first_name: string; last_name: string } }[];
-  tags: string[];
-  attachments: string[];
-  isOverdue: boolean;
-};
-
-export type TaskComment = {
-  id: number;
-  content: string;
-  created_at: string;
-  user_id: string;
-  user_info: RawAssignee;
-};
-
-export type DetailedTask = Omit<Task, 'attachments'> & {
-  attachments: { id: number; storage_path: string; public_url?: string }[];
-  comments: TaskComment[];
-};
+// Import DB and service dependencies (server-only, imported dynamically in functions)
+import * as taskDb from '../db/tasks';
+import { getRolesForUserClient } from '../db/roles';
 
 /**
  * Maps a RawTask from the database to the Task type used in the application.
@@ -136,49 +91,6 @@ export function mapTaskAttributes(task: RawTask): Omit<Task, 'subtasks' | 'assig
     tags: task.tags.map((t) => t.tags.name),
     isOverdue,
   };
-}
-
-/**
- * Calculates the next due date for recurring tasks based on the recurrence interval.
- *
- * For recurring tasks (recurrence_interval > 0), this function calculates the next due date
- * by adding the interval to the previous deadline, regardless of when the task was completed.
- * This ensures consistent scheduling based on the original due date.
- *
- * Implementation follows the requirement: "the due date is based on the calculation from the
- * previous due date"
- *
- * @param task - The task to calculate the next due date for
- * @returns A new Task object with updated deadline and isOverdue status if recurring,
- *          or the original task if not recurring
- *
- * @example
- * // Task due Sep 29, completed Oct 1, interval 1 day → next due is Sep 30
- * const recurringTask = { ...task, recurrence_interval: 1, deadline: '2024-09-29' };
- * const updated = calculateNextDueDate(recurringTask);
- * console.log(updated.deadline); // '2024-09-30T00:00:00.000Z'
- *
- * @example
- * // Non-recurring task remains unchanged
- * const normalTask = { ...task, recurrence_interval: 0 };
- * const result = calculateNextDueDate(normalTask);
- * // result === normalTask
- */
-export function calculateNextDueDate(task: Task): Task {
-  // For recurring tasks, calculate next due date based on previous deadline + interval
-  // This follows the requirement: "the due date is based on the calculation from the previous due date"
-  // Example: Task due Sep 29, completed Oct 1, interval 1 day → next due is Sep 30
-  if (task.recurrence_interval > 0 && task.deadline) {
-    const previousDeadline = new Date(task.deadline);
-    const intervalMs = task.recurrence_interval * 24 * 60 * 60 * 1000;
-    const nextDue = new Date(previousDeadline.getTime() + intervalMs);
-    return {
-      ...task,
-      deadline: nextDue.toISOString(),
-      isOverdue: nextDue < new Date() && task.status !== 'Completed',
-    };
-  }
-  return task;
 }
 
 /**
@@ -376,6 +288,144 @@ export function formatTaskDetails(
   };
 }
 
+// ============================================================================
+// BUSINESS LOGIC LAYER - READ OPERATIONS
+// ============================================================================
+
+/**
+ * Service layer function to get all tasks for a user.
+ *
+ * Fetches raw data from DB and formats it for the UI.
+ * This is the single entry point for getting user tasks - API should call this,
+ * not the DB layer directly.
+ *
+ * @param userId - UUID of the user whose tasks to fetch
+ * @returns Array of formatted Task objects ready for UI consumption
+ * @throws {Error} If there's a database error during fetching
+ */
+export async function getUserTasksService(userId: string): Promise<Task[]> {
+  // Fetch raw data from DB
+  const rawData = await taskDb.getUserTasks(userId);
+
+  // Format for UI
+  return formatTasks(rawData);
+}
+
+/**
+ * Service layer function to get a single task by ID with full details.
+ *
+ * Fetches raw data from DB and formats it for the UI, including comments
+ * and attachment URLs.
+ *
+ * @param taskId - Numeric ID of the task to fetch
+ * @returns Formatted DetailedTask object or null if not found
+ * @throws {Error} If there's a database error during fetching
+ */
+export async function getTaskByIdService(taskId: number): Promise<DetailedTask | null> {
+  // Fetch raw data from DB
+  const rawData = await taskDb.getTaskById(taskId);
+
+  if (!rawData) {
+    return null;
+  }
+
+  // Format for UI
+  return formatTaskDetails(rawData);
+}
+
+// ============================================================================
+// BUSINESS LOGIC LAYER - WRITE OPERATIONS
+// ============================================================================
+
+/**
+ * Service layer function to create a task with all related data.
+ *
+ * Handles:
+ * - Business validation (assignee count, priority range)
+ * - Orchestration of multiple DB operations (task, tags, attachments)
+ * - Future: notifications, webhooks, audit logging
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param payload - Task creation payload with all task details
+ * @param creatorId - UUID of the user creating the task
+ * @param attachmentFiles - Optional array of files to attach
+ * @returns The ID of the newly created task
+ * @throws {Error} If validation fails or DB operations fail
+ */
+export async function createTaskService(
+  supabase: SupabaseClient,
+  payload: CreateTaskPayload,
+  creatorId: string,
+  attachmentFiles?: File[]
+): Promise<number> {
+  // Business validation
+  const uniqueAssigneeIds = Array.from(new Set(payload.assignee_ids));
+
+  if (uniqueAssigneeIds.length === 0) {
+    throw new Error('At least one assignee is required');
+  }
+
+  if (uniqueAssigneeIds.length > 5) {
+    throw new Error('Cannot assign more than 5 users to a task');
+  }
+
+  if (payload.priority_bucket < 1 || payload.priority_bucket > 10) {
+    throw new Error('Priority bucket must be between 1 and 10');
+  }
+
+  // Orchestrate task creation (all DB operations)
+  const taskId = await taskDb.createTask(
+    supabase,
+    payload,
+    creatorId,
+    attachmentFiles
+  );
+
+  // Future: Add side effects here
+  // await notificationService.notifyAssignees(taskId, uniqueAssigneeIds);
+  // await auditService.logTaskCreation(creatorId, taskId);
+
+  return taskId;
+}
+
+/**
+ * Service layer function to archive or unarchive a task.
+ *
+ * Handles:
+ * - Authorization (only managers can archive)
+ * - Business logic (cascade to subtasks)
+ * - Future: audit logging, notifications
+ *
+ * @param supabase - Authenticated Supabase client
+ * @param userId - UUID of the user performing the action
+ * @param taskId - ID of the task to archive/unarchive
+ * @param isArchived - True to archive, false to restore
+ * @returns Number of tasks affected (parent + subtasks)
+ * @throws {Error} If user is not authorized or DB operation fails
+ */
+export async function archiveTaskService(
+  supabase: SupabaseClient,
+  userId: string,
+  taskId: number,
+  isArchived: boolean
+): Promise<number> {
+  // Authorization check
+  const roles = await getRolesForUserClient(supabase, userId);
+
+  if (!roles.includes('manager')) {
+    throw new Error('Only managers can archive tasks');
+  }
+
+  // Execute archive operation
+  const affectedCount = await taskDb.archiveTask(taskId, isArchived);
+
+  // Future: Add side effects here
+  // await auditService.logArchive(userId, taskId, isArchived, affectedCount);
+  // await notificationService.notifyArchive(taskId, isArchived);
+
+  return affectedCount;
+}
+
 
 
 // // ============ CONSTANTS ============
@@ -512,9 +562,6 @@ export async function updateStatus(
   // 3. Update in DB
   const result = await updateTaskStatusDB(taskId, newStatus);
 
-  // TODO: Log status change (ATH002)
-  // TODO: Notify assignees of status change (NSY002)
-  // TODO: If status === 'Completed', handle recurring task (TM074)
 
   return result;
 }

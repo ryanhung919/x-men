@@ -8,7 +8,7 @@ import { format } from "date-fns"
 import { SubtaskLink } from "@/components/tasks/subtask-link"
 import { enUS } from "date-fns/locale"
 import { getTaskById, getAllUsers, getAllProjects } from "@/lib/db/tasks"
-import { formatTaskDetails } from "@/lib/services/tasks"
+import { getTaskByIdService } from "@/lib/services/tasks"
 import { EditableDescription } from "@/components/tasks/editable-description"
 import { EditableTitle } from "@/components/tasks/editable-title"
 import { EditablePriority } from "@/components/tasks/editable-priority"
@@ -45,12 +45,8 @@ export default async function TaskDetailsPage({ params }: { params: Promise<{ ta
     notFound()
   }
 
-  const rawData = await getTaskById(taskId)
-  if (!rawData) {
-    notFound()
-  }
-
-  const task = formatTaskDetails(rawData)
+  // Fetch and format task via service layer (single call)
+  const task = await getTaskByIdService(taskId);
   if (!task) {
     notFound()
   }

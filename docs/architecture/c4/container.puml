@@ -1,0 +1,38 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_TOP_DOWN()
+
+Person(user, " User")
+
+System_Boundary(xmen, "X-Men Task Management System") {
+  Container(browser, "Browser UI", "React (Next.js client)", "Renders pages, submits forms, calls API routes")
+  Container(next_server, "Next.js Server", "Node.js / Next.js App Router", "SSR/ISR, API routes, server actions, auth middleware")
+
+  ContainerDb(db, "Supabase Postgres", "Postgres", "Tasks, projects, users, tags, attachments, comments; RPC & triggers; RLS")
+  Container(storage, "Supabase Storage", "S3-compatible", "Task attachment files (bucket: task-attachments)")
+  Container(auth, "Supabase Auth", "Hosted service", "User auth, JWT")
+  Container(edge, "Supabase Edge Functions", "Deno", "send-task-reminders, daily-digest")
+
+}
+
+  Container_Ext(sendgrid, "SendGrid", "Email API", "Outbound email delivery")
+
+' Primary flows
+Rel(user, browser, "Uses", "HTTPS")
+Rel(browser, next_server, "Navigate / Render / Call APIs", "HTTP/JSON, form-data")
+Rel(next_server, auth, "Authenticate / authorize", "supabase-js")
+Rel(next_server, db, "Query/Mutate domain data (tasks, projects, users)", "supabase-js, SQL/RPC")
+Rel(next_server, storage, "Upload/download attachments", "supabase-js")
+
+' Scheduled flows
+Rel(edge, db, "Read task/user data", "service role")
+Rel(edge, sendgrid, "Send reminders/digests", "HTTPS API")
+
+' Notable containers/components inside Next.js Server (for clarity)
+AddElementTag("api", $fontColor="#ffffff", $bgColor="#1168bd")
+AddElementTag("svc", $fontColor="#ffffff", $bgColor="#6B7280")
+AddElementTag("dal", $fontColor="#111827", $bgColor="#e5e7eb")
+
+SHOW_LEGEND()
+@enduml

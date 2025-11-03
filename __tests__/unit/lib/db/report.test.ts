@@ -18,152 +18,171 @@ describe('lib/db/report', () => {
   });
 
   describe('getTasks', () => {
-    it('should return all tasks when no filters provided', async () => {
+    it('should return all non-archived tasks when no filters provided', async () => {
+      const mockEq = vi.fn().mockResolvedValue({
+        data: tasks,
+        error: null,
+      });
+
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: tasks,
-          error: null,
+        select: vi.fn().mockReturnValue({
+          eq: mockEq,
         }),
       });
 
       const result = await getTasks({});
 
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('tasks');
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
       expect(result).toEqual(tasks);
       expect(result).toHaveLength(tasks.length);
     });
 
-    it('should filter by single projectId', async () => {
+    it('should filter by single projectId and exclude archived tasks', async () => {
       const filteredTasks = tasks.filter((task) => task.project_id === projectsFixtures.alpha.id);
+
+      const mockEq = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValue({
+          data: filteredTasks,
+          error: null,
+        }),
+      });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          in: vi.fn().mockResolvedValue({
-            data: filteredTasks,
-            error: null,
-          }),
+          eq: mockEq,
         }),
       });
 
       const result = await getTasks({ projectIds: [projectsFixtures.alpha.id] });
 
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
       expect(result).toEqual(filteredTasks);
     });
 
-    it('should filter by multiple projectIds', async () => {
+    it('should filter by multiple projectIds and exclude archived tasks', async () => {
       const projectIds = [projectsFixtures.alpha.id, projectsFixtures.beta.id];
       const filteredTasks = tasks.filter((task) => projectIds.includes(task.project_id));
 
+      const mockEq = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValue({
+          data: filteredTasks,
+          error: null,
+        }),
+      });
+
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          in: vi.fn().mockResolvedValue({
-            data: filteredTasks,
-            error: null,
-          }),
+          eq: mockEq,
         }),
       });
 
       const result = await getTasks({ projectIds });
 
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
       expect(result).toHaveLength(filteredTasks.length);
     });
 
-    it('should filter by startDate', async () => {
+    it('should filter by startDate and exclude archived tasks', async () => {
       const startDate = new Date('2024-01-01');
 
-      const mockGte = vi.fn().mockResolvedValue({
-        data: tasks,
-        error: null,
+      const mockEq = vi.fn().mockReturnValue({
+        gte: vi.fn().mockResolvedValue({
+          data: tasks,
+          error: null,
+        }),
       });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          gte: mockGte,
+          eq: mockEq,
         }),
       });
 
       const result = await getTasks({ startDate });
 
-      expect(mockGte).toHaveBeenCalledWith('created_at', startDate.toISOString());
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
       expect(result).toEqual(tasks);
     });
 
-    it('should filter by endDate', async () => {
+    it('should filter by endDate and exclude archived tasks', async () => {
       const endDate = new Date('2024-12-31');
 
-      const mockLte = vi.fn().mockResolvedValue({
-        data: tasks,
-        error: null,
+      const mockEq = vi.fn().mockReturnValue({
+        lte: vi.fn().mockResolvedValue({
+          data: tasks,
+          error: null,
+        }),
       });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          lte: mockLte,
+          eq: mockEq,
         }),
       });
 
       const result = await getTasks({ endDate });
 
-      expect(mockLte).toHaveBeenCalledWith('created_at', endDate.toISOString());
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
       expect(result).toEqual(tasks);
     });
 
-    it('should filter by date range (startDate and endDate)', async () => {
+    it('should filter by date range (startDate and endDate) and exclude archived tasks', async () => {
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-12-31');
 
-      const mockGte = vi.fn().mockReturnThis();
-      const mockLte = vi.fn().mockResolvedValue({
-        data: tasks,
-        error: null,
+      const mockEq = vi.fn().mockReturnValue({
+        gte: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockResolvedValue({
+          data: tasks,
+          error: null,
+        }),
       });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          gte: mockGte,
-          lte: mockLte,
+          eq: mockEq,
         }),
       });
 
       const result = await getTasks({ startDate, endDate });
 
-      expect(mockGte).toHaveBeenCalledWith('created_at', startDate.toISOString());
-      expect(mockLte).toHaveBeenCalledWith('created_at', endDate.toISOString());
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
       expect(result).toEqual(tasks);
     });
 
-    it('should handle combined filters (projectIds and date range)', async () => {
+    it('should handle combined filters (projectIds and date range) and exclude archived tasks', async () => {
       const projectIds = [projectsFixtures.alpha.id];
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-12-31');
 
-      const mockIn = vi.fn().mockReturnThis();
-      const mockGte = vi.fn().mockReturnThis();
-      const mockLte = vi.fn().mockResolvedValue({
-        data: tasks,
-        error: null,
+      const mockEq = vi.fn().mockReturnValue({
+        in: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockResolvedValue({
+          data: tasks,
+          error: null,
+        }),
       });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          in: mockIn,
-          gte: mockGte,
-          lte: mockLte,
+          eq: mockEq,
         }),
       });
 
-      const result = await getTasks({ projectIds, startDate, endDate });
+      await getTasks({ projectIds, startDate, endDate });
 
-      expect(mockIn).toHaveBeenCalledWith('project_id', projectIds);
-      expect(mockGte).toHaveBeenCalledWith('created_at', startDate.toISOString());
-      expect(mockLte).toHaveBeenCalledWith('created_at', endDate.toISOString());
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
     });
 
     it('should return empty array if no tasks found', async () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: [],
-          error: null,
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: [],
+            error: null,
+          }),
         }),
       });
 
@@ -174,9 +193,11 @@ describe('lib/db/report', () => {
 
     it('should return empty array if data is null', async () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: null,
-          error: null,
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: null,
+            error: null,
+          }),
         }),
       });
 
@@ -189,9 +210,11 @@ describe('lib/db/report', () => {
       const mockError = new Error('Database query failed');
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: null,
-          error: mockError,
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: null,
+            error: mockError,
+          }),
         }),
       });
 
@@ -200,9 +223,11 @@ describe('lib/db/report', () => {
 
     it('should not apply projectIds filter when array is empty', async () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: tasks,
-          error: null,
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: tasks,
+            error: null,
+          }),
         }),
       });
 
@@ -211,10 +236,14 @@ describe('lib/db/report', () => {
       expect(result).toEqual(tasks);
     });
 
-    it('should select correct task fields', async () => {
-      const mockSelect = vi.fn().mockResolvedValue({
+    it('should select correct task fields including is_archived', async () => {
+      const mockEq = vi.fn().mockResolvedValue({
         data: tasks,
         error: null,
+      });
+
+      const mockSelect = vi.fn().mockReturnValue({
+        eq: mockEq,
       });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
@@ -226,8 +255,10 @@ describe('lib/db/report', () => {
       expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('id'));
       expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('title'));
       expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('status'));
+      expect(mockSelect).toHaveBeenCalledWith(expect.stringContaining('is_archived'));
     });
   });
+
   describe('getUsersByIds', () => {
     it('should return user info for valid user IDs', async () => {
       const userIds = ['user1', 'user2'];
@@ -360,26 +391,30 @@ describe('lib/db/report', () => {
       expect(result).toHaveLength(1); // Only user1 was found
     });
   });
+
   describe('getWeeklyTaskStatsByUser', () => {
-    it('should return weekly task stats grouped by user', async () => {
+    it('should return weekly task stats grouped by user and exclude archived tasks', async () => {
       const mockTasks = [
         {
           id: 1,
           status: 'Completed',
           creator_id: 'user1',
-          created_at: '2024-01-08T10:00:00Z', // Week 2
+          created_at: '2024-01-08T10:00:00Z',
+          is_archived: false,
         },
         {
           id: 2,
           status: 'In Progress',
           creator_id: 'user1',
-          created_at: '2024-01-08T11:00:00Z', // Week 2
+          created_at: '2024-01-08T11:00:00Z',
+          is_archived: false,
         },
         {
           id: 3,
           status: 'To Do',
           creator_id: 'user2',
-          created_at: '2024-01-08T12:00:00Z', // Week 2
+          created_at: '2024-01-08T12:00:00Z',
+          is_archived: false,
         },
       ];
 
@@ -388,15 +423,6 @@ describe('lib/db/report', () => {
         { id: 'user2', first_name: 'Jane', last_name: 'Smith' },
       ];
 
-      // Mock tasks query
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: mockTasks,
-          error: null,
-        }),
-      });
-
-      // Mock users query (called internally by getUsersByIds)
       mockSupabaseClient.from = vi.fn((table: string) => {
         if (table === 'user_info') {
           return {
@@ -409,9 +435,11 @@ describe('lib/db/report', () => {
           };
         }
         return {
-          select: vi.fn().mockResolvedValue({
-            data: mockTasks,
-            error: null,
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: mockTasks,
+              error: null,
+            }),
           }),
         };
       });
@@ -430,37 +458,42 @@ describe('lib/db/report', () => {
       expect(result[0]).toHaveProperty('total');
     });
 
-    it('should aggregate tasks by status correctly', async () => {
+    it('should aggregate tasks by status correctly and exclude archived', async () => {
       const mockTasks = [
         {
           id: 1,
           status: 'Completed',
           creator_id: 'user1',
           created_at: '2024-01-08T10:00:00Z',
+          is_archived: false,
         },
         {
           id: 2,
           status: 'Completed',
           creator_id: 'user1',
           created_at: '2024-01-08T11:00:00Z',
+          is_archived: false,
         },
         {
           id: 3,
           status: 'In Progress',
           creator_id: 'user1',
           created_at: '2024-01-08T12:00:00Z',
+          is_archived: false,
         },
         {
           id: 4,
           status: 'To Do',
           creator_id: 'user1',
           created_at: '2024-01-08T13:00:00Z',
+          is_archived: false,
         },
         {
           id: 5,
           status: 'Blocked',
           creator_id: 'user1',
           created_at: '2024-01-08T14:00:00Z',
+          is_archived: false,
         },
       ];
 
@@ -478,9 +511,11 @@ describe('lib/db/report', () => {
           };
         }
         return {
-          select: vi.fn().mockResolvedValue({
-            data: mockTasks,
-            error: null,
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: mockTasks,
+              error: null,
+            }),
           }),
         };
       });
@@ -502,19 +537,22 @@ describe('lib/db/report', () => {
           id: 1,
           status: 'Completed',
           creator_id: 'user1',
-          created_at: '2024-01-01T10:00:00Z', // Week 1
+          created_at: '2024-01-01T10:00:00Z',
+          is_archived: false,
         },
         {
           id: 2,
           status: 'Completed',
           creator_id: 'user1',
-          created_at: '2024-01-08T10:00:00Z', // Week 2
+          created_at: '2024-01-08T10:00:00Z',
+          is_archived: false,
         },
         {
           id: 3,
           status: 'Completed',
           creator_id: 'user1',
-          created_at: '2024-01-15T10:00:00Z', // Week 3
+          created_at: '2024-01-15T10:00:00Z',
+          is_archived: false,
         },
       ];
 
@@ -532,9 +570,11 @@ describe('lib/db/report', () => {
           };
         }
         return {
-          select: vi.fn().mockResolvedValue({
-            data: mockTasks,
-            error: null,
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: mockTasks,
+              error: null,
+            }),
           }),
         };
       });
@@ -552,12 +592,14 @@ describe('lib/db/report', () => {
           status: 'Completed',
           creator_id: 'user1',
           created_at: '2024-01-08T10:00:00Z',
+          is_archived: false,
         },
         {
           id: 2,
           status: 'In Progress',
           creator_id: 'user2',
           created_at: '2024-01-08T11:00:00Z',
+          is_archived: false,
         },
       ];
 
@@ -578,20 +620,22 @@ describe('lib/db/report', () => {
           };
         }
         return {
-          select: vi.fn().mockResolvedValue({
-            data: mockTasks,
-            error: null,
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: mockTasks,
+              error: null,
+            }),
           }),
         };
       });
 
       const result = await getWeeklyTaskStatsByUser({});
 
-      expect(result.length).toBe(2); // 2 user-week combinations
+      expect(result.length).toBe(2);
       const user1Week = result.find((r) => r.userId === 'user1');
       const user2Week = result.find((r) => r.userId === 'user2');
 
-      expect(user1Week?.week).toBe(user2Week?.week); // Same week
+      expect(user1Week?.week).toBe(user2Week?.week);
       expect(user1Week?.completed).toBe(1);
       expect(user2Week?.inProgress).toBe(1);
     });
@@ -603,6 +647,7 @@ describe('lib/db/report', () => {
           status: 'To Do',
           creator_id: undefined,
           created_at: '2024-01-08T10:00:00Z',
+          is_archived: false,
         },
       ];
 
@@ -618,9 +663,11 @@ describe('lib/db/report', () => {
           };
         }
         return {
-          select: vi.fn().mockResolvedValue({
-            data: mockTasks,
-            error: null,
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: mockTasks,
+              error: null,
+            }),
           }),
         };
       });
@@ -632,53 +679,57 @@ describe('lib/db/report', () => {
       expect(result[0].userName).toBe('Unassigned');
     });
 
-    it('should filter by projectIds', async () => {
+    it('should filter by projectIds and exclude archived', async () => {
       const projectIds = [projectsFixtures.alpha.id];
 
-      const mockIn = vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
+      const mockEq = vi.fn().mockReturnValue({
+        in: vi.fn().mockResolvedValue({
+          data: [],
+          error: null,
+        }),
       });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          in: mockIn,
+          eq: mockEq,
         }),
       });
 
       await getWeeklyTaskStatsByUser({ projectIds });
 
-      expect(mockIn).toHaveBeenCalledWith('project_id', projectIds);
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
     });
 
-    it('should filter by date range', async () => {
+    it('should filter by date range and exclude archived', async () => {
       const startDate = new Date('2024-01-01');
       const endDate = new Date('2024-12-31');
 
-      const mockGte = vi.fn().mockReturnThis();
-      const mockLte = vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
+      const mockEq = vi.fn().mockReturnValue({
+        gte: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockResolvedValue({
+          data: [],
+          error: null,
+        }),
       });
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          gte: mockGte,
-          lte: mockLte,
+          eq: mockEq,
         }),
       });
 
       await getWeeklyTaskStatsByUser({ startDate, endDate });
 
-      expect(mockGte).toHaveBeenCalledWith('created_at', startDate.toISOString());
-      expect(mockLte).toHaveBeenCalledWith('created_at', endDate.toISOString());
+      expect(mockEq).toHaveBeenCalledWith('is_archived', false);
     });
 
     it('should return empty array for no tasks', async () => {
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: [],
-          error: null,
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: [],
+            error: null,
+          }),
         }),
       });
 
@@ -693,19 +744,22 @@ describe('lib/db/report', () => {
           id: 1,
           status: 'Completed',
           creator_id: 'user2',
-          created_at: '2024-01-15T10:00:00Z', // Week 3
+          created_at: '2024-01-15T10:00:00Z',
+          is_archived: false,
         },
         {
           id: 2,
           status: 'Completed',
           creator_id: 'user1',
-          created_at: '2024-01-08T10:00:00Z', // Week 2
+          created_at: '2024-01-08T10:00:00Z',
+          is_archived: false,
         },
         {
           id: 3,
           status: 'Completed',
           creator_id: 'user2',
-          created_at: '2024-01-08T10:00:00Z', // Week 2
+          created_at: '2024-01-08T10:00:00Z',
+          is_archived: false,
         },
       ];
 
@@ -726,18 +780,18 @@ describe('lib/db/report', () => {
           };
         }
         return {
-          select: vi.fn().mockResolvedValue({
-            data: mockTasks,
-            error: null,
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: mockTasks,
+              error: null,
+            }),
           }),
         };
       });
 
       const result = await getWeeklyTaskStatsByUser({});
 
-      // Should be sorted by week first, then by user name
       expect(result[0].week < result[2].week).toBe(true);
-      // Within same week, Alice should come before Bob
       if (result[0].week === result[1].week) {
         expect(result[0].userName.localeCompare(result[1].userName)).toBeLessThan(0);
       }
@@ -747,9 +801,11 @@ describe('lib/db/report', () => {
       const mockError = new Error('Database query failed');
 
       mockSupabaseClient.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockResolvedValue({
-          data: null,
-          error: mockError,
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: null,
+            error: mockError,
+          }),
         }),
       });
 

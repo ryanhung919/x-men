@@ -155,12 +155,25 @@ async function seedDatabase(): Promise<void> {
   console.log('🌱 Seeding database for integration tests...');
   
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Use VERCEL_URL in production/preview, localhost in development
+    const appUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000';
+    
+    const seedSecret = process.env.SEED_SECRET;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add authorization header if seed secret is configured (for production)
+    if (seedSecret) {
+      headers['Authorization'] = `Bearer ${seedSecret}`;
+    }
+    
     const response = await fetch(`${appUrl}/seed`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
     
     if (!response.ok) {
@@ -169,14 +182,15 @@ async function seedDatabase(): Promise<void> {
     }
     
     const result = await response.json();
-    console.log('Database seeded successfully');
+    console.log('✅ Database seeded successfully');
     console.log('   Message:', result.message);
   } catch (error) {
     console.error('❌ Failed to seed database:', error);
-    console.error('   Make sure your Next.js dev server is running on', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+    console.error('   Make sure your deployment is accessible');
     throw error;
   }
 }
+
 
 /**
  * Verify user roles are correctly seeded
@@ -210,6 +224,10 @@ async function verifyUserRoles(): Promise<void> {
 // Run before all integration tests
 beforeAll(async () => {
   console.log('\n🔧 Setting up integration test environment...');
+
+  // Capture the exact timestamp when testing starts
+  // Use a small buffer to account for any setup operations
+  testStartTime = new Date(Date.now() - 1000).toISOString(); // 1 second buffer
 
   // Verify environment variables
   const requiredEnvVars = [
@@ -246,17 +264,52 @@ beforeAll(async () => {
   console.log('Integration test environment ready\n');
 }, 120000); // 2 minute timeout for setup
 
+// Capture the exact timestamp when testing starts
+let testStartTime: string;
+
 // Clean up after all tests
 afterAll(async () => {
   console.log('\n🧹 Cleaning up integration test environment...');
-  
+
+  // Clean up ONLY notifications created during this specific test run
+  try {
+    // Get test user IDs
+    const testUserIds = Object.values(testUsers).map(user => user.id);
+
+    // Find notifications created AFTER the test started (using captured timestamp)
+    const { data: testNotifications, error: fetchError } = await adminClient
+      .from('notifications')
+      .select('id')
+      .in('user_id', testUserIds)
+      .gt('created_at', testStartTime);
+
+    if (fetchError) {
+      console.error('Error fetching test notifications for cleanup:', fetchError);
+    } else if (testNotifications && testNotifications.length > 0) {
+      const notificationIds = testNotifications.map(n => n.id);
+
+      const { error: deleteError } = await adminClient
+        .from('notifications')
+        .delete()
+        .in('id', notificationIds);
+
+      if (deleteError) {
+        console.error('Error cleaning up test notifications:', deleteError);
+      } else {
+        console.log(`Cleaned up ${notificationIds.length} test notifications created during this test run`);
+      }
+    }
+  } catch (error) {
+    console.error('Error during notification cleanup:', error);
+  }
+
   // Sign out all sessions
   try {
     await adminClient.auth.signOut();
   } catch (error) {
     console.error('Error during cleanup:', error);
   }
-  
+
   console.log('Integration test cleanup complete\n');
 });
 

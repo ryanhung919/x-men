@@ -80,15 +80,39 @@ describe('lib/supabase/middleware', () => {
       expect(response.status).toBe(200);
     });
 
-    it('should allow access to /seed route without authentication', async () => {
-      mockSupabase.auth.getClaims.mockResolvedValue({
-        data: { claims: null },
+    describe('seed route protection', () => {
+      it('should allow access to /seed in local development without auth header', async () => {
+        vi.stubEnv('NODE_ENV', 'development');
+        vi.stubEnv('CI', '');
+
+        mockSupabase.auth.getClaims.mockResolvedValue({
+          data: { claims: null },
+        });
+
+        const request = new NextRequest('http://localhost:3000/seed');
+        const response = await updateSession(request);
+
+        expect(response.status).toBe(200);
+
+        vi.unstubAllEnvs();
       });
 
-      const request = new NextRequest('http://localhost:3000/seed');
-      const response = await updateSession(request);
+      it('should block access to /seed in CI without auth header', async () => {
+        vi.stubEnv('NODE_ENV', 'production');
+        vi.stubEnv('CI', 'true'); // GitHub Actions sets this
+        vi.stubEnv('SEED_SECRET', 'test-secret');
 
-      expect(response.status).toBe(200);
+        mockSupabase.auth.getClaims.mockResolvedValue({
+          data: { claims: null },
+        });
+
+        const request = new NextRequest('http://localhost:3000/seed');
+        const response = await updateSession(request);
+
+        expect(response.status).toBe(404);
+
+        vi.unstubAllEnvs();
+      });
     });
 
     it('should allow API routes without authentication checks', async () => {

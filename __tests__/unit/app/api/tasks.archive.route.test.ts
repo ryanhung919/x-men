@@ -1,16 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PATCH } from '@/app/api/tasks/[id]/archive/route';
-import { archiveTask } from '@/lib/db/tasks';
-import { getRolesForUserClient } from '@/lib/db/roles';
+import { archiveTaskService } from '@/lib/services/tasks';
 import { NextRequest } from 'next/server';
 
-// Mock the database functions
-vi.mock('@/lib/db/tasks', () => ({
-  archiveTask: vi.fn(),
-}));
-
-vi.mock('@/lib/db/roles', () => ({
-  getRolesForUserClient: vi.fn(),
+// Mock the service layer
+vi.mock('@/lib/services/tasks', () => ({
+  archiveTaskService: vi.fn(),
 }));
 
 // Mock the Supabase server client
@@ -29,7 +24,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
     vi.clearAllMocks();
   });
 
-  it('should archive a task successfully when user is a manager', async () => {
+  it('should archive a task successfully when user is authorized', async () => {
     const mockUser = { id: 'user-123' };
     const taskId = 123;
     const affectedCount = 3; // Parent + 2 subtasks
@@ -39,8 +34,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['manager']);
-    (archiveTask as any).mockResolvedValue(affectedCount);
+    (archiveTaskService as any).mockResolvedValue(affectedCount);
 
     const request = new NextRequest('http://localhost:3000/api/tasks/123/archive', {
       method: 'PATCH',
@@ -56,11 +50,10 @@ describe('PATCH /api/tasks/[id]/archive', () => {
     expect(data.taskId).toBe(taskId);
     expect(data.affectedCount).toBe(affectedCount);
     expect(data.message).toContain('archived successfully');
-    expect(archiveTask).toHaveBeenCalledWith(taskId, true);
-    expect(getRolesForUserClient).toHaveBeenCalledWith(mockSupabaseClient, mockUser.id);
+    expect(archiveTaskService).toHaveBeenCalledWith(mockSupabaseClient, mockUser.id, taskId, true);
   });
 
-  it('should unarchive a task successfully when user is a manager', async () => {
+  it('should unarchive a task successfully when user is authorized', async () => {
     const mockUser = { id: 'user-123' };
     const taskId = 456;
     const affectedCount = 1;
@@ -70,8 +63,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['manager', 'staff']);
-    (archiveTask as any).mockResolvedValue(affectedCount);
+    (archiveTaskService as any).mockResolvedValue(affectedCount);
 
     const request = new NextRequest('http://localhost:3000/api/tasks/456/archive', {
       method: 'PATCH',
@@ -86,7 +78,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
     expect(data.success).toBe(true);
     expect(data.taskId).toBe(taskId);
     expect(data.message).toContain('restored successfully');
-    expect(archiveTask).toHaveBeenCalledWith(taskId, false);
+    expect(archiveTaskService).toHaveBeenCalledWith(mockSupabaseClient, mockUser.id, taskId, false);
   });
 
   it('should return 401 if user is not authenticated', async () => {
@@ -106,8 +98,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
-    expect(archiveTask).not.toHaveBeenCalled();
-    expect(getRolesForUserClient).not.toHaveBeenCalled();
+    expect(archiveTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 403 if user is not a manager', async () => {
@@ -118,7 +109,8 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['staff']); // Not a manager
+    // Service layer will check authorization and throw error
+    (archiveTaskService as any).mockRejectedValue(new Error('Only managers can archive tasks'));
 
     const request = new NextRequest('http://localhost:3000/api/tasks/123/archive', {
       method: 'PATCH',
@@ -131,7 +123,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
 
     expect(response.status).toBe(403);
     expect(data.error).toBe('Only managers can archive tasks');
-    expect(archiveTask).not.toHaveBeenCalled();
+    expect(archiveTaskService).toHaveBeenCalledWith(mockSupabaseClient, mockUser.id, 123, true);
   });
 
   it('should return 400 if task ID is invalid', async () => {
@@ -142,7 +134,6 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['manager']);
 
     const request = new NextRequest('http://localhost:3000/api/tasks/invalid/archive', {
       method: 'PATCH',
@@ -155,7 +146,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid task ID');
-    expect(archiveTask).not.toHaveBeenCalled();
+    expect(archiveTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if is_archived is not a boolean', async () => {
@@ -166,7 +157,6 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['manager']);
 
     const request = new NextRequest('http://localhost:3000/api/tasks/123/archive', {
       method: 'PATCH',
@@ -179,7 +169,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('is_archived must be a boolean');
-    expect(archiveTask).not.toHaveBeenCalled();
+    expect(archiveTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 400 if is_archived is missing', async () => {
@@ -190,7 +180,6 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['manager']);
 
     const request = new NextRequest('http://localhost:3000/api/tasks/123/archive', {
       method: 'PATCH',
@@ -203,7 +192,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe('is_archived must be a boolean');
-    expect(archiveTask).not.toHaveBeenCalled();
+    expect(archiveTaskService).not.toHaveBeenCalled();
   });
 
   it('should return 500 if archiveTask throws an error', async () => {
@@ -214,8 +203,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['manager']);
-    (archiveTask as any).mockRejectedValue(new Error('Database error'));
+    (archiveTaskService as any).mockRejectedValue(new Error('Database error'));
 
     const request = new NextRequest('http://localhost:3000/api/tasks/123/archive', {
       method: 'PATCH',
@@ -239,8 +227,7 @@ describe('PATCH /api/tasks/[id]/archive', () => {
       error: null,
     });
 
-    (getRolesForUserClient as any).mockResolvedValue(['manager']);
-    (archiveTask as any).mockRejectedValue(new Error('Task with ID 999 not found'));
+    (archiveTaskService as any).mockRejectedValue(new Error('Task with ID 999 not found'));
 
     const request = new NextRequest('http://localhost:3000/api/tasks/999/archive', {
       method: 'PATCH',
