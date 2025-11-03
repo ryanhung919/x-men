@@ -23,9 +23,11 @@ import {
   deleteTaskCommentDB,
   getCommentAuthorDB,
   checkUserIsAdmin,
+  getTaskById,
 } from '@/lib/db/tasks';
 
 import { CreateTaskPayload } from '../types/task-creation';
+import { createClient } from '@/lib/supabase/server';
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
@@ -37,6 +39,7 @@ import {
   Task,
   TaskComment,
   DetailedTask,
+  calculateNextDueDate,
 } from '../types/tasks';
 
 // Re-export types for backward compatibility
@@ -559,9 +562,62 @@ export async function updateStatus(
     throw new Error('You do not have permission to update this task');
   }
 
-  // 3. Update in DB
+  // 3. Get task details BEFORE updating (needed for recurring task logic)
+  let taskDetails: DetailedTask | null = null;
+  if (newStatus === 'Completed') {
+    const rawTaskData = await getTaskById(taskId);
+    if (rawTaskData) {
+      taskDetails = formatTaskDetails(rawTaskData);
+    }
+  }
+
+  // 4. Update status in DB
   const result = await updateTaskStatusDB(taskId, newStatus);
 
+  // 5. Handle recurring task creation if task is completed
+  if (newStatus === 'Completed' && taskDetails) {
+    // Check if this is a recurring task with a deadline
+    if (taskDetails.recurrence_interval > 0 && taskDetails.deadline) {
+      try {
+        // Convert DetailedTask to Task format (for calculateNextDueDate)
+        const taskForCalculation: Task = {
+          ...taskDetails,
+          attachments: taskDetails.attachments.map(a => a.storage_path),
+        };
+
+        // Calculate next due date using the existing function
+        const taskWithNextDue = calculateNextDueDate(taskForCalculation);
+
+        // Create new recurring task with same properties
+        const newTaskPayload: CreateTaskPayload = {
+          project_id: taskDetails.project.id,
+          title: taskDetails.title,
+          description: taskDetails.description || '',
+          priority_bucket: taskDetails.priority,
+          status: 'To Do',
+          assignee_ids: taskDetails.assignees.map(a => a.assignee_id),
+          deadline: taskWithNextDue.deadline!,
+          notes: taskDetails.notes || undefined,
+          tags: taskDetails.tags,
+          recurrence_interval: taskDetails.recurrence_interval,
+          recurrence_date: taskDetails.recurrence_date || undefined,
+        };
+
+        // Create the new recurring task (createTask creates its own supabase client)
+        const supabase = await createClient();
+        await createTask(supabase, newTaskPayload, taskDetails.creator.creator_id);
+
+        console.log(`[RECURRING] Created new recurring task for task ${taskId} with deadline ${taskWithNextDue.deadline}`);
+      } catch (error) {
+        console.error('[RECURRING] Failed to create recurring task:', error);
+        // Don't fail the status update if recurring task creation fails
+        // The status update was successful, just log the error
+      }
+    }
+  }
+
+  // TODO: Log status change (ATH002)
+  // TODO: Notify assignees of status change (NSY002)
 
   return result;
 }

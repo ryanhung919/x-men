@@ -325,6 +325,7 @@ export const tags = [
   { name: 'Onboarding' },
   { name: 'Analytics' },
   { name: 'Automation' },
+  { name: 'Recurring' },
 ];
 
 /* ======================== TASKS ======================== */
@@ -734,6 +735,58 @@ export const tasks = [
     recurrence_date: null,
     logged_time: 0,
   },
+  // ========== RECURRING TASKS FOR TESTING ==========
+  {
+    title: 'Daily Standup Meeting',
+    description: 'Daily team sync-up meeting notes',
+    priority_bucket: 6,
+    status: 'To Do',
+    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    project_name: 'Website Redesign',
+    deadline: new Date('2024-09-29T10:00:00+08:00'), // Past deadline - will be overdue
+    notes: 'Recurring daily standup',
+    parent_task_external_key: null,
+    is_archived: false,
+    created_at: new Date('2024-09-20T09:00:00+08:00'),
+    updated_at: new Date('2024-09-20T09:00:00+08:00'),
+    recurrence_interval: 1, // Daily (1 day)
+    recurrence_date: new Date('2024-09-20T09:00:00+08:00'),
+    logged_time: 0,
+  },
+  {
+    title: 'Weekly Sprint Planning',
+    description: 'Plan next week sprint goals and tasks',
+    priority_bucket: 8,
+    status: 'To Do',
+    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    project_name: 'Client Onboarding Portal',
+    deadline: new Date('2025-11-10T14:00:00+08:00'), // Future deadline
+    notes: 'Every Monday sprint planning',
+    parent_task_external_key: null,
+    is_archived: false,
+    created_at: new Date('2025-11-03T10:00:00+08:00'),
+    updated_at: new Date('2025-11-03T10:00:00+08:00'),
+    recurrence_interval: 7, // Weekly (7 days)
+    recurrence_date: new Date('2025-11-03T10:00:00+08:00'),
+    logged_time: 0,
+  },
+  {
+    title: 'Monthly Financial Report',
+    description: 'Generate and submit monthly financial summary',
+    priority_bucket: 9,
+    status: 'To Do',
+    creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    project_name: 'Annual Budget FY25',
+    deadline: new Date('2025-11-30T17:00:00+08:00'),
+    notes: 'Include budget variance analysis',
+    parent_task_external_key: null,
+    is_archived: false,
+    created_at: new Date('2025-10-30T09:00:00+08:00'),
+    updated_at: new Date('2025-10-30T09:00:00+08:00'),
+    recurrence_interval: 30, // Monthly (30 days)
+    recurrence_date: new Date('2025-10-30T09:00:00+08:00'),
+    logged_time: 0,
+  },
 
 ];
 
@@ -766,6 +819,11 @@ export const task_tags = [
   { task_title: 'Prepare finance report', tag_name: 'Reporting' },
   { task_title: 'Setup analytics dashboards', tag_name: 'Analytics' },
   { task_title: 'Setup analytics dashboards', tag_name: 'Reporting' },
+  // ========== RECURRING TASK TAGS ==========
+  { task_title: 'Daily Standup Meeting', tag_name: 'Recurring' },
+  { task_title: 'Weekly Sprint Planning', tag_name: 'Recurring' },
+  { task_title: 'Monthly Financial Report', tag_name: 'Recurring' },
+  { task_title: 'Monthly Financial Report', tag_name: 'Budget' },
 ];
 
 /* ======================== ASSIGNMENTS (<=5 per task enforced in DB) ======================== */
@@ -1027,6 +1085,25 @@ export const task_assignments = [
     assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
     created_at: new Date('2025-10-01T10:20:00+08:00'),
+  },
+  // ========== RECURRING TASK ASSIGNMENTS ==========
+  {
+    task_title: 'Daily Standup Meeting',
+    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
+    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Self-assigned
+    created_at: new Date('2024-09-20T09:00:00+08:00'),
+  },
+  {
+    task_title: 'Weekly Sprint Planning',
+    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
+    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Self-assigned
+    created_at: new Date('2025-11-03T10:00:00+08:00'),
+  },
+  {
+    task_title: 'Monthly Financial Report',
+    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
+    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Self-assigned
+    created_at: new Date('2025-10-30T09:00:00+08:00'),
   },
 ];
 
