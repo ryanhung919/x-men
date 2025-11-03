@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { type Task, calculateNextDueDate } from '@/lib/services/tasks';
+// import { type Task, calculateNextDueDate } from '@/lib/services/tasks';
 import {
   Calendar,
   Paperclip,
@@ -31,6 +31,42 @@ import {
   type ColumnId,
 } from '@/components/filters/column-visibility-selector';
 import { useRouter } from 'next/navigation';
+
+type Task = {
+  id: number;
+  title: string;
+  description: string | null;
+  priority: number;
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked';
+  deadline: string | null;
+  notes: string | null;
+  recurrence_interval: number;
+  recurrence_date: string | null;
+  project: { id: number; name: string };
+  creator: { creator_id: string; user_info: { first_name: string; last_name: string } };
+  subtasks: { id: number; title: string; status: string; deadline: string | null }[];
+  assignees: { assignee_id: string; user_info: { first_name: string; last_name: string } }[];
+  tags: string[];
+  attachments: string[];
+  isOverdue: boolean;
+};
+
+export function calculateNextDueDate(task: Task): Task {
+  // For recurring tasks, calculate next due date based on previous deadline + interval
+  // This follows the requirement: "the due date is based on the calculation from the previous due date"
+  // Example: Task due Sep 29, completed Oct 1, interval 1 day → next due is Sep 30
+  if (task.recurrence_interval > 0 && task.deadline) {
+    const previousDeadline = new Date(task.deadline);
+    const intervalMs = task.recurrence_interval * 24 * 60 * 60 * 1000;
+    const nextDue = new Date(previousDeadline.getTime() + intervalMs);
+    return {
+      ...task,
+      deadline: nextDue.toISOString(),
+      isOverdue: nextDue < new Date() && task.status !== 'Completed',
+    };
+  }
+  return task;
+}
 
 type TasksListProps = {
   tasks: Task[];

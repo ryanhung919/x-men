@@ -43,15 +43,19 @@ import { FileUploadZone } from './file-upload-zone';
 
 interface CreateTaskDialogProps {
   onTaskCreated?: (taskId: number) => void;
+  initialProjectId?: number; // NEW: lock project if provided
+  isSubtask?: boolean; // NEW: show different title
+  initialProjectName?: string; // NEW: to show project name if locked
 }
 
-export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = false, initialProjectName }: CreateTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
-  const [projectId, setProjectId] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<number | null>(initialProjectId ?? null);
+  const isProjectLocked = initialProjectId !== undefined;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>(1);
@@ -74,7 +78,7 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
   }, [open]);
 
   const resetForm = () => {
-    setProjectId(null);
+    setProjectId(initialProjectId ??null);
     setTitle('');
     setDescription('');
     setPriority(1);
@@ -179,14 +183,14 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button variant="outline" className="gap-2">
           <PlusIcon className="h-4 w-4" />
-          Create Task
+          {isSubtask ? 'Create Subtask' : 'Create Task'}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:!max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Task</DialogTitle>
+          <DialogTitle>{isSubtask ? 'Create New Subtask' : 'Create New Task'}</DialogTitle>
           <DialogDescription>
             Fill in the details to create a new task. Fields marked with * are mandatory.
           </DialogDescription>
@@ -198,7 +202,15 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
             <Label htmlFor="project">
               Project <span className="text-red-500">*</span>
             </Label>
-            <ProjectSingleSelector selectedProjectId={projectId} onChange={setProjectId} />
+            {isProjectLocked ? (
+              <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded border text-sm">
+                <p className="font-medium text-gray-700 dark:text-gray-300">
+                  {initialProjectName}
+                </p>
+              </div>
+            ) : (
+              <ProjectSingleSelector selectedProjectId={projectId} onChange={setProjectId} />
+            )}
           </div>
 
           {/* Title */}
