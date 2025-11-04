@@ -837,31 +837,6 @@ export async function updateTaskNotesDB(
   return data;
 }
 
-/**
- * Updates only the task project in the database.
- */
-export async function updateTaskProjectDB(
-  taskId: number,
-  newProjectId: number
-): Promise<{ id: number; project_id: number }> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from('tasks')
-    .update({
-      project_id: newProjectId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', taskId)
-    .select('id, project_id')
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to update task project: ${error.message}`);
-  }
-
-  return data;
-}
 
 /**
  * Updates task recurrence settings.

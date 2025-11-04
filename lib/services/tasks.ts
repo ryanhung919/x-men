@@ -5,7 +5,6 @@ import {
   updateTaskPriorityDB,
   updateTaskDeadlineDB,
   updateTaskNotesDB,
-  updateTaskProjectDB,
   updateTaskRecurrenceDB,
   addTaskTagDB,
   removeTaskTagDB,
@@ -715,32 +714,6 @@ export async function updateNotes(
   return result;
 }
 
-// ============ PROJECT ============
-
-export async function updateProject(
-  taskId: number,
-  newProjectId: number,
-  userId: string
-): Promise<{ id: number; project_id: number }> {
-  // 1. Validate project ID is a positive number
-  if (!Number.isInteger(newProjectId) || newProjectId <= 0) {
-    throw new Error('Invalid project ID');
-  }
-
-  // 2. Check permission
-  const hasPermission = await checkTaskPermission(taskId, userId);
-  if (!hasPermission) {
-    throw new Error('You do not have permission to update this task');
-  }
-
-  // 3. Update in DB
-  const result = await updateTaskProjectDB(taskId, newProjectId);
-
-  // TODO: Notify assignees (TM067, TM078, TM087)
-  // TODO: Update project_departments based on assignee departments
-
-  return result;
-}
 
 // ============ RECURRENCE ============
 
@@ -1093,59 +1066,4 @@ export async function linkSubtaskToParent(
       `Failed to link subtask to parent: ${err instanceof Error ? err.message : 'Unknown error'}`
     );
   }
-}
-
-
-// ============ BATCH OPERATIONS ============
-
-/**
- * Update multiple fields at once
- * More efficient than individual updates
- */
-export async function updateTaskMultiple(
-  taskId: number,
-  updates: {
-    title?: string;
-    description?: string;
-    status?: 'To Do' | 'In Progress' | 'Completed' | 'Blocked';
-    priority?: number;
-    deadline?: string | null;
-    notes?: string;
-  },
-  userId: string
-): Promise<Record<string, any>> {
-  // 1. Check permission once
-  const hasPermission = await checkTaskPermission(taskId, userId);
-  if (!hasPermission) {
-    throw new Error('You do not have permission to update this task');
-  }
-
-  const results: Record<string, any> = {};
-
-  // 2. Validate and update each field
-  if (updates.title !== undefined) {
-    results.title = await updateTitle(taskId, updates.title, userId);
-  }
-
-  if (updates.description !== undefined) {
-    results.description = await updateDescription(taskId, updates.description, userId);
-  }
-
-  if (updates.status !== undefined) {
-    results.status = await updateStatus(taskId, updates.status, userId);
-  }
-
-  if (updates.priority !== undefined) {
-    results.priority = await updatePriority(taskId, updates.priority, userId);
-  }
-
-  if (updates.deadline !== undefined) {
-    results.deadline = await updateDeadline(taskId, updates.deadline, userId);
-  }
-
-  if (updates.notes !== undefined) {
-    results.notes = await updateNotes(taskId, updates.notes, userId);
-  }
-
-  return results;
 }

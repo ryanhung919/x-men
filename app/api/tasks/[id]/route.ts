@@ -7,9 +7,7 @@ import {
   updatePriority,
   updateDeadline,
   updateNotes,
-  updateProject,
   updateRecurrence,
-  updateTaskMultiple,
   addAssignee,
   removeAssignee,
   addTag,
@@ -78,11 +76,6 @@ export async function PATCH(
     }
 
     switch (action) {
-      case 'updateMultiple': {
-        const result = await updateTaskMultiple(taskId, updates, user.id);
-        return NextResponse.json(result);
-      }
-
       case 'updateTitle': {
         const { title } = updates;
         if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
@@ -120,13 +113,6 @@ export async function PATCH(
         const { notes } = updates;
         if (notes === undefined) return NextResponse.json({ error: 'Notes required' }, { status: 400 });
         const result = await updateNotes(taskId, notes, user.id);
-        return NextResponse.json(result);
-      }
-
-      case 'updateProject': {
-        const { project_id } = updates;
-        if (!project_id) return NextResponse.json({ error: 'Project ID required' }, { status: 400 });
-        const result = await updateProject(taskId, project_id, user.id);
         return NextResponse.json(result);
       }
 

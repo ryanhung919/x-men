@@ -15,7 +15,6 @@ import { EditablePriority } from "@/components/tasks/editable-priority"
 import { EditableStatus } from "@/components/tasks/editable-status"
 import { EditableAssignees } from "@/components/tasks/editable-assignees"
 import { EditableDeadline } from "@/components/tasks/editable-deadline"
-import { EditableProject } from "@/components/tasks/editable-project"
 import { EditableNotes } from "@/components/tasks/editable-notes"
 import { EditableTags } from "@/components/tasks/editable-tags"
 import { TaskAttachments } from "@/components/tasks/task-attachments"
@@ -102,12 +101,9 @@ export default async function TaskDetailsPage({ params }: { params: Promise<{ ta
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-muted-foreground mb-3">PROJECT</h3>
-                <EditableProject
-                  taskId={task.id}
-                  initialProjectId={task.project?.id || null}
-                  initialProjectName={task.project?.name || null}
-                  allProjects={allProjects}
-                />
+                <div className="text-base">
+                  {task.project?.name || 'No project assigned'}
+                </div>
               </div>
             </div>
 
