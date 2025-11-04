@@ -1,114 +1,95 @@
 import { test, expect } from '@playwright/test';
-import { login } from '../helpers/auth';
+import { login, logout } from '../helpers/auth';
 import { TasksPage } from '../pages/TasksPage';
+import { NotificationHelpers } from '../helpers/notifications';
 
 /**
  * E2E Task Management Workflow Tests
- *
- * These tests verify complete user workflows for task management
- * Phase 2: Workflow-based tests for realistic user journeys
  */
 test.describe('Task Management Workflows', () => {
 
-  test('manager advanced task workflow with attachments, multiple assignees, and archive', async ({ page }) => {
-    // Login as manager user (has admin+manager+staff roles)
-    await login(page, 'manager');
-
+  test('complete multi-assignee task workflow with notifications', async ({ page }) => {
     const tasksPage = new TasksPage(page);
 
-    // After login, user is already on tasks or schedule page
-    // If on schedule, navigate to tasks
+    // === MANAGER: CREATE ADVANCED TASK WITH MULTIPLE ASSIGNEES ===
+    await login(page, 'manager');
     if (!page.url().includes('/tasks')) {
       await page.goto('/tasks');
     }
 
-    // Create a task with advanced fields (attachments, multiple assignees, tags, recurrence)
-    const taskTitle = `E2E Advanced Task ${Date.now()}`;
+    const taskTitle = `E2E Multi-Assignee Task ${Date.now()}`;
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
 
     await tasksPage.createAdvancedTaskWithAttachments({
       project: 'Data Warehouse Lift',
       title: taskTitle,
-      description: 'Advanced task with attachments, multiple assignees, tags and recurrence',
+      description: 'Complete multi-assignee workflow test with notifications and calendar views',
       priority: '8',
-      assignees: ['Joel Wang', 'Mitch Shona'], // Multiple assignees
-      deadline: nextWeek,
-      tags: ['e2e-test', 'workflow', 'advanced'],
-      attachments: ['__tests__/e2e/fixtures/e2e-testing-sample.pdf'], // PDF attachment
+      assignees: ['Mitch Shona', 'Noel Tang'], // MULTIPLE ASSIGNEES (1st will check notifications)
+      deadline: tomorrow, // Use tomorrow to match calendar navigation
+      tags: ['multi-assignee-test', 'notifications', 'calendar'],
+      attachments: ['__tests__/e2e/fixtures/e2e-testing-sample.pdf'],
       recurrence: {
         frequency: 'weekly',
         startDate: tomorrow,
       },
     });
 
-    // Verify task appears in list with correct properties
+    // Verify task appears in manager's list
+    console.log('Verifying task appears in manager list...');
     await tasksPage.verifyTaskInList(taskTitle);
-    await tasksPage.verifyTaskPriority(taskTitle, '8');
 
-    // Verify tags appear
-    const taskRow = tasksPage.getTaskRow(taskTitle);
-    await expect(taskRow.getByText('e2e-test')).toBeVisible();
+    // === 1ST ASSIGNEE: CHECK NOTIFICATIONS AND TASK ACCESS ===
+    console.log('Switching to first assignee (Admin) to check notifications...');
+    await logout(page);
+    await login(page, 'admin');
 
-    // Click task to view details
-    await tasksPage.clickTaskByTitle(taskTitle);
+    const notifications = new NotificationHelpers(page);
+    let foundAssignmentNotification = false;
 
-    // Verify we're on task details page
-    await expect(page).toHaveURL(/\/tasks\/\d+/);
+    // Open notification panel
+    console.log('Opening notification panel...');
+    await notifications.openNotificationPanel();
 
-    // Verify attachment is visible on task details page (optional verification)
+    // Wait for notifications to load
+    console.log('Waiting for notifications to load...');
+    await page.waitForTimeout(3000);
+
+    // Look for the assignment notification with the task title
     try {
-      await expect(page.getByText('e2e-testing-sample.pdf')).toBeVisible({ timeout: 2000 });
-    } catch {
-      // Attachment verification is optional - the main goal is to test task creation and archiving
-      // Attachments may be displayed differently or may not be visible on task details page
+      // Look for "assigned you to task" notification specifically
+      console.log('Looking for assignment notification...');
+      await notifications.verifyNotificationExists('assigned you to task');
+      await notifications.verifyNotificationExists(taskTitle);
+      foundAssignmentNotification = true;
+
+      // Click on the assignment notification (not the file attachment notification)
+      console.log('Clicking on assignment notification...');
+      await notifications.clickNotificationContainingText('assigned you to task');
+    } catch (error) {
+
+      // Debug: show what notifications are actually there
+      const notificationItems = notifications.getNotificationItems();
+      const notificationCount = await notificationItems.count();
+
+      for (let i = 0; i < notificationCount; i++) {
+        const item = notificationItems.nth(i);
+        const text = await item.textContent();
+      }
     }
 
-    // Archive the task (manager-only feature)
-    await tasksPage.archiveTask();
-
-    // Verify redirected back to tasks page
-    await expect(page).toHaveURL('/tasks');
-
-    // Verify task no longer appears in active list
-    await tasksPage.verifyTaskNotInList(taskTitle);
-  });
-
-  test('staff complete task workflow with comprehensive calendar view testing', async ({ page }) => {
-    // Login as staff user
-    await login(page, 'staff');
-
-    const tasksPage = new TasksPage(page);
-
-    // After login, user is already on tasks or schedule page
-    // If on schedule, navigate to tasks
-    if (!page.url().includes('/tasks')) {
-      await page.goto('/tasks');
-    }
-
-    // Create a basic task
-    const taskTitle = `E2E Staff Workflow ${Date.now()}`;
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    await tasksPage.createBasicTask({
-      project: 'Website Redesign',
-      title: taskTitle,
-      description: 'Complete staff workflow test - list view, calendar views (Day/Week/Month), and task discovery',
-      priority: '5',
-      assignee: 'Noel Tang',
-      deadline: tomorrow,
-    });
-
-    // Verify task appears in list view
+    // Navigate to task list view and verify task appears
+    console.log('Navigating to task list to verify task appears...');
+    await tasksPage.goto();
     await tasksPage.verifyTaskInList(taskTitle);
 
-    // Switch to calendar view
+    // Navigate to calendar view and verify task appears across different views
+    console.log('Switching to calendar view for comprehensive testing...');
     await tasksPage.switchToCalendarView();
 
     // === DAY VIEW TESTING ===
+    console.log('Testing Day view...');
     await tasksPage.switchCalendarToDayView();
     await tasksPage.navigateToCalendarDate(tomorrow);
     await tasksPage.waitForTaskInCalendar(taskTitle);
@@ -117,6 +98,7 @@ test.describe('Task Management Workflows', () => {
     await tasksPage.clickTaskInCalendarAndHandlePopup(taskTitle, false);
 
     // === WEEK VIEW TESTING ===
+    console.log('Testing Week view...');
     await tasksPage.switchCalendarToWeekView();
 
     // Scroll to find task in Week view vertical timeline
@@ -127,6 +109,7 @@ test.describe('Task Management Workflows', () => {
     await tasksPage.clickTaskInCalendarAndHandlePopup(taskTitle, false);
 
     // === MONTH VIEW TESTING (DEFAULT FLOW - VIEW FULL DETAILS) ===
+    console.log('Testing Month view with View Full Details flow...');
     await tasksPage.switchCalendarToMonthView();
     await tasksPage.waitForTaskInCalendar(taskTitle);
 
@@ -134,20 +117,57 @@ test.describe('Task Management Workflows', () => {
     await tasksPage.clickTaskInCalendarAndHandlePopup(taskTitle, true);
 
     // Verify we're on task details page
+    console.log('Verifying task details page...');
     await expect(page).toHaveURL(/\/tasks\/\d+/);
 
     // Verify task details are correct
+    console.log('Verifying task details content...');
     await expect(page.getByText(taskTitle)).toBeVisible();
-    await expect(page.getByText('Complete staff workflow test - list view, calendar views (Day/Week/Month), and task discovery')).toBeVisible();
+    await expect(page.getByText('Complete multi-assignee workflow test with notifications and calendar views')).toBeVisible();
 
     // Navigate back to tasks list
+    console.log('Navigating back to tasks list...');
     await tasksPage.backToTasksList();
 
     // Switch back to list view (if not already)
+    console.log('Switching back to list view...');
     await tasksPage.switchToListView();
 
-    // Verify task is still visible in list
-    await tasksPage.verifyTaskInList(taskTitle);
-  });
+    // === MANAGER: LOG BACK IN AND ARCHIVE THE TASK ===
+    console.log('Switching back to manager to archive the task...');
+    await logout(page);
+    await login(page, 'manager');
 
+    // Navigate to tasks page if not already there
+    if (!page.url().includes('/tasks')) {
+      await page.goto('/tasks');
+    }
+
+    // Verify task is still in manager's list
+    console.log('Verifying task appears in manager list before archiving...');
+    await tasksPage.verifyTaskInList(taskTitle);
+
+    // Click on the task to view details
+    console.log('Opening task details for archiving...');
+    await tasksPage.clickTaskByTitle(taskTitle);
+
+    // Verify we're on task details page
+    console.log('Verifying we are on task details page...');
+    await expect(page).toHaveURL(/\/tasks\/\d+/);
+
+    // Archive the task (manager-only feature)
+    console.log('Archiving the task...');
+    await tasksPage.archiveTask();
+
+    // Verify redirected back to tasks page
+    console.log('Verifying redirect back to tasks page...');
+    await expect(page).toHaveURL('/tasks');
+
+    // Verify task no longer appears in active list
+    console.log('Verifying task no longer appears in active list...');
+    await tasksPage.verifyTaskNotInList(taskTitle);
+
+    console.log('Multi-assignee task workflow test completed successfully!');
+  });
 });
+

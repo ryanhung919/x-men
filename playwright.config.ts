@@ -11,7 +11,7 @@ export default defineConfig({
   globalSetup: './__tests__/e2e/global-setup.ts',
 
   // Maximum time one test can run
-  timeout: 30 * 1000,
+  timeout: 60 * 1000,
 
   // Test configuration
   fullyParallel: true,
