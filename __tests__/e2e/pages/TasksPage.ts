@@ -79,9 +79,9 @@ export class TasksPage {
     await this.page.getByRole('button', { name: /Pick a date/i }).click();
     // Wait for calendar grid to be visible
     await this.page.locator('[role="grid"]').waitFor({ state: 'visible' });
-    // Click the day by its visible text - more reliable approach
+    // Click the day by its visible text - use exact match to avoid clicking wrong date
     const dayNumber = taskData.deadline.getDate().toString();
-    await this.page.locator('[role="grid"] button').filter({ hasText: dayNumber }).first().click();
+    await this.page.locator('[role="grid"] button').getByText(dayNumber, { exact: true }).first().click();
 
     // Ensure calendar closes by pressing Escape or clicking outside
     await this.page.waitForTimeout(500); // Wait for date to be selected
@@ -126,9 +126,9 @@ export class TasksPage {
 
     // Select start date - click to open calendar popover (this is in the recurrence section)
     await this.page.locator('div[class*="border"]').locator('button').filter({ hasText: /Pick a date/i }).click();
-    // Wait for calendar and click the day by its visible text
+    // Wait for calendar and click the day by its visible text - use exact match
     const dayNumber = startDate.getDate().toString();
-    await this.page.locator('[role="grid"] button').filter({ hasText: dayNumber }).first().click();
+    await this.page.locator('[role="grid"] button').getByText(dayNumber, { exact: true }).first().click();
   }
 
   /**
@@ -409,7 +409,7 @@ export class TasksPage {
     await this.page.getByRole('button', { name: /Pick a date/i }).click();
     await this.page.locator('[role="grid"]').waitFor({ state: 'visible' });
     const dayNumber = taskData.deadline.getDate().toString();
-    await this.page.locator('[role="grid"] button').filter({ hasText: dayNumber }).first().click();
+    await this.page.locator('[role="grid"] button').getByText(dayNumber, { exact: true }).first().click();
 
     // Ensure calendar closes
     await this.page.waitForTimeout(500);
