@@ -1,5 +1,5 @@
 import { chromium, FullConfig } from '@playwright/test';
-import { seedDatabase, checkDatabaseHealth } from './helpers/database';
+import { seedDatabase } from './helpers/database';
 
 /**
  * Global setup runs once before all tests
@@ -7,7 +7,6 @@ import { seedDatabase, checkDatabaseHealth } from './helpers/database';
  */
 async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0].use.baseURL || 'http://localhost:3000';
-
 
   // Check if server is running
   const browser = await chromium.launch();
@@ -23,17 +22,8 @@ async function globalSetup(config: FullConfig) {
 
   await browser.close();
 
-  // Check database health
-  const isHealthy = await checkDatabaseHealth();
-
-  if (!isHealthy) {
-    console.warn('Database health check failed, but continuing...');
-  } else {
-  }
-
   // Seed database
   await seedDatabase();
-
 }
 
 export default globalSetup;
