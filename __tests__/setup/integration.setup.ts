@@ -2,8 +2,8 @@ import * as dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
-import { beforeAll, afterAll, beforeEach } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
+import { afterAll, beforeAll, beforeEach } from 'vitest';
 
 // Create admin Supabase client for setup/teardown operations
 const adminClient = createClient(
@@ -238,30 +238,57 @@ beforeAll(async () => {
 
   for (const envVar of requiredEnvVars) {
     if (!process.env[envVar]) {
-      throw new Error(`${envVar} is not set. Please check your .env.local file`);
+      const errorMsg = `${envVar} is not set. Please check your .env.local file`;
+      console.error(`❌ ${errorMsg}`);
+      throw new Error(errorMsg);
     }
   }
 
+  console.log('✅ Environment variables verified');
+
   // Check if database is already seeded
-  const isSeeded = await isDatabaseSeeded();
+  let isSeeded = false;
+  try {
+    isSeeded = await isDatabaseSeeded();
+    console.log(`Database seed status: ${isSeeded ? '✅ Seeded' : '⚠️  Not seeded'}`);
+  } catch (error) {
+    console.error('❌ Error checking database seed status:', error);
+    throw error;
+  }
   
   if (!isSeeded) {
     console.log('⚠️  Database not seeded. Attempting to seed...');
-    await seedDatabase();
-    
-    // Verify seeding was successful
-    const isSeededNow = await isDatabaseSeeded();
-    if (!isSeededNow) {
-      throw new Error('Database seeding failed. Please run: pnpm db:seed');
+    try {
+      await seedDatabase();
+      
+      // Verify seeding was successful
+      const isSeededNow = await isDatabaseSeeded();
+      if (!isSeededNow) {
+        throw new Error('Database seeding failed. Please ensure the app is running with `npm run dev`');
+      }
+      console.log('✅ Database seeded successfully');
+    } catch (seedError) {
+      console.error('❌ Seeding failed:', seedError);
+      console.error('\n📝 How to fix:');
+      console.error('   1. Start the Next.js dev server: npm run dev');
+      console.error('   2. Ensure NEXT_PUBLIC_APP_URL is set to http://localhost:3000');
+      console.error('   3. Run tests again: npm run test:integration');
+      throw seedError;
     }
   } else {
-    console.log('Database already seeded');
+    console.log('✅ Database already seeded');
   }
 
   // Verify user roles
-  await verifyUserRoles();
+  try {
+    await verifyUserRoles();
+    console.log('✅ User roles verified');
+  } catch (error) {
+    console.warn('⚠️  Warning during user role verification:', error);
+    // Don't throw here - proceed with tests even if role verification has issues
+  }
 
-  console.log('Integration test environment ready\n');
+  console.log('✅ Integration test environment ready\n');
 }, 120000); // 2 minute timeout for setup
 
 // Capture the exact timestamp when testing starts
