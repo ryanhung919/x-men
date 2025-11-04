@@ -5,10 +5,10 @@ import { defineConfig, devices } from '@playwright/test';
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './__tests__/e2e',
 
   // Global setup - seeds database before tests
-  globalSetup: './tests/e2e/global-setup.ts',
+  globalSetup: './__tests__/e2e/global-setup.ts',
 
   // Maximum time one test can run
   timeout: 30 * 1000,
@@ -36,7 +36,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     
     // Video
-    video: 'retain-on-failure',
+    video: 'on',
   },
 
   // Configure projects for different browsers

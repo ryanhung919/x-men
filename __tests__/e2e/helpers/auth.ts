@@ -24,7 +24,6 @@ export async function login(page: Page, role: UserRole = 'staff'): Promise<void>
   // Wait for redirect to tasks or schedule page
   await page.waitForURL(/\/tasks|\/schedule/);
 
-  console.log(`Logged in as ${role}: ${user.email}`);
 }
 
 /**
@@ -50,7 +49,6 @@ export async function logout(page: Page): Promise<void> {
   // Wait for redirect to login page
   await page.waitForURL('/');
 
-  console.log('Logged out successfully');
 }
 
 /**
