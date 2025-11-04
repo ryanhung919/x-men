@@ -68,7 +68,6 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
   // Recurrence state
   const [recurrenceEnabled, setRecurrenceEnabled] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
-  const [recurrenceStartDate, setRecurrenceStartDate] = useState<Date | undefined>(undefined);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -89,7 +88,6 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
     setFiles([]);
     setRecurrenceEnabled(false);
     setRecurrenceFrequency('weekly');
-    setRecurrenceStartDate(undefined);
     setError(null);
   };
 
@@ -106,10 +104,6 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
     const maxSize = 50 * 1024 * 1024; // 50MB
     if (totalSize > maxSize) {
       return 'Total file size exceeds 50MB limit';
-    }
-
-    if (recurrenceEnabled && !recurrenceStartDate) {
-      return 'Please select a recurrence start date';
     }
 
     return null;
@@ -142,9 +136,9 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
       };
 
       // Add recurrence if enabled
-      if (recurrenceEnabled && recurrenceStartDate) {
+      if (recurrenceEnabled) {
         taskPayload.recurrence_interval = frequencyToInterval(recurrenceFrequency);
-        taskPayload.recurrence_date = recurrenceStartDate.toISOString();
+        // recurrence_date not needed - only interval and deadline matter
       }
 
       // Create FormData for multipart upload
@@ -353,31 +347,14 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          'w-full justify-start text-left font-normal',
-                          !recurrenceStartDate && 'text-muted-foreground'
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {recurrenceStartDate ? format(recurrenceStartDate, 'PPP') : 'Pick a date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={recurrenceStartDate}
-                        onSelect={setRecurrenceStartDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                  <p className="font-medium">How recurring tasks work:</p>
+                  <ul className="list-disc list-inside space-y-0.5 pl-2">
+                    <li><strong>Daily:</strong> Recurs every day</li>
+                    <li><strong>Weekly:</strong> Recurs on the same weekday (e.g., every Tuesday)</li>
+                    <li><strong>Monthly:</strong> Recurs on the same day of month (e.g., every 15th)</li>
+                  </ul>
+                  <p className="mt-1">The deadline you set above determines when this pattern starts.</p>
                 </div>
               </div>
             )}

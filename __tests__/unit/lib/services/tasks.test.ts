@@ -329,8 +329,114 @@ describe('lib/services/tasks', () => {
 
       const result = calculateNextDueDate(task);
 
-      // Previous deadline 2025-09-10 + 30 days = 2025-10-10
+      // Previous deadline 2025-09-10 + 1 calendar month = 2025-10-10
+      // Uses calendar month, not 30 days, to prevent drift
       expect(result.deadline).toBe(new Date('2025-10-10T00:00:00.000Z').toISOString());
+    });
+
+    it('should handle monthly recurrence staying on same day of month', () => {
+      const task: Task = {
+        id: 1,
+        title: 'Monthly Financial Report',
+        description: null,
+        priority: 1,
+        status: 'To Do',
+        deadline: '2025-01-15T00:00:00.000Z', // 15th of January
+        notes: null,
+        recurrence_interval: 30, // monthly
+        recurrence_date: '2025-01-15T00:00:00.000Z',
+        project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
+        subtasks: [],
+        assignees: [],
+        tags: [],
+        attachments: [],
+        isOverdue: false,
+      };
+
+      const result = calculateNextDueDate(task);
+
+      // Should stay on 15th of next month (Feb 15, not Feb 14)
+      expect(result.deadline).toBe(new Date('2025-02-15T00:00:00.000Z').toISOString());
+    });
+
+    it('should handle monthly recurrence edge case: Jan 31 → Feb 28 (non-leap year)', () => {
+      const task: Task = {
+        id: 1,
+        title: 'End of Month Task',
+        description: null,
+        priority: 1,
+        status: 'To Do',
+        deadline: '2025-01-31T00:00:00.000Z', // Jan 31
+        notes: null,
+        recurrence_interval: 30, // monthly
+        recurrence_date: '2025-01-31T00:00:00.000Z',
+        project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
+        subtasks: [],
+        assignees: [],
+        tags: [],
+        attachments: [],
+        isOverdue: false,
+      };
+
+      const result = calculateNextDueDate(task);
+
+      // Jan 31 + 1 month = Feb 28 (since Feb 31 doesn't exist in 2025)
+      // JavaScript automatically adjusts to last valid day of month
+      expect(result.deadline).toBe(new Date('2025-02-28T00:00:00.000Z').toISOString());
+    });
+
+    it('should handle monthly recurrence edge case: Jan 31 → Feb 29 (leap year)', () => {
+      const task: Task = {
+        id: 1,
+        title: 'End of Month Task',
+        description: null,
+        priority: 1,
+        status: 'To Do',
+        deadline: '2024-01-31T00:00:00.000Z', // Jan 31, 2024 (leap year)
+        notes: null,
+        recurrence_interval: 30, // monthly
+        recurrence_date: '2024-01-31T00:00:00.000Z',
+        project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
+        subtasks: [],
+        assignees: [],
+        tags: [],
+        attachments: [],
+        isOverdue: false,
+      };
+
+      const result = calculateNextDueDate(task);
+
+      // Jan 31, 2024 + 1 month = Feb 29, 2024 (2024 is a leap year)
+      expect(result.deadline).toBe(new Date('2024-02-29T00:00:00.000Z').toISOString());
+    });
+
+    it('should handle monthly recurrence across different month lengths', () => {
+      const task: Task = {
+        id: 1,
+        title: 'Monthly Task',
+        description: null,
+        priority: 1,
+        status: 'To Do',
+        deadline: '2025-01-30T00:00:00.000Z', // Jan 30
+        notes: null,
+        recurrence_interval: 30, // monthly
+        recurrence_date: '2025-01-30T00:00:00.000Z',
+        project: { id: 1, name: 'Project' },
+        creator: { creator_id: 'user1', user_info: { first_name: 'Test', last_name: 'User' } },
+        subtasks: [],
+        assignees: [],
+        tags: [],
+        attachments: [],
+        isOverdue: false,
+      };
+
+      const result = calculateNextDueDate(task);
+
+      // Jan 30 + 1 month = Feb 28 (since Feb 30 doesn't exist)
+      expect(result.deadline).toBe(new Date('2025-02-28T00:00:00.000Z').toISOString());
     });
 
     it('should handle overdue task correctly - example from requirements', () => {

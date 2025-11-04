@@ -599,7 +599,7 @@ export async function updateStatus(
           notes: taskDetails.notes || undefined,
           tags: taskDetails.tags,
           recurrence_interval: taskDetails.recurrence_interval,
-          recurrence_date: taskDetails.recurrence_date || undefined,
+          // recurrence_date is not needed - only deadline matters for calculating next occurrence
         };
 
         // Create the new recurring task (createTask creates its own supabase client)

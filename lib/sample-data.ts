@@ -750,7 +750,7 @@ export const tasks = [
     created_at: new Date('2024-09-20T09:00:00+08:00'),
     updated_at: new Date('2024-09-20T09:00:00+08:00'),
     recurrence_interval: 1, // Daily (1 day)
-    recurrence_date: new Date('2024-09-20T09:00:00+08:00'),
+    recurrence_date: null,
     logged_time: 0,
   },
   {
@@ -767,7 +767,7 @@ export const tasks = [
     created_at: new Date('2025-11-03T10:00:00+08:00'),
     updated_at: new Date('2025-11-03T10:00:00+08:00'),
     recurrence_interval: 7, // Weekly (7 days)
-    recurrence_date: new Date('2025-11-03T10:00:00+08:00'),
+    recurrence_date: null,
     logged_time: 0,
   },
   {
@@ -784,7 +784,7 @@ export const tasks = [
     created_at: new Date('2025-10-30T09:00:00+08:00'),
     updated_at: new Date('2025-10-30T09:00:00+08:00'),
     recurrence_interval: 30, // Monthly (30 days)
-    recurrence_date: new Date('2025-10-30T09:00:00+08:00'),
+    recurrence_date: null,
     logged_time: 0,
   },
 
