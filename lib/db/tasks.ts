@@ -704,8 +704,8 @@ export async function updateTaskTitleDB(
  */
 export async function updateTaskDescriptionDB(
   taskId: number,
-  newDescription: string
-): Promise<{ id: number; description: string }> {
+  newDescription: string | null
+): Promise<{ id: number; description: string | null }> {
   const supabase = await createClient();
 
   const { data, error } = await supabase

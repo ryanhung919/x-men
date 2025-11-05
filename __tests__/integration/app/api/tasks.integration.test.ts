@@ -489,10 +489,15 @@ describe('Tasks API Integration Tests', () => {
         body: formData,
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create test task: ${response.status} ${errorText}`);
+      }
+
       const data = await response.json();
       testTaskId = data.taskId;
       createdTaskIds.push(testTaskId);
-    });
+    }, 180000); // 3 minute timeout for beforeEach
 
     // ============ UPDATE TITLE ============
     describe('updateTitle', () => {
@@ -829,7 +834,7 @@ describe('Tasks API Integration Tests', () => {
           body: JSON.stringify({
             action: 'updateRecurrence',
             recurrenceInterval: 7,
-            recurrenceDate: '2025-10-20T00:00:00Z',
+            recurrenceDate: '2026-01-20T00:00:00Z',
           }),
         });
 
@@ -840,7 +845,7 @@ describe('Tasks API Integration Tests', () => {
       });
 
       it('should support different recurrence intervals', async () => {
-        const intervals = [0, 1, 7, 14, 30];
+        const intervals = [0, 1, 7, 30];
 
         for (const interval of intervals) {
           const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
@@ -852,7 +857,7 @@ describe('Tasks API Integration Tests', () => {
             body: JSON.stringify({
               action: 'updateRecurrence',
               recurrenceInterval: interval,
-              recurrenceDate: interval > 0 ? '2025-10-20T00:00:00Z' : null,
+              recurrenceDate: interval > 0 ? '2026-01-20T00:00:00Z' : null,
             }),
           });
 

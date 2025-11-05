@@ -116,12 +116,6 @@ export async function PATCH(
         return NextResponse.json(result);
       }
 
-      case 'updateRecurrence': {
-        const { recurrenceInterval, recurrenceDate } = updates;
-        if (recurrenceInterval === undefined) return NextResponse.json({ error: 'Recurrence interval required' }, { status: 400 });
-        const result = await updateRecurrence(taskId, recurrenceInterval, recurrenceDate, user.id);
-        return NextResponse.json(result);
-      }
       // ASSIGNEES
       case 'addAssignee': {
         const { assignee_id } = updates;

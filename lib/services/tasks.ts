@@ -517,14 +517,14 @@ export async function updateTitle(
 
 export async function updateDescription(
   taskId: number,
-  newDescription: string,
+  newDescription: string | null,
   userId: string
-): Promise<{ id: number; description: string }> {
+): Promise<{ id: number; description: string | null }> {
   // 1. Validate
-  if (typeof newDescription !== 'string') {
-    throw new Error('Description must be a string');
+  if (newDescription !== null && typeof newDescription !== 'string') {
+    throw new Error('Description must be a string or null');
   }
-  if (newDescription.length > 2000) {
+  if (newDescription && newDescription.length > 2000) {
     throw new Error('Description cannot exceed 2000 characters');
   }
 
