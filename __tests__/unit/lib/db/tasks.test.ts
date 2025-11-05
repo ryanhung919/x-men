@@ -3558,34 +3558,34 @@ describe('lib/db/tasks', () => {
 
   describe('updateTaskDeadlineDB', () => {
     it('should update task deadline successfully with date string', async () => {
-      const mockUpdatedTask = { id: 1, deadline: '2025-12-31T23:59:59+08:00' };
-
+      const mockUpdatedTask = { id: 1, deadline: '2025-12-31T23:59:59Z' };
+  
       const singleMock = vi.fn().mockResolvedValue({
         data: mockUpdatedTask,
         error: null,
       });
-
+  
       const selectMock = vi.fn().mockReturnValue({
         single: singleMock,
       });
-
+  
       const eqMock = vi.fn().mockReturnValue({
         select: selectMock,
       });
-
+  
       const updateMock = vi.fn().mockReturnValue({
         eq: eqMock,
       });
-
+  
       mockSupabaseClient.from = vi.fn().mockReturnValue({
         update: updateMock,
       });
-
+  
       const result = await updateTaskDeadlineDB(1, '2025-12-31T23:59:59Z');
-
+  
       expect(result).toEqual(mockUpdatedTask);
       expect(updateMock).toHaveBeenCalledWith({
-        deadline: expect.stringContaining('+08:00'),
+        deadline: '2025-12-31T23:59:59.000Z',
         updated_at: expect.any(String),
       });
     });
@@ -3621,36 +3621,6 @@ describe('lib/db/tasks', () => {
         deadline: null,
         updated_at: expect.any(String),
       });
-    });
-
-    it('should convert deadline to SGT timezone (+08:00)', async () => {
-      const mockUpdatedTask = { id: 1, deadline: '2025-12-31T23:59:59+08:00' };
-
-      const singleMock = vi.fn().mockResolvedValue({
-        data: mockUpdatedTask,
-        error: null,
-      });
-
-      const selectMock = vi.fn().mockReturnValue({
-        single: singleMock,
-      });
-
-      const eqMock = vi.fn().mockReturnValue({
-        select: selectMock,
-      });
-
-      const updateMock = vi.fn().mockReturnValue({
-        eq: eqMock,
-      });
-
-      mockSupabaseClient.from = vi.fn().mockReturnValue({
-        update: updateMock,
-      });
-
-      await updateTaskDeadlineDB(1, '2025-12-31T23:59:59Z');
-
-      const updateCall = (updateMock as any).mock.calls[0][0];
-      expect(updateCall.deadline).toMatch(/\+08:00$/);
     });
 
     it('should throw error when update fails', async () => {

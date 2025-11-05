@@ -58,15 +58,118 @@ describe('Tasks API Integration Tests', () => {
     }
   });
 
+  // afterAll(async () => {
+  //   // Cleanup created tasks
+  //   if (createdTaskIds.length > 0) {
+  //     await adminClient
+  //       .from('tasks')
+  //       .delete()
+  //       .in('id', createdTaskIds);
+  //   }
+  // });
   afterAll(async () => {
-    // Cleanup created tasks
-    if (createdTaskIds.length > 0) {
+    if (createdTaskIds.length === 0) return;
+  
+    try {
+      console.log(`Cleaning up ${createdTaskIds.length} test tasks...`);
+  
+      // Delete in correct order to handle foreign key constraints
+      
+      // 1. Delete task comments
       await adminClient
+        .from('task_comments')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted task comments');
+  
+      // 2. Delete attachments from storage
+      for (const taskId of createdTaskIds) {
+        const { data: attachments } = await adminClient
+          .from('task_attachments')
+          .select('storage_path')
+          .eq('task_id', taskId);
+  
+        if (attachments?.length) {
+          const paths = attachments.map((a: any) => a.storage_path);
+          await adminClient.storage
+            .from('task-attachments')
+            .remove(paths)
+            .catch((err) => console.warn(`Storage cleanup error: ${err.message}`));
+        }
+      }
+      console.log('✓ Deleted attachments from storage');
+  
+      // 3. Delete attachment records
+      await adminClient
+        .from('task_attachments')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted attachment records');
+  
+      // 4. Delete task assignments
+      await adminClient
+        .from('task_assignments')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted task assignments');
+  
+      // 5. Delete task tags
+      await adminClient
+        .from('task_tags')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted task tags');
+  
+      // 6. Delete subtasks first
+      const { data: subtasks } = await adminClient
+        .from('tasks')
+        .select('id')
+        .in('parent_task_id', createdTaskIds);
+  
+      if (subtasks?.length) {
+        const subtaskIds = subtasks.map((s: any) => s.id);
+        
+        // Delete subtask dependencies
+        await adminClient
+          .from('task_comments')
+          .delete()
+          .in('task_id', subtaskIds);
+        
+        await adminClient
+          .from('task_assignments')
+          .delete()
+          .in('task_id', subtaskIds);
+        
+        await adminClient
+          .from('task_tags')
+          .delete()
+          .in('task_id', subtaskIds);
+  
+        // Delete subtasks
+        await adminClient
+          .from('tasks')
+          .delete()
+          .in('id', subtaskIds);
+        
+        console.log(`✓ Deleted ${subtaskIds.length} subtasks`);
+      }
+  
+      // 7. Delete main tasks
+      const { error: deleteError } = await adminClient
         .from('tasks')
         .delete()
         .in('id', createdTaskIds);
+  
+      if (deleteError) {
+        console.error('❌ Error deleting tasks:', deleteError);
+      } else {
+        console.log(`✓ Deleted ${createdTaskIds.length} main tasks`);
+        console.log('✅ Cleanup complete!');
+      }
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error);
     }
-  });
+  }, 60000); // 60 second timeout for cleanup
 
   describe('POST /api/tasks - Create Task', () => {
     it('should create a task successfully with valid data', async () => {

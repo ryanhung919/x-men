@@ -792,7 +792,7 @@ export async function updateTaskDeadlineDB(
   if (newDeadline) {
     const date = new Date(newDeadline);
     // Format as ISO string with SGT timezone offset (+08:00)
-    finalDeadline = date.toISOString().replace('Z', '+08:00');
+    finalDeadline = date.toISOString()
   }
 
   const { data, error } = await supabase
