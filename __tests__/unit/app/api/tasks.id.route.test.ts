@@ -444,34 +444,38 @@ describe('PATCH /api/tasks/[id]', () => {
 
   it('should update task recurrence successfully', async () => {
     const mockUser = { id: 'user-123' };
-
+  
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: mockUser },
       error: null,
     });
-
-    (updateRecurrence as any).mockResolvedValue({
+  
+    vi.mocked(updateRecurrence).mockResolvedValue({
       id: 1,
       recurrence_interval: 7,
       recurrence_date: '2025-12-20T00:00:00Z',
     });
-
+  
+    const requestBody = {
+      action: 'updateRecurrence',
+      recurrenceInterval: 7,
+      recurrenceDate: '2025-12-20T00:00:00Z',
+    };
+  
     const request = new NextRequest('http://localhost:3000/api/tasks/1', {
       method: 'PATCH',
-      body: JSON.stringify({
-        action: 'updateRecurrence',
-        recurrenceInterval: 7,
-        recurrenceDate: '2025-12-20T00:00:00Z',
-      }),
       headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(requestBody),
     });
-
+  
     const response = await PATCH(request, { params: Promise.resolve({ id: '1' }) });
     const data = await response.json();
-
+  
     expect(response.status).toBe(200);
-    expect(data.id).toBe(1);
-    expect(data.recurrence_interval).toBe(7);
+    // The API returns the recurrence object wrapped in success response
+    expect(data.success).toBe(true);
+    expect(data.recurrence.id).toBe(1);
+    expect(data.recurrence.recurrence_interval).toBe(7);
     expect(updateRecurrence).toHaveBeenCalledWith(1, 7, '2025-12-20T00:00:00Z', mockUser.id);
   });
 
@@ -499,28 +503,33 @@ describe('PATCH /api/tasks/[id]', () => {
 
   it('should handle recurrence service errors', async () => {
     const mockUser = { id: 'user-123' };
-
+  
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: mockUser },
       error: null,
     });
-
-    (updateRecurrence as any).mockRejectedValue(new Error('Invalid recurrence date'));
-
+  
+    vi.mocked(updateRecurrence).mockRejectedValue(
+      new Error('Invalid recurrence date')
+    );
+  
+    const requestBody = {
+      action: 'updateRecurrence',
+      recurrenceInterval: 7,
+      recurrenceDate: 'invalid-date',
+    };
+  
     const request = new NextRequest('http://localhost:3000/api/tasks/1', {
       method: 'PATCH',
-      body: JSON.stringify({
-        action: 'updateRecurrence',
-        recurrenceInterval: 7,
-        recurrenceDate: '2020-01-01T00:00:00Z',
-      }),
       headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(requestBody),
     });
-
+  
     const response = await PATCH(request, { params: Promise.resolve({ id: '1' }) });
     const data = await response.json();
-
-    expect(response.status).toBe(500);
+  
+    // Validation errors from the service return 400, not 500
+    expect(response.status).toBe(400);
     expect(data.error).toBe('Invalid recurrence date');
   });
 

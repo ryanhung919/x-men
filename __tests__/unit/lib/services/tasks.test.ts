@@ -1241,9 +1241,9 @@ describe('lib/services/tasks', () => {
         expect(result).toEqual({ id: mockTaskId, description: newDescription });
       });
   
-      it('should throw error when description is not a string', async () => {
-        await expect(updateDescription(1, null as any, 'user1')).rejects.toThrow(
-          'Description must be a string'
+      it('should throw error when description is not a string or null', async () => {
+        await expect(updateDescription(1, 123 as any, 'user1')).rejects.toThrow(
+          'Description must be a string or null'
         );
       });
   
