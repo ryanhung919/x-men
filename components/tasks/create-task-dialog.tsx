@@ -43,15 +43,19 @@ import { FileUploadZone } from './file-upload-zone';
 
 interface CreateTaskDialogProps {
   onTaskCreated?: (taskId: number) => void;
+  initialProjectId?: number; // NEW: lock project if provided
+  isSubtask?: boolean; // NEW: show different title
+  initialProjectName?: string; // NEW: to show project name if locked
 }
 
-export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = false, initialProjectName }: CreateTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
-  const [projectId, setProjectId] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<number | null>(initialProjectId ?? null);
+  const isProjectLocked = initialProjectId !== undefined;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>(1);
@@ -64,7 +68,6 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
   // Recurrence state
   const [recurrenceEnabled, setRecurrenceEnabled] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
-  const [recurrenceStartDate, setRecurrenceStartDate] = useState<Date | undefined>(undefined);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -74,7 +77,7 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
   }, [open]);
 
   const resetForm = () => {
-    setProjectId(null);
+    setProjectId(initialProjectId ??null);
     setTitle('');
     setDescription('');
     setPriority(1);
@@ -85,7 +88,6 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
     setFiles([]);
     setRecurrenceEnabled(false);
     setRecurrenceFrequency('weekly');
-    setRecurrenceStartDate(undefined);
     setError(null);
   };
 
@@ -102,10 +104,6 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
     const maxSize = 50 * 1024 * 1024; // 50MB
     if (totalSize > maxSize) {
       return 'Total file size exceeds 50MB limit';
-    }
-
-    if (recurrenceEnabled && !recurrenceStartDate) {
-      return 'Please select a recurrence start date';
     }
 
     return null;
@@ -138,9 +136,9 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
       };
 
       // Add recurrence if enabled
-      if (recurrenceEnabled && recurrenceStartDate) {
+      if (recurrenceEnabled) {
         taskPayload.recurrence_interval = frequencyToInterval(recurrenceFrequency);
-        taskPayload.recurrence_date = recurrenceStartDate.toISOString();
+        // recurrence_date not needed - only interval and deadline matter
       }
 
       // Create FormData for multipart upload
@@ -179,14 +177,14 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
+        <Button variant="outline" className="gap-2">
           <PlusIcon className="h-4 w-4" />
-          Create Task
+          {isSubtask ? 'Create Subtask' : 'Create Task'}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:!max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Task</DialogTitle>
+          <DialogTitle>{isSubtask ? 'Create New Subtask' : 'Create New Task'}</DialogTitle>
           <DialogDescription>
             Fill in the details to create a new task. Fields marked with * are mandatory.
           </DialogDescription>
@@ -198,7 +196,15 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
             <Label htmlFor="project">
               Project <span className="text-red-500">*</span>
             </Label>
-            <ProjectSingleSelector selectedProjectId={projectId} onChange={setProjectId} />
+            {isProjectLocked ? (
+              <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded border text-sm">
+                <p className="font-medium text-gray-700 dark:text-gray-300">
+                  {initialProjectName}
+                </p>
+              </div>
+            ) : (
+              <ProjectSingleSelector selectedProjectId={projectId} onChange={setProjectId} />
+            )}
           </div>
 
           {/* Title */}
@@ -341,31 +347,14 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          'w-full justify-start text-left font-normal',
-                          !recurrenceStartDate && 'text-muted-foreground'
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {recurrenceStartDate ? format(recurrenceStartDate, 'PPP') : 'Pick a date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={recurrenceStartDate}
-                        onSelect={setRecurrenceStartDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                  <p className="font-medium">How recurring tasks work:</p>
+                  <ul className="list-disc list-inside space-y-0.5 pl-2">
+                    <li><strong>Daily:</strong> Recurs every day</li>
+                    <li><strong>Weekly:</strong> Recurs on the same weekday (e.g., every Tuesday)</li>
+                    <li><strong>Monthly:</strong> Recurs on the same day of month (e.g., every 15th)</li>
+                  </ul>
+                  <p className="mt-1">The deadline you set above determines when this pattern starts.</p>
                 </div>
               </div>
             )}

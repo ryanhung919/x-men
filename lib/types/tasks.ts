@@ -88,6 +88,11 @@ export type DetailedTask = Omit<Task, 'attachments'> & {
  * by adding the interval to the previous deadline, regardless of when the task was completed.
  * This ensures consistent scheduling based on the original due date.
  *
+ * Recurrence behavior:
+ * - Daily (1 day): Adds 1 day to previous deadline
+ * - Weekly (7 days): Adds 7 days to previous deadline (stays on same day of week)
+ * - Monthly (30 days): Adds 1 calendar month (stays on same day of month, no drift)
+ *
  * Implementation follows the requirement: "the due date is based on the calculation from the
  * previous due date"
  *
@@ -96,10 +101,22 @@ export type DetailedTask = Omit<Task, 'attachments'> & {
  *          or the original task if not recurring
  *
  * @example
- * // Task due Sep 29, completed Oct 1, interval 1 day → next due is Sep 30
- * const recurringTask = { ...task, recurrence_interval: 1, deadline: '2024-09-29' };
- * const updated = calculateNextDueDate(recurringTask);
+ * // Daily: Task due Sep 29, completed Oct 1 → next due is Sep 30
+ * const dailyTask = { ...task, recurrence_interval: 1, deadline: '2024-09-29' };
+ * const updated = calculateNextDueDate(dailyTask);
  * console.log(updated.deadline); // '2024-09-30T00:00:00.000Z'
+ *
+ * @example
+ * // Monthly: Task due Jan 10 → next due is Feb 10 (not Jan 10 + 30 days = Feb 9)
+ * const monthlyTask = { ...task, recurrence_interval: 30, deadline: '2025-01-10' };
+ * const updated = calculateNextDueDate(monthlyTask);
+ * console.log(updated.deadline); // '2025-02-10T00:00:00.000Z'
+ *
+ * @example
+ * // Monthly edge case: Jan 31 → Feb 28/29 (last valid day of month)
+ * const endOfMonthTask = { ...task, recurrence_interval: 30, deadline: '2025-01-31' };
+ * const updated = calculateNextDueDate(endOfMonthTask);
+ * console.log(updated.deadline); // '2025-02-28T00:00:00.000Z'
  *
  * @example
  * // Non-recurring task remains unchanged
@@ -113,8 +130,28 @@ export function calculateNextDueDate(task: Task): Task {
   // Example: Task due Sep 29, completed Oct 1, interval 1 day → next due is Sep 30
   if (task.recurrence_interval > 0 && task.deadline) {
     const previousDeadline = new Date(task.deadline);
-    const intervalMs = task.recurrence_interval * 24 * 60 * 60 * 1000;
-    const nextDue = new Date(previousDeadline.getTime() + intervalMs);
+    let nextDue: Date;
+
+    if (task.recurrence_interval === 30) {
+      // Monthly recurrence: add 1 calendar month instead of 30 days
+      // This prevents date drift (e.g., stays on 10th of each month)
+      const originalDay = previousDeadline.getDate();
+      nextDue = new Date(previousDeadline);
+      nextDue.setMonth(nextDue.getMonth() + 1);
+
+      // Handle edge case: if original day doesn't exist in next month
+      // (e.g., Jan 31 → Feb has only 28/29 days, so it overflows to Mar 3/2)
+      // We need to clamp to the last valid day of the target month
+      if (nextDue.getDate() !== originalDay) {
+        // Date overflowed (e.g., Feb 31 became Mar 3), so set to last day of target month
+        nextDue.setDate(0); // Day 0 = last day of previous month
+      }
+    } else {
+      // Daily/Weekly recurrence: add days as before
+      const intervalMs = task.recurrence_interval * 24 * 60 * 60 * 1000;
+      nextDue = new Date(previousDeadline.getTime() + intervalMs);
+    }
+
     return {
       ...task,
       deadline: nextDue.toISOString(),

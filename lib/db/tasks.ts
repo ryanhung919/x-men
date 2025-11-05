@@ -670,3 +670,766 @@ export async function getScheduleTasks(
     assignees: taskAssigneeMap.get(task.id) || [],
   }));
 }
+// ============  TASK UPDATE ============
+
+/**
+ * Updates only the task title in the database.
+ * No permission checks - those happen in the service layer.
+ */
+export async function updateTaskTitleDB(
+  taskId: number,
+  newTitle: string
+): Promise<{ id: number; title: string }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      title: newTitle,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .select('id, title')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update task title: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Updates only the task description in the database.
+ */
+export async function updateTaskDescriptionDB(
+  taskId: number,
+  newDescription: string | null
+): Promise<{ id: number; description: string | null }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      description: newDescription,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .select('id, description')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update task description: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Updates only the task status in the database.
+ */
+export async function updateTaskStatusDB(
+  taskId: number,
+  newStatus: 'To Do' | 'In Progress' | 'Completed' | 'Blocked'
+): Promise<{ id: number; status: string }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .select('id, status')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update task status: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Updates only the task priority in the database.
+ */
+export async function updateTaskPriorityDB(
+  taskId: number,
+  newPriority: number
+): Promise<{ id: number; priority_bucket: number }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      priority_bucket: newPriority,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .select('id, priority_bucket')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update task priority: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Updates only the task deadline in the database.
+ * Converts deadline to Singapore Time (SGT/UTC+8) format.
+ */
+export async function updateTaskDeadlineDB(
+  taskId: number,
+  newDeadline: string | null
+): Promise<{ id: number; deadline: string | null }> {
+  const supabase = await createClient();
+
+  // Convert deadline to SGT format if provided
+  let finalDeadline: string | null = null;
+  if (newDeadline) {
+    const date = new Date(newDeadline);
+    // Format as ISO string with SGT timezone offset (+08:00)
+    finalDeadline = date.toISOString()
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      deadline: finalDeadline,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .select('id, deadline')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update task deadline: ${error.message}`);
+  }
+
+  return data;
+}
+/**
+ * Updates only the task notes in the database.
+ */
+export async function updateTaskNotesDB(
+  taskId: number,
+  newNotes: string
+): Promise<{ id: number; notes: string }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      notes: newNotes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .select('id, notes')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update task notes: ${error.message}`);
+  }
+
+  return data;
+}
+
+
+/**
+ * Updates task recurrence settings.
+ * If recurrenceInterval is 0, clears the recurrence (sets both to null).
+ */
+export async function updateTaskRecurrenceDB(
+  taskId: number,
+  recurrenceInterval: number,
+  recurrenceDate: string | null
+): Promise<{ id: number; recurrence_interval: number; recurrence_date: string | null }> {
+  const supabase = await createClient();
+
+  // If interval is 0, clear recurrence
+  const finalInterval = recurrenceInterval === 0 ? 0 : recurrenceInterval;
+  const finalDate = recurrenceInterval === 0 ? null : recurrenceDate;
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({
+      recurrence_interval: finalInterval,
+      recurrence_date: finalDate,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId)
+    .select('id, recurrence_interval, recurrence_date')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update task recurrence: ${error.message}`);
+  }
+
+  return data;
+}
+
+// ============ TAGS ============
+
+/**
+ * Adds a single tag to a task (without removing existing ones).
+ * Uses service role client to bypass RLS for tag operations.
+ */
+export async function addTaskTagDB(taskId: number, tagName: string): Promise<string> {
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // 1. Try to insert the tag (will fail silently if it exists due to UNIQUE constraint)
+  try {
+    await serviceClient
+      .from('tags')
+      .insert({ name: tagName })
+      .select();
+  } catch (error) {
+    // Tag already exists (UNIQUE constraint), carry on
+    console.log(`Tag "${tagName}" already exists, continuing...`);
+  }
+
+  // 2. Get tag ID
+  const { data: tag, error: tagError } = await serviceClient
+    .from('tags')
+    .select('id')
+    .eq('name', tagName)
+    .single();
+
+  if (tagError || !tag) {
+    throw new Error('Failed to find or create tag');
+  }
+
+  // 3. Check if already linked to this task
+  const { data: existing } = await serviceClient
+    .from('task_tags')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('tag_id', tag.id)
+    .single();
+
+  if (existing) {
+    throw new Error('Tag already linked to this task');
+  }
+
+  // 4. Link tag to task
+  const { error: linkError } = await serviceClient
+    .from('task_tags')
+    .insert({ task_id: taskId, tag_id: tag.id });
+
+  if (linkError) {
+    throw new Error(`Failed to add tag: ${linkError.message}`);
+  }
+
+  return tagName;
+}
+
+/**
+ * Removes a single tag from a task.
+ * Uses service role client to bypass RLS for tag operations.
+ */
+export async function removeTaskTagDB(taskId: number, tagName: string): Promise<string> {
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // 1. Get tag ID
+  const { data: tag, error: tagError } = await serviceClient
+    .from('tags')
+    .select('id')
+    .eq('name', tagName)
+    .single();
+
+  if (tagError || !tag) {
+    throw new Error('Tag not found');
+  }
+
+  // 2. Remove the link between task and tag
+  const { error: deleteError } = await serviceClient
+    .from('task_tags')
+    .delete()
+    .eq('task_id', taskId)
+    .eq('tag_id', tag.id);
+
+  if (deleteError) {
+    throw new Error(`Failed to remove tag: ${deleteError.message}`);
+  }
+
+  return tagName;
+}
+
+// ============ ASSIGNEES ============
+
+
+/**
+ * Adds a single assignee to a task (without removing existing ones).
+ */
+export async function addTaskAssigneeDB(
+  taskId: number,
+  assigneeId: string,
+  currentUserId: string
+): Promise<string> {
+  // Use service role client to bypass RLS for adding assignees
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // 1. Check current count
+  const { count } = await serviceClient
+    .from('task_assignments')
+    .select('*', { count: 'exact' })
+    .eq('task_id', taskId);
+
+  if ((count || 0) >= 5) {
+    throw new Error('Cannot exceed 5 total assignees');
+  }
+
+  // 2. Check if already assigned
+  const { data: existing } = await serviceClient
+    .from('task_assignments')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('assignee_id', assigneeId)
+    .single();
+
+  if (existing) {
+    throw new Error('User already assigned to this task');
+  }
+
+  // 3. Add assignment with service client (bypasses RLS)
+  const { error } = await serviceClient.from('task_assignments').insert({
+    task_id: taskId,
+    assignee_id: assigneeId,
+    assignor_id: currentUserId,
+  });
+
+  if (error) {
+    throw new Error(`Failed to add assignee: ${error.message}`);
+  }
+
+  return assigneeId;
+}
+
+/**
+ * Removes a single assignee from a task.
+ */
+export async function removeTaskAssigneeDB(
+  taskId: number,
+  assigneeId: string
+): Promise<string> {
+  // Use service role client to bypass RLS for removal
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // 1. Check current assignee count
+  const { count } = await serviceClient
+    .from('task_assignments')
+    .select('*', { count: 'exact' })
+    .eq('task_id', taskId);
+
+  if ((count || 0) <= 1) {
+    throw new Error('Cannot remove assignee. A task must have at least 1 assignee.');
+  }
+
+  // 2. Remove the assignee
+  const { error } = await serviceClient
+    .from('task_assignments')
+    .delete()
+    .eq('task_id', taskId)
+    .eq('assignee_id', assigneeId);
+
+  if (error) {
+    throw new Error(`Failed to remove assignee: ${error.message}`);
+  }
+
+  return assigneeId;
+}
+
+// ============ SUBTASKS ============
+
+/**
+ * Links a subtask to its parent task by updating the parent_task_id field.
+ * Called after createTask() succeeds to establish the parent-child relationship.
+ *
+ * @param subtaskId - The ID of the newly created subtask
+ * @param parentTaskId - The ID of the parent task
+ * @throws {Error} If the update fails
+ */
+export async function linkSubtaskToParentDB(
+  subtaskId: number,
+  parentTaskId: number
+): Promise<void> {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ parent_task_id: parentTaskId })
+    .eq('id', subtaskId);
+
+  if (error) {
+    throw new Error(`Failed to link subtask to parent: ${error.message}`);
+  }
+}
+
+
+// ============ ATTACHMENTS ============
+
+export async function getTaskAttachmentsTotalSize(taskId: number): Promise<number> {
+  const supabase = await createClient();
+
+  const { data: attachments, error } = await supabase
+    .from('task_attachments')
+    .select('id')
+    .eq('task_id', taskId);
+
+  if (error) {
+    console.error('Error fetching task attachments:', error);
+    return 0;
+  }
+
+  if (!attachments || attachments.length === 0) {
+    return 0;
+  }
+
+  // Get file sizes from storage metadata
+  let totalSize = 0;
+  const { data: files } = await supabase.storage
+    .from('task-attachments')
+    .list(`tasks/${taskId}`);
+
+  if (files) {
+    totalSize = files.reduce((sum, file) => sum + (file.metadata?.size || 0), 0);
+  }
+
+  return totalSize;
+}
+
+export async function addTaskAttachmentsDB(
+  taskId: number,
+  files: File[],
+  userId: string
+): Promise<{ id: number; storage_path: string }[]> {
+  // Use service client to bypass RLS for attachment operations
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Verify task exists
+  const { data: taskExists, error: taskError } = await serviceClient
+    .from('tasks')
+    .select('id')
+    .eq('id', taskId)
+    .single();
+
+  if (taskError || !taskExists) {
+    throw new Error('Task not found');
+  }
+
+  // Validate files input
+  if (!files || !Array.isArray(files) || files.length === 0) {
+    throw new Error('No valid files provided');
+  }
+
+  console.log(`Starting upload of ${files.length} files for task ${taskId}`);
+
+  const createdAttachments: { id: number; storage_path: string }[] = [];
+  const uploadErrors: string[] = [];
+
+  // Process each file
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+
+    // Validate file object
+    if (!file || typeof file !== 'object') {
+      uploadErrors.push(`File ${i}: Invalid file object`);
+      continue;
+    }
+
+    const fileName = (file as any).name || `file_${i}`;
+    const fileSize = (file as any).size || 0;
+
+    console.log(`Processing file ${i}: ${fileName} (${fileSize} bytes)`);
+
+    // Generate unique file path
+    const timestamp = Date.now();
+    const storagePath = `tasks/${taskId}/${timestamp}-${i}-${fileName}`;
+
+    try {
+      // 1. Upload to Supabase Storage using service client
+      console.log(`Uploading to storage: ${storagePath}`);
+      
+      const { error: uploadError } = await serviceClient.storage
+        .from('task-attachments')
+        .upload(storagePath, file as any, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error(`Upload error for ${fileName}:`, uploadError);
+        uploadErrors.push(`${fileName}: ${uploadError.message}`);
+        continue;
+      }
+
+      console.log(`Successfully uploaded to storage: ${storagePath}`);
+
+      // 2. Create attachment record using service client (bypasses RLS)
+      const { data: attachment, error: attachmentError } = await serviceClient
+        .from('task_attachments')
+        .insert({
+          task_id: taskId,
+          storage_path: storagePath,
+          uploaded_by: userId,
+        })
+        .select('id, storage_path')
+        .single();
+
+      if (attachmentError) {
+        console.error(`DB error for ${fileName}:`, attachmentError);
+        uploadErrors.push(`${fileName}: DB insert failed`);
+        
+        // Clean up the uploaded file
+        await serviceClient.storage
+          .from('task-attachments')
+          .remove([storagePath])
+          .catch((err) => {
+            console.error(`Cleanup error for ${storagePath}:`, err);
+          });
+        continue;
+      }
+
+      if (attachment) {
+        console.log(`Successfully created attachment record: ${attachment.id}`);
+        createdAttachments.push(attachment);
+      }
+    } catch (error) {
+      console.error(`Exception processing file ${fileName}:`, error);
+      uploadErrors.push(`${fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Log results
+  console.log(`Upload complete: ${createdAttachments.length} succeeded, ${uploadErrors.length} failed`);
+  if (uploadErrors.length > 0) {
+    console.error('Upload errors:', uploadErrors);
+  }
+
+  if (createdAttachments.length === 0 && files.length > 0) {
+    throw new Error(
+      `Failed to upload any files. Errors: ${uploadErrors.join('; ')}`
+    );
+  }
+
+  return createdAttachments;
+}
+
+export async function removeTaskAttachmentDB(attachmentId: number): Promise<string> {
+  // Use service client to bypass RLS for attachment operations
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // 1. Fetch attachment to get storage path
+  const { data: attachment, error: fetchError } = await serviceClient
+    .from('task_attachments')
+    .select('storage_path')
+    .eq('id', attachmentId)
+    .single();
+
+  if (fetchError || !attachment) {
+    throw new Error('Attachment not found');
+  }
+
+  const storagePath = attachment.storage_path;
+
+  // 2. Delete from storage using service client
+  const { error: storageError } = await serviceClient.storage
+    .from('task-attachments')
+    .remove([storagePath]);
+
+  if (storageError) {
+    console.error(`Error deleting file from storage ${storagePath}:`, storageError);
+    // Continue with DB deletion anyway - file may already be deleted
+  }
+
+  // 3. Delete attachment record from database using service client
+  const { error: dbError } = await serviceClient
+    .from('task_attachments')
+    .delete()
+    .eq('id', attachmentId);
+
+  if (dbError) {
+    throw new Error(`Failed to delete attachment: ${dbError.message}`);
+  }
+
+  return storagePath;
+}
+
+// ============ COMMENTS ============
+
+/**
+ * Adds a comment to a task.
+ * Any authenticated user can add a comment.
+ */
+export async function addTaskCommentDB(
+  taskId: number,
+  userId: string,
+  content: string
+): Promise<{ id: number; content: string; created_at: string; user_id: string }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('task_comments')
+    .insert({
+      task_id: taskId,
+      user_id: userId,
+      content: content,
+    })
+    .select('id, content, created_at, user_id')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to add comment: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Updates a comment.
+ * Only the comment author can edit their own comments.
+ */
+export async function updateTaskCommentDB(
+  commentId: number,
+  newContent: string
+): Promise<{ id: number; content: string; updated_at: string }> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('task_comments')
+    .update({
+      content: newContent,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', commentId)
+    .select('id, content, updated_at')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update comment: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Deletes a comment.
+ * Uses service role client to bypass RLS for admin deletion.
+ */
+export async function deleteTaskCommentDB(commentId: number): Promise<void> {
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { error } = await serviceClient
+    .from('task_comments')
+    .delete()
+    .eq('id', commentId);
+
+  if (error) {
+    throw new Error(`Failed to delete comment: ${error.message}`);
+  }
+}
+
+/**
+ * Fetches the author of a comment (for permission checks).
+ */
+export async function getCommentAuthorDB(commentId: number): Promise<string | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('task_comments')
+    .select('user_id')
+    .eq('id', commentId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.user_id;
+}
+
+
+
+// ============ HELPER: Get task with permission data ============
+
+/**
+ * Fetches task data needed for permission checks (creator + assignees).
+ * Used by service layer for authorization.
+ */
+export async function getTaskPermissionDataDB(
+  taskId: number
+): Promise<{ creator_id: string; assignee_ids: string[] } | null> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('creator_id, task_assignments(assignee_id)')
+    .eq('id', taskId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    creator_id: data.creator_id,
+    assignee_ids: (data.task_assignments || []).map((a: any) => a.assignee_id),
+  };
+}
+
+export async function isUserManager(userId: string): Promise<boolean> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`Failed to check user role: ${error.message}`);
+  }
+
+  // Check if 'manager' or 'admin' is in the roles (admins can also remove)
+  const roles = data?.map((row: { role: string }) => row.role) || [];
+  return roles.includes('manager');
+}
+
+export async function checkUserIsAdmin(userId: string): Promise<boolean> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`Failed to check user role: ${error.message}`);
+  }
+
+  const roles = data?.map((row: any) => row.role) || [];
+  return roles.includes('admin');
+}
