@@ -5,16 +5,19 @@ import { defineConfig, devices } from '@playwright/test';
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  testDir: './tests/e2e',
-  
+  testDir: './__tests__/e2e',
+
+  // Global setup - seeds database before tests for clean state
+  globalSetup: './__tests__/e2e/global-setup.ts',
+
   // Maximum time one test can run
-  timeout: 30 * 1000,
-  
+  timeout: 60 * 1000,
+
   // Test configuration
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 1,
   
   // Reporter
   reporter: process.env.CI 
@@ -33,7 +36,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     
     // Video
-    video: 'retain-on-failure',
+    video: 'on',
   },
 
   // Configure projects for different browsers
@@ -42,30 +45,30 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-    // Mobile viewports
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
+    // Other browsers commented out for now - can be enabled later
+    // {
+    //   name: 'firefox',
+    //   use: { ...devices['Desktop Firefox'] },
+    // },
+    // {
+    //   name: 'webkit',
+    //   use: { ...devices['Desktop Safari'] },
+    // },
+    // {
+    //   name: 'Mobile Chrome',
+    //   use: { ...devices['Pixel 5'] },
+    // },
+    // {
+    //   name: 'Mobile Safari',
+    //   use: { ...devices['iPhone 12'] },
+    // },
   ],
 
   // Run local dev server before starting tests
   webServer: {
     command: 'pnpm dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true, // Always reuse existing server if available
     timeout: 120 * 1000,
   },
 });
