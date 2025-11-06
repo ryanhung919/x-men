@@ -348,7 +348,7 @@ jobs:
     name: End-to-End Tests
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: [unit-tests, component-tests]
+    needs: [unit-tests, component-tests, integration-tests]
 
     # Only run E2E tests on main/develop or PRs to those branches
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.base_ref == 'main' || github.base_ref == 'develop'
