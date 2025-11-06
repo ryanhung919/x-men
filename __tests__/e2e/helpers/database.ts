@@ -2,22 +2,41 @@
  * Database helper utilities for E2E tests
  */
 
-const BASE_URL = process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://localhost:3000';
 
 /**
  * Seed the database with sample data via the /seed endpoint
+ * Uses same authentication method as db-management.ts
  */
 export async function seedDatabase(): Promise<void> {
   try {
-    const response = await fetch(`${BASE_URL}/seed`);
+    const seedSecret = process.env.SEED_SECRET;
 
-    if (!response.ok) {
-      throw new Error(`Failed to seed database: ${response.status} ${response.statusText}`);
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add authorization header if seed secret is configured (for CI)
+    if (seedSecret) {
+      headers['Authorization'] = `Bearer ${seedSecret}`;
+      console.log('Using SEED_SECRET for database seeding');
     }
 
-    console.log('Database seeded successfully');
+    const response = await fetch(`${BASE_URL}/seed`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to seed database: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Database seeded successfully');
+    console.log('   Message:', result.message);
   } catch (error) {
-    console.error('Database seeding failed:', error);
+    console.error('❌ Database seeding failed:', error);
     throw error;
   }
 }

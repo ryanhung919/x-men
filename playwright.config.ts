@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './__tests__/e2e',
 
-  // Global setup - seeds database before tests
+  // Global setup - seeds database before tests for clean state
   globalSetup: './__tests__/e2e/global-setup.ts',
 
   // Maximum time one test can run
