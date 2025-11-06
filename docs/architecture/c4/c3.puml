@@ -19,7 +19,7 @@ Container_Boundary(next_components, "Next.js Server internals") {
 	Component(api_tasks, "/api/tasks", "API Route", "Create task, helper lists", $tags="api")
 	Component(api_reports, "/api/reports/*", "API Routes", "Report endpoints", $tags="api")
 	Component(api_schedule, "/api/schedule/*", "API Routes", "Schedule endpoints", $tags="api")
-    Component(api_calendar, "/api/calendar/*", "API Routes", "Calendar endpoints", $tags="api")
+
 
 	' Services layer
 	Component(svc_tasks, "lib/services/tasks.ts", "Service", "Map/format task data", $tags="svc")
@@ -44,7 +44,6 @@ Rel(api_tasks, svc_tasks, "tasks: api -> services")
 Rel(api_reports, svc_report, "report: api -> services")
 
 Rel(api_schedule, svc_tasks, "schedule: api -> services")
-Rel(api_calendar, svc_tasks, "calendar: api -> services")
 
 
 Rel(svc_tasks, dal_tasks, "tasks: services -> db")
@@ -55,10 +54,10 @@ Rel(svc_filter, dal_filter, "filter: services -> db")
 Rel(sa_notifs, dal_notifs, "notif: server actions -> db")
 
 ' DB relationships
-Rel(dal_tasks, db, "SQL/RPC incl. create_task_with_assignments")
+Rel(dal_tasks, db, "SQL/RPC queries incl. create_task_with_assignments")
 Rel(dal_report, db, "SQL queries")
-Rel(dal_filter, db, "SQL lookups")
-Rel(dal_notifs, db, "SQL inserts/selects")
+Rel(dal_filter, db, "SQL queries")
+Rel(dal_notifs, db, "SQL queries")
 
 ' Email: server -> edge function -> sendgrid
 Rel(edge, sendgrid, "Send emails")

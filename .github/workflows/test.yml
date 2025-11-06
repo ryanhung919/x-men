@@ -217,14 +217,6 @@ jobs:
             kill $(cat .next-pid) || true
             rm .next-pid
           fi
-      - name: Upload integration test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-test-results
-          path: |
-            test-results/
-          retention-days: 7
 
   test-summary:
     name: Test Summary
