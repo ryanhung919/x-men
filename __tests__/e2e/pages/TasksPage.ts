@@ -115,20 +115,18 @@ export class TasksPage {
 
   /**
    * Set task as recurring
+   * Note: The main deadline field serves as the recurrence start date
    */
-  async setRecurring(frequency: 'daily' | 'weekly' | 'monthly', startDate: Date) {
+  async setRecurring(frequency: 'daily' | 'weekly' | 'monthly') {
     // Check recurring checkbox
     await this.page.getByRole('checkbox', { name: /Recurring Task/i }).check();
+    await this.page.waitForTimeout(500);
 
     // Select frequency
     await this.page.getByRole('combobox', { name: /Frequency/i }).click();
+    await this.page.waitForTimeout(300);
     await this.page.getByRole('option', { name: new RegExp(frequency, 'i') }).click();
-
-    // Select start date - click to open calendar popover (this is in the recurrence section)
-    await this.page.locator('div[class*="border"]').locator('button').filter({ hasText: /Pick a date/i }).click();
-    // Wait for calendar and click the day by its visible text - use exact match
-    const dayNumber = startDate.getDate().toString();
-    await this.page.locator('[role="grid"] button').getByText(dayNumber, { exact: true }).first().click();
+    await this.page.waitForTimeout(300);
   }
 
   /**
@@ -398,7 +396,6 @@ export class TasksPage {
     tags?: string[];
     recurrence?: {
       frequency: 'daily' | 'weekly' | 'monthly';
-      startDate: Date;
     };
     attachments?: string[]; // File paths
   }) {
@@ -475,7 +472,7 @@ export class TasksPage {
 
     // Set recurrence
     if (taskData.recurrence) {
-      await this.setRecurring(taskData.recurrence.frequency, taskData.recurrence.startDate);
+      await this.setRecurring(taskData.recurrence.frequency);
     }
 
     // Scroll back up to find the submit button
@@ -708,5 +705,38 @@ export class TasksPage {
         await this.page.waitForTimeout(500);
       }
     }
+  }
+
+  /**
+   * Add comment to task (individual action that generates separate notification)
+   */
+  async addTaskComment(comment: string): Promise<void> {
+    console.log('Adding comment to task:', comment);
+
+    // Look for "Add Comment" button at the bottom of the page
+    const addCommentButton = this.page.locator('button').filter({ hasText: 'Add Comment' })
+      .or(this.page.getByRole('button', { name: 'Add Comment' }))
+      .first();
+
+    await addCommentButton.click();
+    await this.page.waitForTimeout(1000);
+
+    // Look for textarea that appears after clicking Add Comment
+    const commentTextarea = this.page.locator('textarea').first()
+      .or(this.page.getByRole('textbox'))
+      .first();
+
+    await commentTextarea.fill(comment);
+    await this.page.waitForTimeout(500);
+
+    // Look for "Post Comment" button
+    const postCommentButton = this.page.getByRole('button', { name: 'Post Comment' })
+      .or(this.page.locator('button').filter({ hasText: 'Post Comment' }))
+      .first();
+
+    await postCommentButton.click();
+    await this.page.waitForTimeout(2000);
+
+    console.log('Comment added successfully');
   }
 }

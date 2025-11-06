@@ -137,4 +137,70 @@ export class NotificationHelpers {
     // Wait a moment for the read status to update
     await this.page.waitForTimeout(1000);
   }
+
+  /**
+   * Verify the total number of notifications
+   */
+  async verifyNotificationCount(expectedCount: number): Promise<void> {
+    const items = this.getNotificationItems();
+    const actualCount = await items.count();
+
+    if (actualCount !== expectedCount) {
+      throw new Error(`Expected ${expectedCount} notifications, but found ${actualCount}`);
+    }
+
+    console.log(`✓ Verified notification count: ${actualCount}`);
+  }
+
+  /**
+   * Get all notification texts for debugging
+   */
+  async getAllNotificationTexts(): Promise<string[]> {
+    const items = this.getNotificationItems();
+    const count = await items.count();
+    const texts: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const item = items.nth(i);
+      const text = await item.textContent();
+      if (text) {
+        texts.push(text.trim());
+      }
+    }
+
+    return texts;
+  }
+
+  /**
+   * Verify notifications appear in the expected chronological order
+   * Expected messages should be in order from oldest to newest
+   */
+  async verifyNotificationOrder(expectedMessages: string[]): Promise<void> {
+    const actualTexts = await this.getAllNotificationTexts();
+
+    console.log('Expected notification order:', expectedMessages);
+    console.log('Actual notification texts:', actualTexts);
+
+    // Check that all expected messages are present in the correct order
+    let actualIndex = 0;
+    for (const expectedMessage of expectedMessages) {
+      let found = false;
+
+      // Look for the expected message in the remaining notifications
+      for (let i = actualIndex; i < actualTexts.length; i++) {
+        if (actualTexts[i].toLowerCase().includes(expectedMessage.toLowerCase())) {
+          console.log(`✓ Found "${expectedMessage}" at position ${i}`);
+          actualIndex = i + 1;
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        throw new Error(`Expected to find notification containing "${expectedMessage}" in chronological order`);
+      }
+    }
+
+    console.log('✓ Verified notification chronological order');
+  }
 }
