@@ -4,10 +4,11 @@ import { TasksPage } from '../pages/TasksPage';
 import { NotificationHelpers } from '../helpers/notifications';
 
 /**
- * E2E Task Management Workflow Tests
+ * E2E Multi-User Task Lifecycle Tests
+ * Tests complete task lifecycle: creation → notifications → updates → calendar views → schedule → archiving
  */
-test.describe('Task Management Workflows', () => {
-  test('complete multi-assignee task workflow with notifications', async ({ page }) => {
+test.describe('Multi-User Task Lifecycle', () => {
+  test('complete multi-assignee task lifecycle with notifications, calendar, schedule, and archiving', async ({ page }) => {
     test.setTimeout(300000); // Increase timeout to 5 minutes
     const tasksPage = new TasksPage(page);
 
