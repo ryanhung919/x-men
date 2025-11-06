@@ -136,8 +136,8 @@ export class TasksPage {
    */
   async submitTaskForm() {
     await this.page.getByRole('button', { name: /^Create Task$/i }).click();
-    // Wait for dialog to close
-    await expect(this.page.getByRole('heading', { name: /Create New Task/i })).not.toBeVisible();
+    // Wait for dialog to close (task creation can take a while with attachments/API)
+    await expect(this.page.getByRole('heading', { name: /Create New Task/i })).not.toBeVisible({ timeout: 30000 });
   }
 
   
@@ -171,6 +171,15 @@ export class TasksPage {
     await taskRow.click();
     // Wait for navigation to task details page
     await this.page.waitForURL(/\/tasks\/\d+/);
+  }
+
+  /**
+   * Toggle show completed tasks
+   */
+  async toggleShowCompleted() {
+    const showCompletedButton = this.page.getByRole('button', { name: /Show Completed|Hide Completed/i });
+    await showCompletedButton.click();
+    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -383,6 +392,7 @@ export class TasksPage {
     title: string;
     description: string;
     priority: string;
+    status?: string; // Optional status (defaults to "To Do")
     assignees: string[]; // Multiple assignees
     deadline: Date;
     tags?: string[];
@@ -404,6 +414,12 @@ export class TasksPage {
 
     await this.page.getByRole('combobox', { name: /Priority/i }).click();
     await this.page.getByRole('option', { name: taskData.priority }).click();
+
+    // Select status if provided
+    if (taskData.status) {
+      await this.page.getByRole('combobox', { name: /Status/i }).click();
+      await this.page.getByRole('option', { name: taskData.status }).click();
+    }
 
     // Select deadline
     await this.page.getByRole('button', { name: /Pick a date/i }).click();
