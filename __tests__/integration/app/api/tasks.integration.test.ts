@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integration.setup';
+import { adminClient, authenticateAs, testUsers } from '@/__tests__/setup/integration.setup';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 describe('Tasks API Integration Tests', () => {
   let joelClient: SupabaseClient;
@@ -58,15 +58,118 @@ describe('Tasks API Integration Tests', () => {
     }
   });
 
+  // afterAll(async () => {
+  //   // Cleanup created tasks
+  //   if (createdTaskIds.length > 0) {
+  //     await adminClient
+  //       .from('tasks')
+  //       .delete()
+  //       .in('id', createdTaskIds);
+  //   }
+  // });
   afterAll(async () => {
-    // Cleanup created tasks
-    if (createdTaskIds.length > 0) {
+    if (createdTaskIds.length === 0) return;
+  
+    try {
+      console.log(`Cleaning up ${createdTaskIds.length} test tasks...`);
+  
+      // Delete in correct order to handle foreign key constraints
+      
+      // 1. Delete task comments
       await adminClient
+        .from('task_comments')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted task comments');
+  
+      // 2. Delete attachments from storage
+      for (const taskId of createdTaskIds) {
+        const { data: attachments } = await adminClient
+          .from('task_attachments')
+          .select('storage_path')
+          .eq('task_id', taskId);
+  
+        if (attachments?.length) {
+          const paths = attachments.map((a: any) => a.storage_path);
+          await adminClient.storage
+            .from('task-attachments')
+            .remove(paths)
+            .catch((err) => console.warn(`Storage cleanup error: ${err.message}`));
+        }
+      }
+      console.log('✓ Deleted attachments from storage');
+  
+      // 3. Delete attachment records
+      await adminClient
+        .from('task_attachments')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted attachment records');
+  
+      // 4. Delete task assignments
+      await adminClient
+        .from('task_assignments')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted task assignments');
+  
+      // 5. Delete task tags
+      await adminClient
+        .from('task_tags')
+        .delete()
+        .in('task_id', createdTaskIds);
+      console.log('✓ Deleted task tags');
+  
+      // 6. Delete subtasks first
+      const { data: subtasks } = await adminClient
+        .from('tasks')
+        .select('id')
+        .in('parent_task_id', createdTaskIds);
+  
+      if (subtasks?.length) {
+        const subtaskIds = subtasks.map((s: any) => s.id);
+        
+        // Delete subtask dependencies
+        await adminClient
+          .from('task_comments')
+          .delete()
+          .in('task_id', subtaskIds);
+        
+        await adminClient
+          .from('task_assignments')
+          .delete()
+          .in('task_id', subtaskIds);
+        
+        await adminClient
+          .from('task_tags')
+          .delete()
+          .in('task_id', subtaskIds);
+  
+        // Delete subtasks
+        await adminClient
+          .from('tasks')
+          .delete()
+          .in('id', subtaskIds);
+        
+        console.log(`✓ Deleted ${subtaskIds.length} subtasks`);
+      }
+  
+      // 7. Delete main tasks
+      const { error: deleteError } = await adminClient
         .from('tasks')
         .delete()
         .in('id', createdTaskIds);
+  
+      if (deleteError) {
+        console.error('❌ Error deleting tasks:', deleteError);
+      } else {
+        console.log(`✓ Deleted ${createdTaskIds.length} main tasks`);
+        console.log('✅ Cleanup complete!');
+      }
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error);
     }
-  });
+  }, 60000); // 60 second timeout for cleanup
 
   describe('POST /api/tasks - Create Task', () => {
     it('should create a task successfully with valid data', async () => {
@@ -463,6 +566,910 @@ describe('Tasks API Integration Tests', () => {
       expect(response.status).toBe(400);
       const data = await response.json();
       expect(data.error).toBe('Invalid action parameter. Use "users" or "projects"');
+    });
+  });
+
+  describe('PATCH /api/tasks/[id] - Update Task', () => {
+    let testTaskId: number;
+
+    beforeEach(async () => {
+      // Create a fresh test task for each test
+      const formData = new FormData();
+      formData.append('taskData', JSON.stringify({
+        project_id: testProjectId,
+        title: 'Test Task for Updates',
+        description: 'Original description',
+        priority_bucket: 5,
+        status: 'To Do',
+        assignee_ids: [testUsers.joel.id, testUsers.mitch.id],
+        deadline: '2025-12-31T23:59:59Z',
+        notes: 'Original notes',
+      }));
+
+      const response = await fetch(`${API_BASE}/api/tasks`, {
+        method: 'POST',
+        headers: { Cookie: joelCookie },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create test task: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      testTaskId = data.taskId;
+      createdTaskIds.push(testTaskId);
+    }, 180000); // 3 minute timeout for beforeEach
+
+    // ============ UPDATE TITLE ============
+    describe('updateTitle', () => {
+      it('should update task title successfully', async () => {
+        const newTitle = 'Updated Task Title';
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateTitle',
+            title: newTitle,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.title).toBe(newTitle);
+
+        // Verify in database
+        const { data: verified } = await adminClient
+          .from('tasks')
+          .select('title')
+          .eq('id', testTaskId)
+          .single();
+
+        expect(verified?.title).toBe(newTitle);
+      });
+
+      it('should return 400 when title is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateTitle',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Title required');
+      });
+
+      it('should return 401 when not authenticated', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'updateTitle',
+            title: 'New Title',
+          }),
+        });
+
+        expect(response.status).toBe(401);
+      });
+    });
+
+    // ============ UPDATE DESCRIPTION ============
+    describe('updateDescription', () => {
+      it('should update task description successfully', async () => {
+        const newDescription = 'Updated description with more details';
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateDescription',
+            description: newDescription,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.description).toBe(newDescription);
+      });
+
+      it('should allow empty description', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateDescription',
+            description: '',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.description).toBe('');
+      });
+
+      it('should allow null description', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateDescription',
+            description: null,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.description).toBeNull();
+      });
+    });
+
+    // ============ UPDATE STATUS ============
+    describe('updateStatus', () => {
+      it('should update task status successfully', async () => {
+        const newStatus = 'In Progress';
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateStatus',
+            status: newStatus,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.status).toBe(newStatus);
+      });
+
+      it('should support all valid statuses', async () => {
+        const statuses = ['To Do', 'In Progress', 'Completed', 'Blocked'];
+
+        for (const status of statuses) {
+          const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Cookie: joelCookie,
+            },
+            body: JSON.stringify({
+              action: 'updateStatus',
+              status,
+            }),
+          });
+
+          expect(response.status).toBe(200);
+          const data = await response.json();
+          expect(data.status).toBe(status);
+        }
+      });
+
+      it('should return 400 when status is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateStatus',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Status required');
+      });
+    });
+
+    // ============ UPDATE PRIORITY ============
+    describe('updatePriority', () => {
+      it('should update task priority successfully', async () => {
+        const newPriority = 9;
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updatePriority',
+            priority_bucket: newPriority,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.priority_bucket).toBe(newPriority);
+      });
+
+      it('should support priority range 1-10', async () => {
+        for (let priority = 1; priority <= 10; priority++) {
+          const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Cookie: joelCookie,
+            },
+            body: JSON.stringify({
+              action: 'updatePriority',
+              priority_bucket: priority,
+            }),
+          });
+
+          expect(response.status).toBe(200);
+          const data = await response.json();
+          expect(data.priority_bucket).toBe(priority);
+        }
+      });
+
+      it('should return 400 when priority is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updatePriority',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+      });
+    });
+
+    // ============ UPDATE DEADLINE ============
+    describe('updateDeadline', () => {
+      it('should update task deadline successfully', async () => {
+        const newDeadline = '2026-06-30T23:59:59Z';
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateDeadline',
+            deadline: newDeadline,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.deadline).toBeTruthy();
+      });
+
+      it('should allow null deadline', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateDeadline',
+            deadline: null,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.deadline).toBeNull();
+      });
+    });
+
+    // ============ UPDATE NOTES ============
+    describe('updateNotes', () => {
+      it('should update task notes successfully', async () => {
+        const newNotes = 'Updated notes with important information';
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateNotes',
+            notes: newNotes,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.notes).toBe(newNotes);
+      });
+
+      it('should allow empty notes', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateNotes',
+            notes: '',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.notes).toBe('');
+      });
+    });
+
+    // ============ UPDATE RECURRENCE ============
+    describe('updateRecurrence', () => {
+      it('should update recurrence interval successfully', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateRecurrence',
+            recurrenceInterval: 7,
+            recurrenceDate: '2026-01-20T00:00:00Z',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.success).toBe(true);
+        expect(data.recurrence.recurrence_interval).toBe(7);
+      });
+
+      it('should support different recurrence intervals', async () => {
+        const intervals = [0, 1, 7, 30];
+
+        for (const interval of intervals) {
+          const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Cookie: joelCookie,
+            },
+            body: JSON.stringify({
+              action: 'updateRecurrence',
+              recurrenceInterval: interval,
+              recurrenceDate: interval > 0 ? '2026-01-20T00:00:00Z' : null,
+            }),
+          });
+
+          expect(response.status).toBe(200);
+          const data = await response.json();
+          expect(data.recurrence.recurrence_interval).toBe(interval);
+        }
+      });
+
+      it('should return 400 when recurrence interval is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateRecurrence',
+            recurrenceDate: '2025-10-20T00:00:00Z',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+      });
+    });
+
+    // ============ ADD ASSIGNEE ============
+    describe('addAssignee', () => {
+      it('should add assignee to task successfully', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addAssignee',
+            assignee_id: testUsers.kester.id,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.success).toBe(true);
+        expect(data.assignee_id).toBe(testUsers.kester.id);
+
+        // Verify in database
+        const { data: assignment } = await adminClient
+          .from('task_assignments')
+          .select('*')
+          .eq('task_id', testTaskId)
+          .eq('assignee_id', testUsers.kester.id)
+          .single();
+
+        expect(assignment).toBeDefined();
+      });
+
+      it('should return 400 when assignee_id is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addAssignee',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Assignee ID required');
+      });
+    });
+
+    // ============ REMOVE ASSIGNEE ============
+    describe('removeAssignee', () => {
+      it('should remove assignee from task successfully', async () => {
+        // First verify the assignee exists
+        const { data: assignments } = await adminClient
+          .from('task_assignments')
+          .select('*')
+          .eq('task_id', testTaskId)
+          .eq('assignee_id', testUsers.mitch.id);
+
+        expect(assignments?.length).toBeGreaterThan(0);
+
+        // Remove the assignee
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'removeAssignee',
+            assignee_id: testUsers.mitch.id,
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.success).toBe(true);
+
+        // Verify removed from database
+        const { data: afterRemoval } = await adminClient
+          .from('task_assignments')
+          .select('*')
+          .eq('task_id', testTaskId)
+          .eq('assignee_id', testUsers.mitch.id);
+
+        expect(afterRemoval?.length).toBe(0);
+      });
+    });
+
+    // ============ ADD TAG ============
+    describe('addTag', () => {
+      it('should add tag to task successfully', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addTag',
+            tag_name: 'urgent',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.success).toBe(true);
+        expect(data.tag).toBe('urgent');
+      });
+
+      it('should return 400 when tag_name is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addTag',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Tag name required');
+      });
+    });
+
+    // ============ REMOVE TAG ============
+    describe('removeTag', () => {
+      it('should remove tag from task successfully', async () => {
+        // First add a tag
+        await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addTag',
+            tag_name: 'test-tag',
+          }),
+        });
+
+        // Then remove it
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'removeTag',
+            tag_name: 'test-tag',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.success).toBe(true);
+      });
+    });
+
+    // ============ ADD ATTACHMENTS ============
+    describe('addAttachments', () => {
+      it('should add attachments to task successfully', async () => {
+        const formData = new FormData();
+        formData.append('action', 'addAttachments');
+        formData.append('file_0', new File(['test content'], 'test.txt', { type: 'text/plain' }));
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            Cookie: joelCookie,
+          },
+          body: formData,
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.success).toBe(true);
+        expect(data.attachments).toBeDefined();
+        expect(Array.isArray(data.attachments)).toBe(true);
+      });
+
+      it('should return 400 when no files provided', async () => {
+        const formData = new FormData();
+        formData.append('action', 'addAttachments');
+
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            Cookie: joelCookie,
+          },
+          body: formData,
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('No files provided');
+      });
+    });
+
+    // ============ REMOVE ATTACHMENT ============
+    describe('removeAttachment', () => {
+      it('should remove attachment from task successfully', async () => {
+        // First add an attachment
+        const formData = new FormData();
+        formData.append('action', 'addAttachments');
+        formData.append('file_0', new File(['test content'], 'test.txt', { type: 'text/plain' }));
+
+        const addResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            Cookie: joelCookie,
+          },
+          body: formData,
+        });
+
+        const addData = await addResponse.json();
+        const attachmentId = addData.attachments[0].id;
+
+        // Then remove it
+        const removeResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'removeAttachment',
+            attachment_id: attachmentId,
+          }),
+        });
+
+        expect(removeResponse.status).toBe(200);
+        const removeData = await removeResponse.json();
+        expect(removeData.success).toBe(true);
+      });
+    });
+
+    // ============ ADD COMMENT ============
+    describe('addComment', () => {
+      it('should add comment to task successfully', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addComment',
+            content: 'This is a test comment',
+          }),
+        });
+
+        expect(response.status).toBe(200);
+        const data = await response.json();
+        expect(data.success).toBe(true);
+        expect(data.comment).toBeDefined();
+        expect(data.comment.content).toBe('This is a test comment');
+      });
+
+      it('should return 400 when comment content is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addComment',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Comment content required');
+      });
+
+      it('should return 400 when comment content is empty', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addComment',
+            content: '   ',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Comment content required');
+      });
+    });
+
+    // ============ UPDATE COMMENT ============
+    describe('updateComment', () => {
+      it('should update comment successfully', async () => {
+        // First add a comment
+        const addResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addComment',
+            content: 'Original comment',
+          }),
+        });
+
+        const addData = await addResponse.json();
+        const commentId = addData.comment.id;
+
+        // Then update it
+        const updateResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateComment',
+            commentId,
+            content: 'Updated comment',
+          }),
+        });
+
+        expect(updateResponse.status).toBe(200);
+        const updateData = await updateResponse.json();
+        expect(updateData.success).toBe(true);
+        expect(updateData.comment.content).toBe('Updated comment');
+      });
+    });
+
+    // ============ DELETE COMMENT ============
+    describe('deleteComment', () => {
+      it('should delete comment successfully', async () => {
+        // First add a comment
+        const addResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'addComment',
+            content: 'Comment to delete',
+          }),
+        });
+
+        const addData = await addResponse.json();
+        const commentId = addData.comment.id;
+
+        // Then delete it
+        const deleteResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'deleteComment',
+            commentId,
+          }),
+        });
+
+        expect(deleteResponse.status).toBe(200);
+        const deleteData = await deleteResponse.json();
+        expect(deleteData.success).toBe(true);
+        expect(deleteData.message).toBe('Comment deleted successfully');
+      });
+    });
+
+    // ============ LINK SUBTASK ============
+    describe('linkSubtask', () => {
+      it('should link subtask to parent task successfully', async () => {
+        // Create a subtask
+        const formData = new FormData();
+        formData.append('taskData', JSON.stringify({
+          project_id: testProjectId,
+          title: 'Subtask',
+          description: 'A subtask',
+          priority_bucket: 5,
+          status: 'To Do',
+          assignee_ids: [testUsers.joel.id],
+          deadline: '2025-12-31T23:59:59Z',
+        }));
+
+        const createResponse = await fetch(`${API_BASE}/api/tasks`, {
+          method: 'POST',
+          headers: { Cookie: joelCookie },
+          body: formData,
+        });
+
+        const createData = await createResponse.json();
+        const subtaskId = createData.taskId;
+
+        // Link it to parent
+        const linkResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'linkSubtask',
+            subtaskId,
+          }),
+        });
+
+        expect(linkResponse.status).toBe(200);
+        const linkData = await linkResponse.json();
+        expect(linkData.success).toBe(true);
+
+        // Verify in database
+        const { data: verified } = await adminClient
+          .from('tasks')
+          .select('parent_task_id')
+          .eq('id', subtaskId)
+          .single();
+
+        expect(verified?.parent_task_id).toBe(testTaskId);
+      });
+
+      it('should return 400 when subtaskId is missing', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'linkSubtask',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Subtask ID required');
+      });
+    });
+
+    // ============ INVALID TASK ID ============
+    describe('Invalid Task ID', () => {
+      it('should return 400 for invalid task ID', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/invalid`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'updateTitle',
+            title: 'New Title',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Invalid task ID');
+      });
+
+      it('should return 400 for invalid action', async () => {
+        const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Cookie: joelCookie,
+          },
+          body: JSON.stringify({
+            action: 'invalidAction',
+          }),
+        });
+
+        expect(response.status).toBe(400);
+        const data = await response.json();
+        expect(data.error).toBe('Invalid action');
+      });
     });
   });
 });

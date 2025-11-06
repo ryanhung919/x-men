@@ -1,5 +1,34 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  updateTaskTitleDB,
+  updateTaskDescriptionDB,
+  updateTaskStatusDB,
+  updateTaskPriorityDB,
+  updateTaskDeadlineDB,
+  updateTaskNotesDB,
+  updateTaskRecurrenceDB,
+  addTaskTagDB,
+  removeTaskTagDB,
+  addTaskAssigneeDB,
+  removeTaskAssigneeDB,
+  createTask,
+  linkSubtaskToParentDB,
+  getTaskAttachmentsTotalSize,
+  addTaskAttachmentsDB,
+  removeTaskAttachmentDB,
+  getTaskPermissionDataDB,
+  isUserManager,
+  addTaskCommentDB,
+  updateTaskCommentDB,
+  deleteTaskCommentDB,
+  getCommentAuthorDB,
+  checkUserIsAdmin,
+  getTaskById,
+} from '@/lib/db/tasks';
+
 import { CreateTaskPayload } from '../types/task-creation';
+import { createClient } from '@/lib/supabase/server';
+
+import { SupabaseClient } from '@supabase/supabase-js';
 import {
   RawTask,
   RawSubtask,
@@ -9,6 +38,7 @@ import {
   Task,
   TaskComment,
   DetailedTask,
+  calculateNextDueDate,
 } from '../types/tasks';
 
 // Re-export types for backward compatibility
@@ -396,4 +426,644 @@ export async function archiveTaskService(
   // await notificationService.notifyArchive(taskId, isArchived);
 
   return affectedCount;
+}
+
+
+
+// // ============ CONSTANTS ============
+
+export const FILE_UPLOAD_LIMITS = {
+  MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB per file
+  MAX_TOTAL_SIZE: 500 * 1024 * 1024, // 500MB total per task
+  MAX_FILES: 10,
+  ALLOWED_TYPES: [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'text/plain',
+    'text/csv',
+  ],
+} as const;
+
+export function isAllowedFileType(fileType: string): fileType is (typeof FILE_UPLOAD_LIMITS.ALLOWED_TYPES)[number] {
+  return FILE_UPLOAD_LIMITS.ALLOWED_TYPES.includes(fileType as any);
+}
+
+// ============ HELPERS ============
+
+/**
+ * Format bytes as human-readable size
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 bytes';
+  const k = 1024;
+  const sizes = ['bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 10) / 10 + ' ' + sizes[i];
+}
+
+/**
+ * Check if user has permission to modify a task
+ * User can modify if they are the creator OR an assignee
+ */
+async function checkTaskPermission(taskId: number, userId: string): Promise<boolean> {
+  const permData = await getTaskPermissionDataDB(taskId);
+  if (!permData) return false;
+
+  const isCreator = permData.creator_id === userId;
+  const isAssignee = permData.assignee_ids.includes(userId);
+
+  return isCreator || isAssignee;
+}
+
+
+// ============ TITLE ============
+
+export async function updateTitle(
+  taskId: number,
+  newTitle: string,
+  userId: string
+): Promise<{ id: number; title: string }> {
+  // 1. Validate
+  if (!newTitle || newTitle.trim().length === 0) {
+    throw new Error('Title cannot be empty');
+  }
+  if (newTitle.length > 200) {
+    throw new Error('Title cannot exceed 200 characters');
+  }
+
+  // 2. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Update in DB
+  const result = await updateTaskTitleDB(taskId, newTitle);
+
+  // TODO: Log activity (ATH002)
+  // TODO: Notify assignees
+
+  return result;
+}
+
+// ============ DESCRIPTION ============
+
+export async function updateDescription(
+  taskId: number,
+  newDescription: string | null,
+  userId: string
+): Promise<{ id: number; description: string | null }> {
+  // 1. Validate
+  if (newDescription !== null && typeof newDescription !== 'string') {
+    throw new Error('Description must be a string or null');
+  }
+  if (newDescription && newDescription.length > 2000) {
+    throw new Error('Description cannot exceed 2000 characters');
+  }
+
+  // 2. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Update in DB
+  const result = await updateTaskDescriptionDB(taskId, newDescription);
+
+  // TODO: Notify assignees
+
+  return result;
+}
+
+// ============ STATUS ============
+
+export async function updateStatus(
+  taskId: number,
+  newStatus: 'To Do' | 'In Progress' | 'Completed' | 'Blocked',
+  userId: string
+): Promise<{ id: number; status: string }> {
+  // 1. Validate status
+  const validStatuses = ['To Do', 'In Progress', 'Completed', 'Blocked'];
+  if (!validStatuses.includes(newStatus)) {
+    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  // 2. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Get task details BEFORE updating (needed for recurring task logic)
+  let taskDetails: DetailedTask | null = null;
+  if (newStatus === 'Completed') {
+    const rawTaskData = await getTaskById(taskId);
+    if (rawTaskData) {
+      taskDetails = formatTaskDetails(rawTaskData);
+    }
+  }
+
+  // 4. Update status in DB
+  const result = await updateTaskStatusDB(taskId, newStatus);
+
+  // 5. Handle recurring task creation if task is completed
+  if (newStatus === 'Completed' && taskDetails) {
+    // Check if this is a recurring task with a deadline
+    if (taskDetails.recurrence_interval > 0 && taskDetails.deadline) {
+      try {
+        // Convert DetailedTask to Task format (for calculateNextDueDate)
+        const taskForCalculation: Task = {
+          ...taskDetails,
+          attachments: taskDetails.attachments.map(a => a.storage_path),
+        };
+
+        // Calculate next due date using the existing function
+        const taskWithNextDue = calculateNextDueDate(taskForCalculation);
+
+        // Create new recurring task with same properties
+        const newTaskPayload: CreateTaskPayload = {
+          project_id: taskDetails.project.id,
+          title: taskDetails.title,
+          description: taskDetails.description || '',
+          priority_bucket: taskDetails.priority,
+          status: 'To Do',
+          assignee_ids: taskDetails.assignees.map(a => a.assignee_id),
+          deadline: taskWithNextDue.deadline!,
+          notes: taskDetails.notes || undefined,
+          tags: taskDetails.tags,
+          recurrence_interval: taskDetails.recurrence_interval,
+          // recurrence_date is not needed - only deadline matters for calculating next occurrence
+        };
+
+        // Create the new recurring task (createTask creates its own supabase client)
+        const supabase = await createClient();
+        await createTask(supabase, newTaskPayload, taskDetails.creator.creator_id);
+
+        console.log(`[RECURRING] Created new recurring task for task ${taskId} with deadline ${taskWithNextDue.deadline}`);
+      } catch (error) {
+        console.error('[RECURRING] Failed to create recurring task:', error);
+        // Don't fail the status update if recurring task creation fails
+        // The status update was successful, just log the error
+      }
+    }
+  }
+
+  // TODO: Log status change (ATH002)
+  // TODO: Notify assignees of status change (NSY002)
+
+  return result;
+}
+
+// ============ PRIORITY ============
+
+export async function updatePriority(
+  taskId: number,
+  newPriority: number,
+  userId: string,
+  userRole?: string
+): Promise<{ id: number; priority_bucket: number }> {
+  // 1. Validate
+  if (typeof newPriority !== 'number' || newPriority < 1 || newPriority > 10) {
+    throw new Error('Priority must be a number between 1 and 10');
+  }
+
+  // 2. Check permission
+  // Any user can update priority, but we log who changed it
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Update in DB
+  const result = await updateTaskPriorityDB(taskId, newPriority);
+
+  // TODO: Notify assignees
+
+  return result;
+}
+
+// ============ DEADLINE ============
+
+export async function updateDeadline(
+  taskId: number,
+  newDeadline: string | null,
+  userId: string
+): Promise<{ id: number; deadline: string | null }> {
+  // 1. Validate
+  if (newDeadline !== null && typeof newDeadline !== 'string') {
+    throw new Error('Deadline must be a date string or null');
+  }
+
+  if (newDeadline) {
+    const deadlineDate = new Date(newDeadline);
+    if (isNaN(deadlineDate.getTime())) {
+      throw new Error('Invalid date format');
+    }
+
+    // Warn if deadline is in the past, but allow it
+    if (deadlineDate < new Date()) {
+      console.warn(`[WARN] Deadline set to past date: ${newDeadline}`);
+    }
+  }
+
+  // 2. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Update in DB
+  const result = await updateTaskDeadlineDB(taskId, newDeadline);
+
+  // TODO: Notify assignees of deadline change (DST007)
+
+  return result;
+}
+
+// ============ NOTES ============
+
+export async function updateNotes(
+  taskId: number,
+  newNotes: string,
+  userId: string
+): Promise<{ id: number; notes: string }> {
+  // 1. Validate
+  if (typeof newNotes !== 'string') {
+    throw new Error('Notes must be a string');
+  }
+  if (newNotes.length > 1000) {
+    throw new Error('Notes cannot exceed 1000 characters');
+  }
+
+  // 2. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Update in DB
+  const result = await updateTaskNotesDB(taskId, newNotes);
+
+  return result;
+}
+
+
+// ============ RECURRENCE ============
+
+export async function updateRecurrence(
+  taskId: number,
+  recurrenceInterval: number,
+  recurrenceDate: string | null,
+  userId: string
+): Promise<{ id: number; recurrence_interval: number; recurrence_date: string | null }> {
+  // Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // Validate recurrence interval
+  const validIntervals = [0, 1, 7, 30];
+  if (!validIntervals.includes(recurrenceInterval)) {
+    throw new Error('Invalid recurrence interval. Must be 0, 1, 7, or 30 days');
+  }
+
+  // If setting recurrence, validate date
+  if (recurrenceInterval > 0) {
+    if (!recurrenceDate) {
+      throw new Error('Recurrence date is required when setting up recurrence');
+    }
+
+    const dateObj = new Date(recurrenceDate);
+    if (isNaN(dateObj.getTime())) {
+      throw new Error('Invalid recurrence date');
+    }
+
+    // Date should not be in the past
+    if (dateObj < new Date()) {
+      throw new Error('Recurrence date cannot be in the past');
+    }
+  }
+
+  // Call DB layer
+  const result = await updateTaskRecurrenceDB(taskId, recurrenceInterval, recurrenceDate);
+
+  return result;
+}
+
+// ============ TAGS ============
+
+export async function addTag(
+  taskId: number,
+  tagName: string,
+  userId: string
+): Promise<string> {
+  // 1. Validate
+  if (!tagName || typeof tagName !== 'string') {
+    throw new Error('Tag name must be a non-empty string');
+  }
+
+  const cleanedTag = tagName.trim();
+  if (cleanedTag.length === 0) {
+    throw new Error('Tag name cannot be empty');
+  }
+
+  if (cleanedTag.length > 50) {
+    throw new Error('Tag name cannot exceed 50 characters');
+  }
+
+  // 2. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Update in DB
+  const result = await addTaskTagDB(taskId, cleanedTag);
+
+  return result;
+}
+
+export async function removeTag(
+  taskId: number,
+  tagName: string,
+  userId: string
+): Promise<string> {
+  // 1. Validate
+  if (!tagName || typeof tagName !== 'string') {
+    throw new Error('Tag name must be a non-empty string');
+  }
+
+  // 2. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // 3. Update in DB
+  const result = await removeTaskTagDB(taskId, tagName);
+
+  return result;
+}
+
+// ============ ASSIGNEES ============
+
+export async function addAssignee(
+  taskId: number,
+  newAssigneeId: string,
+  userId: string
+): Promise<string> {
+  // 1. Validate
+  if (!newAssigneeId || typeof newAssigneeId !== 'string') {
+    throw new Error('Assignee ID must be a non-empty string');
+  }
+
+  // 2. Check permission (creator or any assignee can add someone)
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update assignees for this task');
+  }
+
+  // 3. Update in DB
+  const result = await addTaskAssigneeDB(taskId, newAssigneeId, userId);
+
+  // TODO: Notify new assignee (NSY002)
+
+  return result;
+}
+
+export async function removeAssignee(
+  taskId: number,
+  assigneeId: string,
+  userId: string
+): Promise<string> {
+  // 1. Validate
+  if (!assigneeId || typeof assigneeId !== 'string') {
+    throw new Error('Assignee ID must be a non-empty string');
+  }
+
+  // 2. Check if user is a manager (permission check happens HERE)
+  const isManager = await isUserManager(userId);
+  if (!isManager) {
+    throw new Error('Only managers can remove assignees from tasks');
+  }
+
+  // 3. Call DB layer to remove (no permission check needed there)
+  const result = await removeTaskAssigneeDB(taskId, assigneeId);
+
+  return result;
+}
+
+// ============ SUBTASKS ============
+
+export async function createSubtask(
+  supabase: any,
+  parentTaskId: number,
+  payload: CreateTaskPayload,
+  creatorId: string,
+  attachmentFiles?: File[]
+): Promise<number> {
+  // 1. Create task as usual (without parent_task_id set yet)
+  const subtaskId = await createTask(supabase, payload, creatorId, attachmentFiles);
+
+  // 2. Link to parent
+  await linkSubtaskToParent(subtaskId, parentTaskId);
+
+  return subtaskId;
+}
+
+
+// ============ ATTACHMENTS ============
+
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+];
+const MAX_TOTAL_ATTACHMENT_SIZE = 50 * 1024 * 1024; // 50MB total per task
+
+export async function addTaskAttachments(
+  taskId: number,
+  files: File[],
+  userId: string
+): Promise<{ id: number; storage_path: string }[]> {
+  // Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to update this task');
+  }
+
+  // Get existing attachment size for this task
+  const existingSize = await getTaskAttachmentsTotalSize(taskId);
+
+  // Validate files
+  let totalNewSize = 0;
+  for (const file of files) {
+    // Check file type
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      throw new Error(
+        `File type not allowed: ${file.type}. Allowed: PDF, images, Word, Excel, TXT`
+      );
+    }
+
+    totalNewSize += file.size;
+  }
+
+  // Check total size (existing + new)
+  const totalSize = existingSize + totalNewSize;
+  if (totalSize > MAX_TOTAL_ATTACHMENT_SIZE) {
+    const remainingMB = ((MAX_TOTAL_ATTACHMENT_SIZE - existingSize) / 1024 / 1024).toFixed(1);
+    throw new Error(
+      `Total attachment size would exceed 50MB limit. You have ${remainingMB}MB remaining. Trying to add ${(totalNewSize / 1024 / 1024).toFixed(1)}MB.`
+    );
+  }
+
+  // Call DB layer
+  const result = await addTaskAttachmentsDB(taskId, files, userId);
+
+  return result;
+}
+
+export async function removeTaskAttachment(
+  taskId: number,
+  attachmentId: number,
+  userId: string
+): Promise<{ id: number; removed: true }> {
+  // 1. Check permission
+  const hasPermission = await checkTaskPermission(taskId, userId);
+  if (!hasPermission) {
+    throw new Error('You do not have permission to delete attachments from this task');
+  }
+
+  // 2. Delete from storage and DB
+  const storagePath = await removeTaskAttachmentDB(attachmentId);
+
+  console.log(`[ATTACHMENTS] Removed attachment ${attachmentId} from task ${taskId} (${storagePath})`);
+
+  return { id: attachmentId, removed: true };
+}
+
+// ============ COMMENTS ============
+
+export async function addComment(
+  taskId: number,
+  content: string,
+  userId: string
+): Promise<{ id: number; content: string; created_at: string; user_id: string }> {
+  // Validate content
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    throw new Error('Comment content cannot be empty');
+  }
+
+  if (content.trim().length > 5000) {
+    throw new Error('Comment cannot exceed 5000 characters');
+  }
+
+  // Verify task exists
+  const taskData = await getTaskPermissionDataDB(taskId);
+  if (!taskData) {
+    throw new Error('Task not found');
+  }
+
+  // Add the comment
+  const result = await addTaskCommentDB(taskId, userId, content.trim());
+
+  return result;
+}
+
+export async function updateComment(
+  commentId: number,
+  newContent: string,
+  userId: string
+): Promise<{ id: number; content: string; updated_at: string }> {
+  // Validate content
+  if (!newContent || typeof newContent !== 'string' || newContent.trim().length === 0) {
+    throw new Error('Comment content cannot be empty');
+  }
+
+  if (newContent.trim().length > 5000) {
+    throw new Error('Comment cannot exceed 5000 characters');
+  }
+
+  // Check if user is the author
+  const authorId = await getCommentAuthorDB(commentId);
+  if (!authorId) {
+    throw new Error('Comment not found');
+  }
+
+  if (authorId !== userId) {
+    throw new Error('You can only edit your own comments');
+  }
+
+  // Update the comment
+  const result = await updateTaskCommentDB(commentId, newContent.trim());
+
+  return result;
+}
+
+export async function deleteComment(
+  commentId: number,
+  userId: string
+): Promise<void> {
+  // Check if user is admin
+  const isAdmin = await checkUserIsAdmin(userId);
+  if (!isAdmin) {
+    throw new Error('Only admins can delete comments');
+  }
+
+  // Delete the comment
+  await deleteTaskCommentDB(commentId);
+}
+
+
+export async function linkSubtaskToParent(
+  subtaskId: number,
+  parentTaskId: number
+): Promise<void> {
+  // Validation
+  if (!Number.isInteger(subtaskId) || subtaskId <= 0) {
+    throw new Error('Invalid subtask ID');
+  }
+
+  if (!Number.isInteger(parentTaskId) || parentTaskId <= 0) {
+    throw new Error('Invalid parent task ID');
+  }
+
+  // Prevent self-parenting
+  if (subtaskId === parentTaskId) {
+    throw new Error('A task cannot be its own parent');
+  }
+
+  // Verify both tasks exist
+  const subtask = await getTaskPermissionDataDB(subtaskId);
+  if (!subtask) {
+    throw new Error('Subtask not found');
+  }
+
+  const parentTask = await getTaskPermissionDataDB(parentTaskId);
+  if (!parentTask) {
+    throw new Error('Parent task not found');
+  }
+
+  // Call DB layer
+  try {
+    await linkSubtaskToParentDB(subtaskId, parentTaskId);
+  } catch (err) {
+    throw new Error(
+      `Failed to link subtask to parent: ${err instanceof Error ? err.message : 'Unknown error'}`
+    );
+  }
 }
