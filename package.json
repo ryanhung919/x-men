@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "pnpm test:unit && pnpm test:component && pnpm test:integration:dev",
+    "test:all": "pnpm test:unit && pnpm test:component && pnpm test:integration:dev && pnpm test:e2e",
     "test:unit": "vitest run --config vitest.config.unit.ts --coverage",
     "test:component": "cross-env NODE_OPTIONS=\"--experimental-vm-modules --no-warnings\" vitest run --config vitest.config.component.ts --coverage",
     "test:unit:deno": "deno test __tests__/unit/supabase/functions/ --allow-env --allow-net --coverage=coverage/deno && deno coverage coverage/deno --lcov --output=coverage/deno/lcov.info",
