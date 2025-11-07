@@ -6,8 +6,6 @@ It's a Next.js application backed by Supabase (Postgres + Auth), styled with Tai
 
 > **Note**: If you see a security warning, click the last underlined link and select "visit this unsafe website", or visit our main branch URL.
 
-View our deployed website using Vercel [here](x-men-git-main-spm-x.vercel.app)
-
 Access the our GitHub Repository [here](https://github.com/ryanhung919/x-men)
 
 ## Prerequisites
