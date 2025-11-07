@@ -80,10 +80,10 @@ pnpm dev
 pnpm test:integration
 ```
 
-- CI convenience (unit then integration):
+- e2e tests
 
 ```bash
-pnpm ci:test
+pnpm test:e2e
 ```
 
 ## Auth & Roles
@@ -96,9 +96,10 @@ pnpm ci:test
 ## Tech Stack
 
 - Next.js 15 (App Router, React 19)
-- Supabase (Auth, Postgres, RLS)
+- Supabase (Auth, Postgres, RLS, Edge Functions, Realtime)
 - Tailwind CSS + shadcn/ui
-- Vitest (unit + integration)
+- Vitest (unit + integration) + Playwright (e2e)
+– Vercel (Deployment)
 
 ## Collaborators
 
