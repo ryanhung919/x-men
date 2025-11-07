@@ -21,7 +21,6 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "db:status": "tsx scripts/db-management.ts status",
     "db:seed": "tsx scripts/db-management.ts seed",

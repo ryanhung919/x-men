@@ -1,6 +1,10 @@
 This is a Smart Task Management System created for our client All-In-One.
 
-It’s a Next.js application backed by Supabase (Postgres + Auth), styled with Tailwind, and deployed on Vercel.
+It's a Next.js application backed by Supabase (Postgres + Auth), styled with Tailwind, and deployed on Vercel.
+
+**Production URL**: https://x-men-rosy.vercel.app/
+
+> **Note**: If you see a security warning, click the last underlined link and select "visit this unsafe website", or visit our main branch URL.
 
 View our deployed website using Vercel [here](x-men-git-main-spm-x.vercel.app)
 
