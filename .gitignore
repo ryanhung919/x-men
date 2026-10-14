@@ -61,3 +61,5 @@ next-env.d.ts
 
 # Supabase temporary files
 supabase/.temp/
+# Demo recording output (scripts/record-demo.ts)
+/demo-recording/
