@@ -70,7 +70,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your email below to login to your account</CardDescription>
+          <CardDescription>Enter your email below to log in to NODAL</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin}>

@@ -1,64 +1,188 @@
-/* ======================== AUTH USERS ======================== */
-/* All passwords: "password123" */
-export const auth_users = [
-  {
-    id: '235d62da-62cc-484b-8715-6683b2a3805a',
-    email: 'garrisonkoh12315@gmail.com',
-    password: 'password123',
+/**
+ * Demo dataset for NODAL.
+ *
+ * Everyone here is a fictional persona on the `nodal.demo` domain, except
+ * `ryanhung919@gmail.com`, which is the project owner's own admin account.
+ * No passwords live in this file: the seed route reads them from
+ * DEMO_PASSWORD (all demo personas, including the owner) and GUEST_PASSWORD
+ * (the public guest account).
+ *
+ * All dates are relative to the moment the seed runs, so the dashboard always
+ * shows a realistic mix of finished, late, overdue and upcoming work. Call
+ * `buildSampleData()` at seed time rather than caching its result.
+ *
+ * Report semantics this data is shaped around (see lib/services/report.ts):
+ * - on time         = status Completed and updated_at <= deadline
+ * - completion time = updated_at - created_at
+ * - overdue         = not Completed and deadline < now
+ * so updated_at is set deliberately for every task.
+ */
+
+/* ======================== PERSONAS ======================== */
+
+export type PasswordEnv = 'DEMO_PASSWORD' | 'GUEST_PASSWORD';
+
+export interface Persona {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  department_name: string;
+  roles: Array<'staff' | 'manager' | 'admin'>;
+  default_view: 'tasks' | 'schedule';
+  password_env: PasswordEnv;
+}
+
+export const personas = {
+  // Engineering Operations: the main demo team
+  daniel: {
+    id: '8b241273-ac8c-44f4-8f62-81b759789528',
+    email: 'daniel.tan@nodal.demo',
+    first_name: 'Daniel',
+    last_name: 'Tan',
+    department_name: 'Engineering Operations Division Director',
+    roles: ['admin', 'manager', 'staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: 'aa344933-c44b-4097-b0ac-56987a10734b',
-    email: 'mitchshonaaa@gmail.com',
-    password: 'password123',
+  weijie: {
+    id: '44543879-c7c9-475c-b946-0a0cc04d9874',
+    email: 'weijie.ong@nodal.demo',
+    first_name: 'Wei Jie',
+    last_name: 'Ong',
+    department_name: 'Engineering Operations Division Director',
+    roles: ['admin', 'manager', 'staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
-    email: 'joel.wang.03@gmail.com',
-    password: 'password123',
+  hannah: {
+    id: 'f7b96ff5-e0c2-4b47-a348-fc4f3ec88d9b',
+    email: 'hannah.lee@nodal.demo',
+    first_name: 'Hannah',
+    last_name: 'Lee',
+    department_name: 'Senior Engineers',
+    roles: ['staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: '9a3c4306-8beb-494a-aee9-ba71a444f19a',
-    email: 'kesteryeo@hotmail.com',
-    password: 'password123',
+  kavya: {
+    id: '896fdd75-a866-4941-b228-f92d8abbb361',
+    email: 'kavya.menon@nodal.demo',
+    first_name: 'Kavya',
+    last_name: 'Menon',
+    department_name: 'Junior Engineers',
+    roles: ['staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
+
+  // Finance
+  priya: {
+    id: '567b705f-ed96-4172-ba14-440af578553d',
+    email: 'priya.nair@nodal.demo',
+    first_name: 'Priya',
+    last_name: 'Nair',
+    department_name: 'Finance Director',
+    roles: ['admin', 'manager', 'staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
+  },
+  aisha: {
+    id: 'b6bd482e-e002-4653-941e-3d5f7a7ce6b3',
+    email: 'aisha.rahman@nodal.demo',
+    first_name: 'Aisha',
+    last_name: 'Rahman',
+    department_name: 'Finance Director',
+    roles: ['admin', 'manager', 'staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
+  },
+  ryan: {
+    // Project owner's own account (kept on purpose).
     id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
     email: 'ryanhung919@gmail.com',
-    password: 'password123',
+    first_name: 'Ryan',
+    last_name: 'Hung',
+    department_name: 'Finance Managers',
+    roles: ['admin', 'staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: '32635261-038c-4405-b6ed-2d446738f94c',
-    email: 'garrisonkoh.2023@scis.smu.edu.sg',
-    password: 'password123',
+  farah: {
+    id: 'd5779ca9-ee53-41dd-9bc4-0636a8e3fd27',
+    email: 'farah.iskandar@nodal.demo',
+    first_name: 'Farah',
+    last_name: 'Iskandar',
+    department_name: 'Finance Executive',
+    roles: ['staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    email: 'joel.wang.2023@scis.smu.edu.sg',
-    password: 'password123',
+
+  // System Solutioning
+  marcus: {
+    id: '0923d9a9-4781-477c-8a5a-2a82287ba159',
+    email: 'marcus.lim@nodal.demo',
+    first_name: 'Marcus',
+    last_name: 'Lim',
+    department_name: 'System Solutioning Division Director',
+    roles: ['admin', 'manager', 'staff'],
+    default_view: 'schedule',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
-    email: 'mitch.shona.2023@scis.smu.edu.sg',
-    password: 'password123',
+  ethan: {
+    id: '2ff99ef8-8050-4905-b4be-b88b53e853df',
+    email: 'ethan.goh@nodal.demo',
+    first_name: 'Ethan',
+    last_name: 'Goh',
+    department_name: 'System Solutioning Division Director',
+    roles: ['staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: '61ca6b82-6d42-4058-bb4c-9316e7079b24',
-    email: 'ryan.hung.2023@scis.smu.edu.sg',
-    password: 'password123',
+  sofia: {
+    id: '09f9fb50-3bad-47c7-ad00-24b909386e38',
+    email: 'sofia.reyes@nodal.demo',
+    first_name: 'Sofia',
+    last_name: 'Reyes',
+    department_name: 'Developers',
+    roles: ['staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-  {
-    id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kester.yeo.2024@computing.smu.edu.sg',
-    password: 'password123',
+  omar: {
+    id: '1ee6c80b-3ff0-41d6-a96b-1812a40272fd',
+    email: 'omar.haddad@nodal.demo',
+    first_name: 'Omar',
+    last_name: 'Haddad',
+    department_name: 'Support Team',
+    roles: ['staff'],
+    default_view: 'tasks',
+    password_env: 'DEMO_PASSWORD',
   },
-];
+
+  // Public guest account (credentials go in the README). Staff only.
+  guest: {
+    id: 'b782f303-d0a5-401f-9dec-3abbf5c753c2',
+    email: 'guest@nodal.demo',
+    first_name: 'Guest',
+    last_name: 'Visitor',
+    department_name: 'Engineering Operations Division Director',
+    roles: ['staff'],
+    default_view: 'tasks',
+    password_env: 'GUEST_PASSWORD',
+  },
+} satisfies Record<string, Persona>;
+
+export type PersonaKey = keyof typeof personas;
+const P = personas as Record<PersonaKey, Persona>;
 
 /* ======================== ORGANISATION CATALOG ======================== */
 export const departments = [
-  // Top Level (Orange)
+  // Top Level
   { name: 'Managing Director', parent_department_name: null },
 
-  // Second Level (Yellow - Directors)
+  // Second Level (Directors)
   { name: 'Sales Director', parent_department_name: 'Managing Director' },
   { name: 'Consultancy Division Director', parent_department_name: 'Managing Director' },
   { name: 'System Solutioning Division Director', parent_department_name: 'Managing Director' },
@@ -67,19 +191,11 @@ export const departments = [
   { name: 'Finance Director', parent_department_name: 'Managing Director' },
   { name: 'IT Director', parent_department_name: 'Managing Director' },
 
-  // Third Level (Blue - Teams/Managers)
-
-  // Sales Branch (3-tier)
+  // Third Level (Teams)
   { name: 'Sales Manager', parent_department_name: 'Sales Director' },
-
-  // Consultancy Branch
   { name: 'Consultant', parent_department_name: 'Consultancy Division Director' },
-
-  // System Solutioning Branch
   { name: 'Developers', parent_department_name: 'System Solutioning Division Director' },
   { name: 'Support Team', parent_department_name: 'System Solutioning Division Director' },
-
-  // Engineering Operations Branch
   { name: 'Senior Engineers', parent_department_name: 'Engineering Operations Division Director' },
   { name: 'Junior Engineers', parent_department_name: 'Engineering Operations Division Director' },
   { name: 'Call Centre', parent_department_name: 'Engineering Operations Division Director' },
@@ -87,1309 +203,1055 @@ export const departments = [
     name: 'Operation Planning Team',
     parent_department_name: 'Engineering Operations Division Director',
   },
-
-  // HR and Admin Branch
   { name: 'HR Team', parent_department_name: 'HR and Admin Director' },
   { name: 'L&D Team', parent_department_name: 'HR and Admin Director' },
   { name: 'Admin Team', parent_department_name: 'HR and Admin Director' },
-
-  // Finance Branch (3-tier)
   { name: 'Finance Managers', parent_department_name: 'Finance Director' },
-
-  // IT Branch
   { name: 'IT Team', parent_department_name: 'IT Director' },
 
-  // Fourth Level (Blue - Leaf nodes, only for Sales and Finance)
-
-  // Sales 4th tier
+  // Fourth Level
   { name: 'Account Managers', parent_department_name: 'Sales Manager' },
-
-  // Finance 4th tier
   { name: 'Finance Executive', parent_department_name: 'Finance Managers' },
 ];
 
 export const roles = [{ role: 'staff' }, { role: 'manager' }, { role: 'admin' }];
 
-/* ======================== USER PROFILES (user_info) ======================== */
-/** Each user belongs to exactly one department. */
-export const user_info = [
-  // School accounts (primary for work data)
-  {
-    id: '61ca6b82-6d42-4058-bb4c-9316e7079b24',
-    first_name: 'Ryan',
-    last_name: 'Hung',
-    default_view: 'tasks',
-    department_name: 'Finance Director',
-  },
-  {
-    id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    first_name: 'Joel',
-    last_name: 'Wang',
-    default_view: 'schedule',
-    department_name: 'Engineering Operations Division Director',
-  },
-  {
-    id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
-    first_name: 'Mitch',
-    last_name: 'Shona',
-    default_view: 'tasks',
-    department_name: 'Finance Director',
-  },
-  {
-    id: '32635261-038c-4405-b6ed-2d446738f94c',
-    first_name: 'Garrison',
-    last_name: 'Koh',
-    default_view: 'schedule',
-    department_name: 'System Solutioning Division Director',
-  },
-  {
-    id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    first_name: 'Kester',
-    last_name: 'Yeo',
-    default_view: 'tasks',
-    department_name: 'Engineering Operations Division Director',
-  },
-
-  // Personal accounts
-  {
-    id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
-    first_name: 'Bryan',
-    last_name: 'Hong',
-    default_view: 'tasks',
-    department_name: 'Finance Managers',
-  },
-  {
-    id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
-    first_name: 'Noel',
-    last_name: 'Tang',
-    default_view: 'tasks',
-    department_name: 'Senior Engineers',
-  },
-  {
-    id: 'aa344933-c44b-4097-b0ac-56987a10734b',
-    first_name: 'Michelle',
-    last_name: 'Jhona',
-    default_view: 'tasks',
-    department_name: 'Finance Executive',
-  },
-  {
-    id: '235d62da-62cc-484b-8715-6683b2a3805a',
-    first_name: 'Garry',
-    last_name: 'Toh',
-    default_view: 'tasks',
-    department_name: 'System Solutioning Division Director',
-  },
-  {
-    id: '9a3c4306-8beb-494a-aee9-ba71a444f19a',
-    first_name: 'Chester',
-    last_name: 'Nut',
-    default_view: 'tasks',
-    department_name: 'Junior Engineers',
-  },
-];
-
-/* ======================== USER ROLES ======================== */
-/** Joel manages Finance Director and is also admin; Mitch is admin; others staff. */
-export const user_roles = [
-  { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'admin' },
-  { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'manager' }, // Joel (SMU)
-  { user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', role: 'staff' },
-
-  { user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', role: 'admin' },
-  { user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', role: 'manager' },
-  { user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', role: 'staff' }, // Mitch (SMU)
-
-  { user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', role: 'admin' },
-  { user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', role: 'manager' },
-  { user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', role: 'staff' }, // Ryan (SMU)
-
-  { user_id: '32635261-038c-4405-b6ed-2d446738f94c', role: 'admin' },
-  { user_id: '32635261-038c-4405-b6ed-2d446738f94c', role: 'manager' },
-  { user_id: '32635261-038c-4405-b6ed-2d446738f94c', role: 'staff' }, // Garrison (SMU)
-
-  { user_id: '67393282-3a06-452b-a05a-9c93a95b597f', role: 'admin' },
-  { user_id: '67393282-3a06-452b-a05a-9c93a95b597f', role: 'manager' },
-  { user_id: '67393282-3a06-452b-a05a-9c93a95b597f', role: 'staff' }, // Kester (SMU)
-
-  // Mirror roles on personal accounts for future tests:
-  { user_id: 'baa47e05-2dba-4f12-8321-71769a9a3702', role: 'staff' }, // Noel (personal)
-
-  { user_id: 'aa344933-c44b-4097-b0ac-56987a10734b', role: 'staff' }, // Mitchelle (personal)
-
-  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'staff' },
-  { user_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', role: 'admin' }, // Bryan (personal)
-
-  { user_id: '235d62da-62cc-484b-8715-6683b2a3805a', role: 'staff' }, // Garry (personal)
-
-  { user_id: '9a3c4306-8beb-494a-aee9-ba71a444f19a', role: 'staff' }, // Chester (personal)
-];
-
-/* ======================== PROJECTS & LINKS ======================== */
 export const projects = [
-  { name: 'Annual Budget FY25', is_archived: false },
-  { name: 'Website Redesign', is_archived: false },
-  { name: 'Data Warehouse Lift', is_archived: false },
-  { name: 'Digital Collaboration Rollout', is_archived: false },
-  { name: 'Client Onboarding Portal', is_archived: false },
-  { name: 'Internal Analytics Dashboard', is_archived: false },
-  { name: 'Cloud Doc Management', is_archived: false },
-  { name: 'Regional Training Program', is_archived: false },
-  { name: 'Workflow Automation Pilot', is_archived: false },
-  { name: 'FY25 Forecast Review', is_archived: false },
+  { name: 'Customer Portal Revamp', is_archived: false },
+  { name: 'Warehouse Sensor Rollout', is_archived: false },
+  { name: 'Field Service Mobile App', is_archived: false },
+  { name: 'Data Platform Migration', is_archived: false },
+  { name: 'Office Network Refresh', is_archived: false },
+  { name: 'FY26 Budget Planning', is_archived: false },
+  { name: 'Q3 Financial Close', is_archived: false },
+  { name: 'Vendor Onboarding Automation', is_archived: false },
+  { name: 'Support Desk Playbook', is_archived: false },
+  { name: 'Legacy CRM Decommission', is_archived: true },
 ];
 
-/* ======================== PROJECT DEPARTMENTS ======================== */
-export const project_departments = [
-  {
-    project_name: 'Annual Budget FY25',
-    department_name: 'Engineering Operations Division Director',
-  },
-  { project_name: 'Annual Budget FY25', department_name: 'Finance Director' },
-  { project_name: 'Annual Budget FY25', department_name: 'Consultancy Division Director' },
-  { project_name: 'Website Redesign', department_name: 'Engineering Operations Division Director' },
-  {
-    project_name: 'Data Warehouse Lift',
-    department_name: 'Engineering Operations Division Director',
-  },
-  { project_name: 'Data Warehouse Lift', department_name: 'Finance Director' },
-  { project_name: 'Data Warehouse Lift', department_name: 'System Solutioning Division Director' },
-  {
-    project_name: 'Digital Collaboration Rollout',
-    department_name: 'System Solutioning Division Director',
-  },
-  { project_name: 'Digital Collaboration Rollout', department_name: 'Sales Director' },
-  {
-    project_name: 'Digital Collaboration Rollout',
-    department_name: 'Finance Director',
-  },
-  {
-    project_name: 'Client Onboarding Portal',
-    department_name: 'Engineering Operations Division Director',
-  },
-  { project_name: 'Client Onboarding Portal', department_name: 'Finance Director' },
-  {
-    project_name: 'Client Onboarding Portal',
-    department_name: 'System Solutioning Division Director',
-  },
-  {
-    project_name: 'Client Onboarding Portal',
-    department_name: 'System Solutioning Division Director',
-  }, // Garrison is assigned
-
-  {
-    project_name: 'Internal Analytics Dashboard',
-    department_name: 'Engineering Operations Division Director',
-  },
-  { project_name: 'Internal Analytics Dashboard', department_name: 'Finance Director' },
-  { project_name: 'Internal Analytics Dashboard', department_name: 'Finance Managers' }, // Bryan is assigned
-  {
-    project_name: 'Internal Analytics Dashboard',
-    department_name: 'System Solutioning Division Director',
-  }, // Garrison is assigned
-  {
-    project_name: 'Cloud Doc Management',
-    department_name: 'Engineering Operations Division Director',
-  },
-  { project_name: 'Cloud Doc Management', department_name: 'System Solutioning Division Director' },
-  { project_name: 'Cloud Doc Management', department_name: 'Finance Director' }, // Ryan is assigned
-  {
-    project_name: 'Regional Training Program',
-    department_name: 'System Solutioning Division Director',
-  },
-  { project_name: 'Regional Training Program', department_name: 'Finance Director' }, // Mitch is assigned
-
-  {
-    project_name: 'Workflow Automation Pilot',
-    department_name: 'Engineering Operations Division Director',
-  },
-  { project_name: 'Workflow Automation Pilot', department_name: 'Finance Director' },
-  { project_name: 'Workflow Automation Pilot', department_name: 'Finance Executive' }, // Michelle is assigned
-
-  { project_name: 'FY25 Forecast Review', department_name: 'Finance Director' },
-  {
-    project_name: 'FY25 Forecast Review',
-    department_name: 'Engineering Operations Division Director',
-  }, // Joel and Kester are assigned
-
-  { project_name: 'Website Redesign', department_name: 'Finance Director' }, // Ryan is assigned
-  { project_name: 'Website Redesign', department_name: 'Finance Director' }, // Mitch is assigned
-];
-
-/* ======================== TAGS ======================== */
 export const tags = [
   { name: 'Budget' },
   { name: 'Design' },
   { name: 'Infra' },
   { name: 'Reporting' },
-  { name: 'Collaboration' },
+  { name: 'Security' },
   { name: 'Onboarding' },
   { name: 'Analytics' },
   { name: 'Automation' },
   { name: 'Recurring' },
 ];
 
-/* ======================== TASKS ======================== */
-export const tasks = [
+/* ======================== TASK SPECS ======================== */
+/*
+ * Day offsets are relative to "now" at seed time: negative = past.
+ * `updated` is when the task last changed; for Completed tasks it is the
+ * completion moment that the reports use.
+ */
+interface TaskSpec {
+  title: string;
+  description: string;
+  notes?: string;
+  project: string;
+  creator: PersonaKey;
+  assignees: PersonaKey[];
+  status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked';
+  priority: number;
+  created: number;
+  deadline: number | null;
+  updated: number;
+  hours: number;
+  parent?: string;
+  recurrence?: 0 | 1 | 7 | 30;
+  archived?: boolean;
+  tags?: string[];
+}
+
+const TASKS: TaskSpec[] = [
+  /* ---- Customer Portal Revamp ---- */
   {
-    title: 'Design budget dashboard layout',
-    description: 'Create FY25 dashboard (KPI tiles, spend vs plan).',
-    priority_bucket: 9,
+    title: 'Customer portal v2 launch',
+    description: 'Ship the redesigned self-service portal to all B2B customers.',
+    notes: 'Go/no-go review with Support two days before launch.',
+    project: 'Customer Portal Revamp',
+    creator: 'daniel',
+    assignees: ['daniel', 'weijie', 'sofia'],
+    status: 'In Progress',
+    priority: 9,
+    created: -68,
+    deadline: 12,
+    updated: -1,
+    hours: 34,
+    tags: ['Design', 'Infra'],
+  },
+  {
+    title: 'Define portal information architecture',
+    description: 'Card-sort with five customers and agree the new navigation tree.',
+    project: 'Customer Portal Revamp',
+    creator: 'weijie',
+    assignees: ['weijie', 'sofia'],
     status: 'Completed',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-11-05T17:00:00+08:00'),
-    notes: 'Use shadcn DataTable; filters in URL.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-20T10:20:00+08:00'),
-    updated_at: new Date('2025-10-25T16:30:00+08:00'), // Completed on Oct 25
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 7200,
+    priority: 7,
+    created: -66,
+    deadline: -52,
+    updated: -55.2,
+    hours: 14,
+    parent: 'Customer portal v2 launch',
+    tags: ['Design'],
   },
   {
-    title: 'Implement task board drag/drop',
-    description: 'Kanban by status with optimistic updates + Realtime.',
-    priority_bucket: 5,
-    status: 'To Do',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    project_name: 'Website Redesign',
-    deadline: new Date('2025-11-10T17:00:00+08:00'),
-    notes: 'Prevent self-parenting on move.',
-    parent_task_external_key: 'Design budget dashboard layout',
-    is_archived: false,
-    created_at: new Date('2025-10-22T10:22:00+08:00'),
-    updated_at: new Date('2025-10-22T10:22:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 0,
-  },
-  {
-    title: 'Connect sales data source',
-    description: 'ETL from SG data mart into DWH; nightly batch.',
-    priority_bucket: 7,
+    title: 'Build account settings pages',
+    description: 'Profile, billing contacts and notification preferences.',
+    project: 'Customer Portal Revamp',
+    creator: 'sofia',
+    assignees: ['sofia', 'weijie'],
     status: 'Completed',
-    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    project_name: 'Data Warehouse Lift',
-    deadline: new Date('2025-11-12T17:00:00+08:00'),
-    notes: 'Mask PII; agree on schema v1.0.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-23T09:00:00+08:00'),
-    updated_at: new Date('2025-10-26T14:20:00+08:00'), // Completed on Oct 26
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 9120,
+    priority: 6,
+    created: -50,
+    deadline: -30,
+    updated: -27,
+    hours: 22,
+    parent: 'Customer portal v2 launch',
   },
   {
-    title: 'Roll out collaboration tools to SG office',
-    description: 'Deploy cloud-based document and chat tools to all SG staff.',
-    priority_bucket: 8,
+    title: 'Integrate SSO with customer directory',
+    description: 'SAML login against each customer identity provider.',
+    notes: 'Blocked: waiting on signed IdP certificates from two pilot customers.',
+    project: 'Customer Portal Revamp',
+    creator: 'daniel',
+    assignees: ['weijie', 'marcus'],
+    status: 'Blocked',
+    priority: 8,
+    created: -40,
+    deadline: -5,
+    updated: -6,
+    hours: 11,
+    parent: 'Customer portal v2 launch',
+    tags: ['Security', 'Infra'],
+  },
+  {
+    title: 'Write SSO rollback runbook',
+    description: 'Step-by-step fallback to password login if SSO fails on launch day.',
+    project: 'Customer Portal Revamp',
+    creator: 'weijie',
+    assignees: ['weijie'],
     status: 'To Do',
-    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
-    project_name: 'Digital Collaboration Rollout',
-    deadline: new Date('2025-11-15T17:00:00+08:00'),
-    notes: 'Coordinate with IT for licenses and onboarding sessions.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-24T09:00:00+08:00'),
-    updated_at: new Date('2025-10-24T09:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 0,
+    priority: 5,
+    created: -20,
+    deadline: 6,
+    updated: -20,
+    hours: 0,
+    parent: 'Integrate SSO with customer directory',
+    tags: ['Security'],
   },
   {
-    title: 'Design client onboarding forms',
-    description: 'Create digital forms for MNC and SME clients.',
-    priority_bucket: 7,
+    title: 'Portal accessibility audit',
+    description: 'WCAG 2.2 AA pass on login, dashboard and invoices.',
+    project: 'Customer Portal Revamp',
+    creator: 'hannah',
+    assignees: ['hannah', 'daniel'],
     status: 'In Progress',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    project_name: 'Client Onboarding Portal',
-    deadline: new Date('2025-11-20T17:00:00+08:00'),
-    notes: 'Include regional language support (MY, VN, HK).',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-25T10:00:00+08:00'),
-    updated_at: new Date('2025-10-25T10:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 30000,
+    priority: 6,
+    created: -18,
+    deadline: 4,
+    updated: -2,
+    hours: 6,
+    tags: ['Design'],
   },
   {
-    title: 'Develop finance KPIs for dashboard',
-    description: 'Define metrics, create dashboard mockups, link to accounting data.',
-    priority_bucket: 9,
+    title: 'Load test portal checkout flow',
+    description: 'k6 scenario at 3x last year peak traffic.',
+    project: 'Customer Portal Revamp',
+    creator: 'kavya',
+    assignees: ['kavya', 'weijie'],
+    status: 'To Do',
+    priority: 7,
+    created: -9,
+    deadline: 9,
+    updated: -9,
+    hours: 0,
+    tags: ['Infra'],
+  },
+  {
+    title: 'Portal release notes',
+    description: 'Customer-facing summary of what changed in v2.',
+    project: 'Customer Portal Revamp',
+    creator: 'daniel',
+    assignees: ['daniel', 'guest'],
+    status: 'To Do',
+    priority: 3,
+    created: -2,
+    deadline: 9,
+    updated: -2,
+    hours: 0,
+  },
+
+  /* ---- Warehouse Sensor Rollout ---- */
+  {
+    title: 'Install temperature sensors at Tuas warehouse',
+    description: '48 sensors across cold-chain bays, wired to the new LoRa gateways.',
+    project: 'Warehouse Sensor Rollout',
+    creator: 'daniel',
+    assignees: ['hannah', 'kavya', 'daniel'],
     status: 'Completed',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    project_name: 'Internal Analytics Dashboard',
-    deadline: new Date('2025-11-18T17:00:00+08:00'),
-    notes: 'Ensure drill-down for monthly and quarterly reports.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-26T09:30:00+08:00'),
-    updated_at: new Date('2025-10-27T11:45:00+08:00'), // Completed on Oct 27
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 40901,
+    priority: 8,
+    created: -63,
+    deadline: -40,
+    updated: -42,
+    hours: 40,
+    tags: ['Infra'],
   },
   {
-    title: 'Migrate docs to cloud platform',
-    description: 'Move legacy files and folders to new cloud solution.',
-    priority_bucket: 6,
-    status: 'In Progress',
-    creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
-    project_name: 'Cloud Doc Management',
-    deadline: new Date('2025-10-29T17:00:00+08:00'), // Due tomorrow for reminder test
-    notes: 'Maintain folder structure and access control.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-15T11:00:00+08:00'),
-    updated_at: new Date('2025-10-27T15:30:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 22000,
-  },
-  {
-    title: 'Plan regional training sessions',
-    description: 'Schedule training for InCompletedsia and Malaysia offices.',
-    priority_bucket: 5,
-    status: 'To Do',
-    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
-    project_name: 'Regional Training Program',
-    deadline: new Date('2025-11-25T17:00:00+08:00'),
-    notes: 'Include onboarding for new cloud tools and workflows.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-27T09:00:00+08:00'),
-    updated_at: new Date('2025-10-27T09:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 0,
-  },
-  {
-    title: 'Automate invoice approval workflow',
-    description: 'Reduce manual approvals by integrating rules engine.',
-    priority_bucket: 8,
-    status: 'To Do',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    project_name: 'Workflow Automation Pilot',
-    deadline: new Date('2025-11-28T17:00:00+08:00'),
-    notes: 'Use test data from FY24 invoices.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-27T10:00:00+08:00'),
-    updated_at: new Date('2025-10-27T10:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 0,
-  },
-  {
-    title: 'Review FY25 revenue forecast',
-    description: 'Analyze projected revenues for SE Asia offices.',
-    priority_bucket: 9,
-    status: 'In Progress',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    project_name: 'FY25 Forecast Review',
-    deadline: new Date('2025-11-30T17:00:00+08:00'),
-    notes: 'Compare with previous 3 years of actuals.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-27T09:30:00+08:00'),
-    updated_at: new Date('2025-10-27T09:30:00+08:00'),
-    recurrence_interval: 1,
-    recurrence_date: new Date('2025-10-16T17:00:00+08:00'),
-    logged_time: 10900,
-  },
-  {
-    title: 'Implement login auth flow',
-    description: 'Add JWT-based login with Supabase auth.',
-    priority_bucket: 8,
-    status: 'In Progress',
-    creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    project_name: 'Workflow Automation Pilot',
-    deadline: new Date('2025-11-25T17:00:00+08:00'),
-    notes: 'Ensure refresh token handling.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-26T10:00:00+08:00'),
-    updated_at: new Date('2025-10-26T10:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 98080,
-  },
-  {
-    title: 'Setup CI/CD pipeline',
-    description: 'Automate deployments for staging & prod.',
-    priority_bucket: 7,
+    title: 'Calibrate sensor thresholds',
+    description: 'Set alert bands per bay using two weeks of baseline readings.',
+    project: 'Warehouse Sensor Rollout',
+    creator: 'hannah',
+    assignees: ['hannah', 'weijie'],
     status: 'Completed',
-    creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
-    project_name: 'Website Redesign',
-    deadline: new Date('2025-11-28T17:00:00+08:00'),
-    notes: 'Use GitHub Actions.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-26T12:00:00+08:00'),
-    updated_at: new Date('2025-10-27T09:15:00+08:00'), // Completed on Oct 27
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 30123,
+    priority: 6,
+    created: -45,
+    deadline: -35,
+    updated: -33.5,
+    hours: 9,
+    tags: ['Analytics'],
   },
   {
-    title: 'Create onboarding video',
-    description: 'Short video tutorial for new hires.',
-    priority_bucket: 6,
+    title: 'Sensor alert routing to on-call',
+    description: 'Route threshold breaches to the on-call rota with escalation.',
+    project: 'Warehouse Sensor Rollout',
+    creator: 'weijie',
+    assignees: ['weijie', 'omar'],
     status: 'In Progress',
-    creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    project_name: 'Client Onboarding Portal',
-    deadline: new Date('2025-11-27T17:00:00+08:00'),
-    notes: 'Include captions for APAC regions.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-27T09:00:00+08:00'),
-    updated_at: new Date('2025-10-27T09:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 2120,
+    priority: 8,
+    created: -30,
+    deadline: -3,
+    updated: -1,
+    hours: 16,
+    tags: ['Automation'],
   },
   {
-    title: 'Optimize dashboard queries',
-    description: 'Improve SQL performance for FY25 KPIs.',
-    priority_bucket: 9,
+    title: 'Replace faulty gateway in Bay 4',
+    description: 'Gateway drops packets above 30% humidity.',
+    notes: 'Blocked: vendor RMA approved, replacement unit not yet shipped.',
+    project: 'Warehouse Sensor Rollout',
+    creator: 'kavya',
+    assignees: ['kavya', 'daniel'],
+    status: 'Blocked',
+    priority: 9,
+    created: -14,
+    deadline: -2,
+    updated: -3,
+    hours: 3,
+    tags: ['Infra'],
+  },
+  {
+    title: 'Warehouse sensor rollout retrospective',
+    description: 'What went well, what to change before the Jurong site.',
+    project: 'Warehouse Sensor Rollout',
+    creator: 'daniel',
+    assignees: ['daniel', 'weijie', 'hannah'],
     status: 'To Do',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-11-30T17:00:00+08:00'),
-    notes: 'Add indexes on key tables.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-27T11:00:00+08:00'),
-    updated_at: new Date('2025-10-27T11:00:00+08:00'),
-    recurrence_interval: 7,
-    recurrence_date: new Date('2025-10-15T17:00:00+08:00'),
-    logged_time: 0,
+    priority: 3,
+    created: -6,
+    deadline: 18,
+    updated: -6,
+    hours: 0,
   },
   {
-    title: 'Design API for mobile app',
-    description: 'REST endpoints for tasks and projects.',
-    priority_bucket: 8,
-    status: 'In Progress',
-    creator_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // Ryan
-    project_name: 'Internal Analytics Dashboard',
-    deadline: new Date('2025-12-01T17:00:00+08:00'),
-    notes: 'Follow RESTful best practices.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-28T10:00:00+08:00'),
-    updated_at: new Date('2025-10-28T10:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 30120,
-  },
-  {
-    title: 'Conduct UX testing',
-    description: 'Gather feedback from 10 pilot users.',
-    priority_bucket: 5,
+    title: 'Evaluate second sensor vendor',
+    description: 'Price and battery-life comparison against the current vendor.',
+    notes: 'Archived: procurement chose to stay with the current vendor.',
+    project: 'Warehouse Sensor Rollout',
+    creator: 'daniel',
+    assignees: ['daniel', 'hannah'],
     status: 'To Do',
-    creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    project_name: 'Website Redesign',
-    deadline: new Date('2025-12-03T17:00:00+08:00'),
-    notes: 'Record issues in JIRA.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-28T09:00:00+08:00'),
-    updated_at: new Date('2025-10-28T09:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 0,
+    priority: 3,
+    created: -61,
+    deadline: -45,
+    updated: -50,
+    hours: 2,
+    archived: true,
   },
+
+  /* ---- Field Service Mobile App ---- */
   {
-    title: 'Update project documentation',
-    description: 'Ensure docs match latest process changes.',
-    priority_bucket: 6,
+    title: 'Offline job sheet sync',
+    description: 'Technicians can complete job sheets with no signal; sync on reconnect.',
+    project: 'Field Service Mobile App',
+    creator: 'marcus',
+    assignees: ['sofia', 'daniel'],
     status: 'In Progress',
-    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
-    project_name: 'Digital Collaboration Rollout',
-    deadline: new Date('2025-12-05T17:00:00+08:00'),
-    notes: 'Use Confluence; tag owners.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-28T11:00:00+08:00'),
-    updated_at: new Date('2025-10-28T11:00:00+08:00'),
-    recurrence_interval: 14,
-    recurrence_date: new Date('2025-11-20T17:00:00+08:00'),
-    logged_time: 1390,
+    priority: 8,
+    created: -48,
+    deadline: -10,
+    updated: -2,
+    hours: 28,
+    tags: ['Infra'],
   },
   {
-    title: 'Refactor data pipelines',
-    description: 'Improve ETL reliability and logging.',
-    priority_bucket: 7,
+    title: 'Technician photo upload',
+    description: 'Compress and attach before/after photos to each job.',
+    project: 'Field Service Mobile App',
+    creator: 'sofia',
+    assignees: ['sofia', 'weijie'],
     status: 'Completed',
-    creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
-    project_name: 'Data Warehouse Lift',
-    deadline: new Date('2025-12-07T17:00:00+08:00'),
-    notes: 'Add retry logic; monitor failed batches.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-12T09:30:00+08:00'),
-    updated_at: new Date('2025-10-26T15:20:00+08:00'), // Completed on Oct 26
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 42180,
+    priority: 6,
+    created: -42,
+    deadline: -25,
+    updated: -24.7,
+    hours: 12,
   },
   {
-    title: 'Prepare finance report',
-    description: 'Consolidate monthly expenses and revenue.',
-    priority_bucket: 9,
+    title: 'Push notifications for job changes',
+    description: 'Notify technicians when a job is reassigned or rescheduled.',
+    project: 'Field Service Mobile App',
+    creator: 'marcus',
+    assignees: ['marcus', 'weijie'],
+    status: 'To Do',
+    priority: 5,
+    created: -21,
+    deadline: 15,
+    updated: -21,
+    hours: 0,
+  },
+  {
+    title: 'Field app beta feedback triage',
+    description: 'Sort the 60 beta reports into bugs, quick wins and backlog.',
+    project: 'Field Service Mobile App',
+    creator: 'daniel',
+    assignees: ['daniel', 'omar'],
     status: 'In Progress',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-12-10T17:00:00+08:00'),
-    notes: 'Send PDF to CFO.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-30T10:00:00+08:00'),
-    updated_at: new Date('2025-10-30T10:00:00+08:00'),
-    recurrence_interval: 30,
-    recurrence_date: new Date('2025-11-10T17:00:00+08:00'),
-    logged_time: 41230,
+    priority: 4,
+    created: -12,
+    deadline: 2,
+    updated: -1,
+    hours: 5,
   },
   {
-    title: 'Setup analytics dashboards',
-    description: 'Create dashboards for all business units.',
-    priority_bucket: 8,
+    title: 'App store listing copy',
+    description: 'Short description, screenshots and privacy labels.',
+    project: 'Field Service Mobile App',
+    creator: 'marcus',
+    assignees: ['ethan', 'daniel'],
+    status: 'Completed',
+    priority: 2,
+    created: -35,
+    deadline: null,
+    updated: -28,
+    hours: 2,
+  },
+
+  /* ---- Data Platform Migration ---- */
+  {
+    title: 'Migrate nightly ETL to managed Postgres',
+    description: 'Move the 14 nightly jobs off the on-prem server.',
+    project: 'Data Platform Migration',
+    creator: 'marcus',
+    assignees: ['marcus', 'ethan', 'weijie'],
+    status: 'Completed',
+    priority: 9,
+    created: -70,
+    deadline: -45,
+    updated: -49,
+    hours: 52,
+    tags: ['Infra', 'Reporting'],
+  },
+  {
+    title: 'Backfill historical orders table',
+    description: 'Load 2019-2024 orders and reconcile row counts.',
+    project: 'Data Platform Migration',
+    creator: 'ethan',
+    assignees: ['ethan', 'weijie'],
+    status: 'Completed',
+    priority: 7,
+    created: -55,
+    deadline: -38,
+    updated: -36,
+    hours: 18,
+    parent: 'Migrate nightly ETL to managed Postgres',
+  },
+  {
+    title: 'Retire on-prem reporting server',
+    description: 'Decommission after two clean weeks on the new platform.',
+    project: 'Data Platform Migration',
+    creator: 'weijie',
+    assignees: ['weijie', 'ethan'],
+    status: 'To Do',
+    priority: 6,
+    created: -25,
+    deadline: -1,
+    updated: -25,
+    hours: 1,
+    tags: ['Infra'],
+  },
+  {
+    title: 'Data quality checks for finance marts',
+    description: 'Null, duplicate and freshness checks on the GL and AR marts.',
+    project: 'Data Platform Migration',
+    creator: 'priya',
+    assignees: ['weijie', 'aisha'],
     status: 'In Progress',
-    creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    project_name: 'Internal Analytics Dashboard',
-    deadline: new Date('2025-12-12T17:00:00+08:00'),
-    notes: 'Integrate with accounting and CRM systems.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-11-01T09:00:00+08:00'),
-    updated_at: new Date('2025-11-01T09:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 52120,
+    priority: 7,
+    created: -28,
+    deadline: 5,
+    updated: -3,
+    hours: 10,
+    tags: ['Reporting', 'Analytics'],
   },
   {
-    title: 'Write unit tests for auth module',
-    description: 'Achieve 85% code coverage for authentication flows.',
-    priority_bucket: 7,
+    title: 'Document data platform access policy',
+    description: 'Who can query what, and how to request access.',
+    project: 'Data Platform Migration',
+    creator: 'daniel',
+    assignees: ['daniel'],
+    status: 'Completed',
+    priority: 3,
+    created: -33,
+    deadline: null,
+    updated: -31,
+    hours: 1.5,
+    tags: ['Security'],
+  },
+  {
+    title: 'Quarterly access review',
+    description: 'Confirm every data platform account still needs its access.',
+    project: 'Data Platform Migration',
+    creator: 'weijie',
+    assignees: ['weijie', 'guest'],
     status: 'In Progress',
-    creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    project_name: 'Workflow Automation Pilot',
-    deadline: (() => {
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      d.setHours(17, 0, 0, 0);
-      return d;
-    })(), // Yesterday at 5 PM SGT
-    notes: 'Use Jest + React Testing Library; mock Supabase client.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-09-30T14:00:00+08:00'),
-    updated_at: new Date('2025-09-30T14:00:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 5400,
+    priority: 6,
+    created: -11,
+    deadline: 1,
+    updated: -1,
+    hours: 3,
+    tags: ['Security'],
+  },
+
+  /* ---- Office Network Refresh ---- */
+  {
+    title: 'Replace office Wi-Fi access points',
+    description: 'Swap 12 ageing access points for Wi-Fi 6E units.',
+    project: 'Office Network Refresh',
+    creator: 'daniel',
+    assignees: ['kavya', 'daniel'],
+    status: 'Completed',
+    priority: 5,
+    created: -58,
+    deadline: -50,
+    updated: -46,
+    hours: 15,
+    tags: ['Infra'],
   },
   {
-    title: 'Review and merge pending PRs',
-    description: 'Review 4 open pull requests from team members.',
-    priority_bucket: 8,
+    title: 'Firewall rule review',
+    description: 'Remove stale rules and document the rest.',
+    project: 'Office Network Refresh',
+    creator: 'weijie',
+    assignees: ['weijie', 'hannah'],
+    status: 'Completed',
+    priority: 7,
+    created: -38,
+    deadline: -30,
+    updated: -31.5,
+    hours: 6,
+    tags: ['Security'],
+  },
+  {
+    title: 'Monthly patch rollout',
+    description: 'Apply OS and firmware patches to office and warehouse devices.',
+    project: 'Office Network Refresh',
+    creator: 'weijie',
+    assignees: ['weijie', 'kavya'],
     status: 'To Do',
-    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    project_name: 'Website Redesign',
-    deadline: (() => {
-      const d = new Date();
-      d.setHours(17, 0, 0, 0);
-      return d;
-    })(), // Today at 5 PM SGT
-    notes: 'Check code quality, test coverage, and documentation.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-01T09:30:00+08:00'),
-    updated_at: new Date('2025-10-01T09:30:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 0,
+    priority: 6,
+    created: -40,
+    deadline: 6,
+    updated: -10,
+    hours: 4,
+    recurrence: 30,
+    tags: ['Recurring', 'Security'],
   },
   {
-    title: 'Deploy staging environment for QA',
-    description: 'Build and deploy latest code to staging for quality assurance testing.',
-    priority_bucket: 9,
+    title: 'Daily backup verification',
+    description: 'Check last night backups completed and test-restore one file.',
+    project: 'Office Network Refresh',
+    creator: 'daniel',
+    assignees: ['kavya', 'daniel'],
+    status: 'In Progress',
+    priority: 5,
+    created: -60,
+    deadline: 1,
+    updated: -1,
+    hours: 20,
+    recurrence: 1,
+    tags: ['Recurring', 'Infra'],
+  },
+  {
+    title: 'Weekly infra standup',
+    description: '30 minutes: incidents, changes this week, blockers.',
+    project: 'Office Network Refresh',
+    creator: 'daniel',
+    assignees: ['daniel', 'weijie', 'hannah', 'kavya'],
     status: 'To Do',
-    creator_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    project_name: 'Digital Collaboration Rollout',
-    deadline: (() => {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      d.setHours(17, 0, 0, 0);
-      return d;
-    })(), // Tomorrow at 5 PM SGT
-    notes: 'Run smoke tests; document any breaking changes.',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-01T10:15:00+08:00'),
-    updated_at: new Date('2025-10-01T10:15:00+08:00'),
-    recurrence_interval: 0,
-    recurrence_date: null,
-    logged_time: 0,
+    priority: 4,
+    created: -65,
+    deadline: 3,
+    updated: -4,
+    hours: 13,
+    recurrence: 7,
+    tags: ['Recurring'],
   },
-  // ========== RECURRING TASKS FOR TESTING ==========
   {
-    title: 'Daily Standup Meeting',
-    description: 'Daily team sync-up meeting notes',
-    priority_bucket: 6,
+    title: 'Rotate service account credentials',
+    description: 'Rotate keys for the backup, monitoring and ETL service accounts.',
+    project: 'Office Network Refresh',
+    creator: 'hannah',
+    assignees: ['hannah', 'weijie'],
     status: 'To Do',
-    creator_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    project_name: 'Website Redesign',
-    deadline: new Date('2024-09-29T10:00:00+08:00'), // Past deadline - will be overdue
-    notes: 'Recurring daily standup',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2024-09-20T09:00:00+08:00'),
-    updated_at: new Date('2024-09-20T09:00:00+08:00'),
-    recurrence_interval: 1, // Daily (1 day)
-    recurrence_date: null,
-    logged_time: 0,
+    priority: 8,
+    created: -3,
+    deadline: 2,
+    updated: -3,
+    hours: 0,
+    tags: ['Security'],
   },
   {
-    title: 'Weekly Sprint Planning',
-    description: 'Plan next week sprint goals and tasks',
-    priority_bucket: 8,
+    title: 'Network cabinet labelling',
+    description: 'Label patch panels on levels 3 and 4.',
+    project: 'Office Network Refresh',
+    creator: 'kavya',
+    assignees: ['kavya', 'guest'],
     status: 'To Do',
-    creator_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    project_name: 'Client Onboarding Portal',
-    deadline: new Date('2025-11-10T14:00:00+08:00'), // Future deadline
-    notes: 'Every Monday sprint planning',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-11-03T10:00:00+08:00'),
-    updated_at: new Date('2025-11-03T10:00:00+08:00'),
-    recurrence_interval: 7, // Weekly (7 days)
-    recurrence_date: null,
-    logged_time: 0,
+    priority: 2,
+    created: -4,
+    deadline: null,
+    updated: -4,
+    hours: 0,
   },
   {
-    title: 'Monthly Financial Report',
-    description: 'Generate and submit monthly financial summary',
-    priority_bucket: 9,
+    title: 'Onboard new junior engineer',
+    description: 'Laptop, accounts, buddy and a first-week plan.',
+    project: 'Office Network Refresh',
+    creator: 'daniel',
+    assignees: ['daniel', 'kavya'],
+    status: 'Completed',
+    priority: 4,
+    created: -26,
+    deadline: -19,
+    updated: -20,
+    hours: 5,
+    tags: ['Onboarding'],
+  },
+
+  /* ---- FY26 Budget Planning ---- */
+  {
+    title: 'FY26 budget submission',
+    description: 'Consolidated FY26 operating and capex budget for board approval.',
+    project: 'FY26 Budget Planning',
+    creator: 'priya',
+    assignees: ['priya', 'aisha', 'ryan'],
+    status: 'In Progress',
+    priority: 9,
+    created: -50,
+    deadline: 20,
+    updated: -2,
+    hours: 30,
+    tags: ['Budget'],
+  },
+  {
+    title: 'Collect department budget requests',
+    description: 'Template out to every director; chase missing submissions.',
+    project: 'FY26 Budget Planning',
+    creator: 'aisha',
+    assignees: ['aisha', 'farah', 'daniel'],
+    status: 'Completed',
+    priority: 7,
+    created: -48,
+    deadline: -30,
+    updated: -32,
+    hours: 12,
+    parent: 'FY26 budget submission',
+    tags: ['Budget'],
+  },
+  {
+    title: 'Engineering Ops capex estimate',
+    description: 'Sensors, network and laptop refresh for FY26.',
+    project: 'FY26 Budget Planning',
+    creator: 'daniel',
+    assignees: ['daniel', 'weijie', 'ryan'],
+    status: 'Completed',
+    priority: 8,
+    created: -40,
+    deadline: -26,
+    updated: -23,
+    hours: 8,
+    parent: 'FY26 budget submission',
+    tags: ['Budget'],
+  },
+  {
+    title: 'Headcount plan review',
+    description: 'Check FY26 hiring plan against the salary budget.',
+    project: 'FY26 Budget Planning',
+    creator: 'ryan',
+    assignees: ['ryan', 'priya'],
     status: 'To Do',
-    creator_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    project_name: 'Annual Budget FY25',
-    deadline: new Date('2025-11-30T17:00:00+08:00'),
-    notes: 'Include budget variance analysis',
-    parent_task_external_key: null,
-    is_archived: false,
-    created_at: new Date('2025-10-30T09:00:00+08:00'),
-    updated_at: new Date('2025-10-30T09:00:00+08:00'),
-    recurrence_interval: 30, // Monthly (30 days)
-    recurrence_date: null,
-    logged_time: 0,
+    priority: 6,
+    created: -15,
+    deadline: 10,
+    updated: -15,
+    hours: 0,
+    parent: 'FY26 budget submission',
+    tags: ['Budget'],
+  },
+  {
+    title: 'Board budget presentation deck',
+    description: '12 slides: headline numbers, risks, asks.',
+    project: 'FY26 Budget Planning',
+    creator: 'priya',
+    assignees: ['priya', 'aisha'],
+    status: 'To Do',
+    priority: 7,
+    created: -7,
+    deadline: 21,
+    updated: -7,
+    hours: 0,
+    tags: ['Budget', 'Reporting'],
+  },
+  {
+    title: 'Weekly finance sync',
+    description: 'Cash position, close progress and open approvals.',
+    project: 'FY26 Budget Planning',
+    creator: 'priya',
+    assignees: ['priya', 'aisha', 'ryan', 'farah'],
+    status: 'To Do',
+    priority: 3,
+    created: -60,
+    deadline: 2,
+    updated: -5,
+    hours: 10,
+    recurrence: 7,
+    tags: ['Recurring'],
   },
 
-];
+  /* ---- Q3 Financial Close ---- */
+  {
+    title: 'Q3 accruals reconciliation',
+    description: 'Reconcile accrued expenses against received invoices.',
+    project: 'Q3 Financial Close',
+    creator: 'aisha',
+    assignees: ['aisha', 'farah'],
+    status: 'Completed',
+    priority: 8,
+    created: -30,
+    deadline: -12,
+    updated: -13,
+    hours: 14,
+    tags: ['Reporting'],
+  },
+  {
+    title: 'Intercompany invoice matching',
+    description: 'Match SG and MY entity invoices before consolidation.',
+    project: 'Q3 Financial Close',
+    creator: 'farah',
+    assignees: ['farah', 'ryan'],
+    status: 'Completed',
+    priority: 6,
+    created: -28,
+    deadline: -14,
+    updated: -9,
+    hours: 19,
+  },
+  {
+    title: 'Q3 management report',
+    description: 'P&L commentary and KPI pack for the leadership team.',
+    project: 'Q3 Financial Close',
+    creator: 'priya',
+    assignees: ['priya', 'ryan', 'aisha'],
+    status: 'In Progress',
+    priority: 9,
+    created: -16,
+    deadline: -4,
+    updated: -1,
+    hours: 9,
+    tags: ['Reporting'],
+  },
+  {
+    title: 'Monthly expense report',
+    description: 'Department spend vs budget, sent to directors.',
+    project: 'Q3 Financial Close',
+    creator: 'ryan',
+    assignees: ['ryan', 'farah'],
+    status: 'To Do',
+    priority: 5,
+    created: -45,
+    deadline: 16,
+    updated: -15,
+    hours: 6,
+    recurrence: 30,
+    tags: ['Recurring', 'Budget'],
+  },
+  {
+    title: 'Fixed asset register update',
+    description: 'Add Q3 equipment purchases and disposals.',
+    notes: 'Blocked: waiting for the Engineering Ops asset list.',
+    project: 'Q3 Financial Close',
+    creator: 'farah',
+    assignees: ['farah', 'weijie'],
+    status: 'Blocked',
+    priority: 4,
+    created: -10,
+    deadline: 3,
+    updated: -5,
+    hours: 2,
+  },
 
-/* ======================== TASK TAGS ======================== */
-export const task_tags = [
-  { task_title: 'Design budget dashboard layout', tag_name: 'Budget' },
-  { task_title: 'Design budget dashboard layout', tag_name: 'Design' },
-  { task_title: 'Implement task board drag/drop', tag_name: 'Design' },
-  { task_title: 'Connect sales data source', tag_name: 'Infra' },
-  { task_title: 'Connect sales data source', tag_name: 'Reporting' },
-  { task_title: 'Roll out collaboration tools to SG office', tag_name: 'Collaboration' },
-  { task_title: 'Design client onboarding forms', tag_name: 'Onboarding' },
-  { task_title: 'Develop finance KPIs for dashboard', tag_name: 'Analytics' },
-  { task_title: 'Migrate docs to cloud platform', tag_name: 'Infra' },
-  { task_title: 'Plan regional training sessions', tag_name: 'Onboarding' },
-  { task_title: 'Automate invoice approval workflow', tag_name: 'Automation' },
-  { task_title: 'Review FY25 revenue forecast', tag_name: 'Budget' },
-  { task_title: 'Implement login auth flow', tag_name: 'Infra' },
-  { task_title: 'Setup CI/CD pipeline', tag_name: 'Infra' },
-  { task_title: 'Setup CI/CD pipeline', tag_name: 'Automation' },
-  { task_title: 'Create onboarding video', tag_name: 'Onboarding' },
-  { task_title: 'Optimize dashboard queries', tag_name: 'Budget' },
-  { task_title: 'Optimize dashboard queries', tag_name: 'Analytics' },
-  { task_title: 'Design API for mobile app', tag_name: 'Design' },
-  { task_title: 'Conduct UX testing', tag_name: 'Design' },
-  { task_title: 'Update project documentation', tag_name: 'Collaboration' },
-  { task_title: 'Refactor data pipelines', tag_name: 'Infra' },
-  { task_title: 'Refactor data pipelines', tag_name: 'Automation' },
-  { task_title: 'Prepare finance report', tag_name: 'Budget' },
-  { task_title: 'Prepare finance report', tag_name: 'Reporting' },
-  { task_title: 'Setup analytics dashboards', tag_name: 'Analytics' },
-  { task_title: 'Setup analytics dashboards', tag_name: 'Reporting' },
-  // ========== RECURRING TASK TAGS ==========
-  { task_title: 'Daily Standup Meeting', tag_name: 'Recurring' },
-  { task_title: 'Weekly Sprint Planning', tag_name: 'Recurring' },
-  { task_title: 'Monthly Financial Report', tag_name: 'Recurring' },
-  { task_title: 'Monthly Financial Report', tag_name: 'Budget' },
-];
+  /* ---- Vendor Onboarding Automation ---- */
+  {
+    title: 'Vendor onboarding workflow design',
+    description: 'Map the current 9-step email process and design the new flow.',
+    project: 'Vendor Onboarding Automation',
+    creator: 'priya',
+    assignees: ['priya', 'daniel'],
+    status: 'Completed',
+    priority: 7,
+    created: -56,
+    deadline: -42,
+    updated: -43,
+    hours: 10,
+    tags: ['Automation'],
+  },
+  {
+    title: 'Automate vendor bank detail verification',
+    description: 'Penny-test new bank details and flag mismatches for review.',
+    project: 'Vendor Onboarding Automation',
+    creator: 'daniel',
+    assignees: ['weijie', 'farah'],
+    status: 'In Progress',
+    priority: 8,
+    created: -35,
+    deadline: -6,
+    updated: -2,
+    hours: 21,
+    tags: ['Automation', 'Security'],
+  },
+  {
+    title: 'Vendor portal e-signature integration',
+    description: 'Vendors sign the master agreement inside the portal.',
+    project: 'Vendor Onboarding Automation',
+    creator: 'marcus',
+    assignees: ['sofia', 'weijie'],
+    status: 'To Do',
+    priority: 6,
+    created: -8,
+    deadline: 13,
+    updated: -8,
+    hours: 0,
+  },
+  {
+    title: 'Vendor master data cleanup',
+    description: 'Merge duplicate vendors and close dormant accounts.',
+    project: 'Vendor Onboarding Automation',
+    creator: 'ryan',
+    assignees: ['ryan', 'farah'],
+    status: 'Completed',
+    priority: 5,
+    created: -24,
+    deadline: null,
+    updated: -19,
+    hours: 7,
+  },
 
-/* ======================== ASSIGNMENTS (<=5 per task enforced in DB) ======================== */
-export const task_assignments = [
+  /* ---- Support Desk Playbook ---- */
   {
-    task_title: 'Design budget dashboard layout',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-19T10:20:00+08:00'),
+    title: 'Draft L1 support playbook',
+    description: 'Top 20 ticket types with first-response steps.',
+    project: 'Support Desk Playbook',
+    creator: 'marcus',
+    assignees: ['omar', 'ethan'],
+    status: 'Completed',
+    priority: 5,
+    created: -52,
+    deadline: -36,
+    updated: -38,
+    hours: 9,
+    tags: ['Onboarding'],
   },
   {
-    task_title: 'Design budget dashboard layout',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel self-assign to help
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    created_at: new Date('2025-09-19T10:25:00+08:00'),
+    title: 'Escalation matrix for field incidents',
+    description: 'Who to call, by severity and time of day.',
+    project: 'Support Desk Playbook',
+    creator: 'omar',
+    assignees: ['omar', 'daniel'],
+    status: 'In Progress',
+    priority: 6,
+    created: -20,
+    deadline: 8,
+    updated: -3,
+    hours: 4,
   },
   {
-    task_title: 'Implement task board drag/drop',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-19T10:22:00+08:00'),
+    title: 'Support macros for portal launch',
+    description: 'Canned replies for the expected launch-week questions.',
+    project: 'Support Desk Playbook',
+    creator: 'ethan',
+    assignees: ['omar', 'ethan'],
+    status: 'To Do',
+    priority: 4,
+    created: -5,
+    deadline: 11,
+    updated: -5,
+    hours: 0,
+  },
+
+  /* ---- Legacy CRM Decommission (archived project) ---- */
+  {
+    title: 'Export legacy CRM contacts',
+    description: 'Full export with consent flags for the new CRM import.',
+    project: 'Legacy CRM Decommission',
+    creator: 'marcus',
+    assignees: ['ethan', 'weijie'],
+    status: 'Completed',
+    priority: 6,
+    created: -72,
+    deadline: -60,
+    updated: -61,
+    hours: 8,
+    archived: true,
   },
   {
-    task_title: 'Implement task board drag/drop',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-19T10:23:00+08:00'),
-  },
-  {
-    task_title: 'Connect sales data source',
-    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    created_at: new Date('2025-09-20T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Connect sales data source',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    created_at: new Date('2025-09-20T09:06:00+08:00'),
-  },
-  {
-    task_title: 'Roll out collaboration tools to SG office',
-    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // self-assign
-    created_at: new Date('2025-09-21T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Roll out collaboration tools to SG office',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    created_at: new Date('2025-09-21T09:06:00+08:00'),
-  },
-  {
-    task_title: 'Design client onboarding forms',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-22T10:05:00+08:00'),
-  },
-  {
-    task_title: 'Design client onboarding forms',
-    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-22T10:06:00+08:00'),
-  },
-  {
-    task_title: 'Develop finance KPIs for dashboard',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-23T09:35:00+08:00'),
-  },
-  {
-    task_title: 'Develop finance KPIs for dashboard',
-    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-23T09:36:00+08:00'),
-  },
-  {
-    task_title: 'Migrate docs to cloud platform',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // self-assign
-    created_at: new Date('2025-09-23T11:05:00+08:00'),
-  },
-  {
-    task_title: 'Migrate docs to cloud platform',
-    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    created_at: new Date('2025-09-23T11:05:00+08:00'),
-  },
-  {
-    task_title: 'Plan regional training sessions',
-    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // self-assign
-    created_at: new Date('2025-09-24T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Plan regional training sessions',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    created_at: new Date('2025-09-24T09:06:00+08:00'),
-  },
-  {
-    task_title: 'Automate invoice approval workflow',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-24T10:05:00+08:00'),
-  },
-  {
-    task_title: 'Automate invoice approval workflow',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-24T10:06:00+08:00'),
-  },
-  {
-    task_title: 'Review FY25 revenue forecast',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-25T09:35:00+08:00'),
-  },
-  {
-    task_title: 'Review FY25 revenue forecast',
-    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-25T09:36:00+08:00'),
-  },
-  {
-    task_title: 'Implement login auth flow',
-    assignee_id: 'aa344933-c44b-4097-b0ac-56987a10734b', // Mitch (personal)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-25T10:05:00+08:00'),
-  },
-  {
-    task_title: 'Implement login auth flow',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-25T10:06:00+08:00'),
-  },
-  {
-    task_title: 'Setup CI/CD pipeline',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // self-assign
-    created_at: new Date('2025-09-25T12:05:00+08:00'),
-  },
-  {
-    task_title: 'Setup CI/CD pipeline',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    created_at: new Date('2025-09-25T12:06:00+08:00'),
-  },
-  {
-    task_title: 'Create onboarding video',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-26T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Create onboarding video',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-26T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Optimize dashboard queries',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-26T11:05:00+08:00'),
-  },
-  {
-    task_title: 'Optimize dashboard queries',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-26T11:06:00+08:00'),
-  },
-  {
-    task_title: 'Design API for mobile app',
-    assignee_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // Ryan (personal)
-    assignor_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // self-assign
-    created_at: new Date('2025-09-27T10:05:00+08:00'),
-  },
-  {
-    task_title: 'Design API for mobile app',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b', // Ryan (personal)
-    created_at: new Date('2025-09-27T10:05:00+08:00'),
-  },
-  {
-    task_title: 'Conduct UX testing',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // self-assign
-    created_at: new Date('2025-09-28T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Conduct UX testing',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-09-28T09:06:00+08:00'),
-  },
-  {
-    task_title: 'Update project documentation',
-    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // self-assign
-    created_at: new Date('2025-09-28T11:05:00+08:00'),
-  },
-  {
-    task_title: 'Update project documentation',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    created_at: new Date('2025-09-28T11:06:00+08:00'),
-  },
-  {
-    task_title: 'Refactor data pipelines',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // self-assign
-    created_at: new Date('2025-09-29T09:35:00+08:00'),
-  },
-  {
-    task_title: 'Refactor data pipelines',
-    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    created_at: new Date('2025-09-29T09:35:00+08:00'),
-  },
-  {
-    task_title: 'Prepare finance report',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // self-assign
-    created_at: new Date('2025-09-30T10:05:00+08:00'),
-  },
-  {
-    task_title: 'Prepare finance report',
-    assignee_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-30T10:05:00+08:00'),
-  },
-  {
-    task_title: 'Setup analytics dashboards',
-    assignee_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // self-assign
-    created_at: new Date('2025-10-01T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Setup analytics dashboards',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    created_at: new Date('2025-10-01T09:05:00+08:00'),
-  },
-  {
-    task_title: 'Write unit tests for auth module',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-09-30T14:05:00+08:00'),
-  },
-  {
-    task_title: 'Review and merge pending PRs',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-10-01T09:35:00+08:00'),
-  },
-  {
-    task_title: 'Deploy staging environment for QA',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    created_at: new Date('2025-10-01T10:20:00+08:00'),
-  },
-  // ========== RECURRING TASK ASSIGNMENTS ==========
-  {
-    task_title: 'Daily Standup Meeting',
-    assignee_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    assignor_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Self-assigned
-    created_at: new Date('2024-09-20T09:00:00+08:00'),
-  },
-  {
-    task_title: 'Weekly Sprint Planning',
-    assignee_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    assignor_id: '32635261-038c-4405-b6ed-2d446738f94c', // Self-assigned
-    created_at: new Date('2025-11-03T10:00:00+08:00'),
-  },
-  {
-    task_title: 'Monthly Financial Report',
-    assignee_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    assignor_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Self-assigned
-    created_at: new Date('2025-10-30T09:00:00+08:00'),
+    title: 'Shut down legacy CRM servers',
+    description: 'Power off, wipe disks, return the rack space.',
+    project: 'Legacy CRM Decommission',
+    creator: 'weijie',
+    assignees: ['weijie'],
+    status: 'Completed',
+    priority: 5,
+    created: -64,
+    deadline: -55,
+    updated: -54,
+    hours: 3,
+    archived: true,
   },
 ];
 
-/* ======================== ATTACHMENTS (paths only; files not uploaded by seed) ======================== */
-export const task_attachments = [
-  {
-    task_title: 'Design budget dashboard layout',
-    storage_path: 'design_doc.pdf',
-    uploaded_by: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    uploaded_at: new Date('2025-09-19T10:30:00+08:00'),
-  },
-  {
-    task_title: 'Design budget dashboard layout',
-    storage_path: 'wireframe.png',
-    uploaded_by: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    uploaded_at: new Date('2025-09-19T11:10:00+08:00'),
-  },
-  {
-    task_title: 'Connect sales data source',
-    storage_path: 'etl_mapping.xlsx',
-    uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison (SMU)
-    uploaded_at: new Date('2025-09-20T09:30:00+08:00'),
-  },
-  {
-    task_title: 'Roll out collaboration tools to SG office',
-    storage_path: 'TEST FILE.pdf',
-    uploaded_by: '32635261-038c-4405-b6ed-2d446738f94c',
-    uploaded_at: new Date('2025-09-21T09:15:00+08:00'),
-  },
-  {
-    task_title: 'Design client onboarding forms',
-    storage_path: 'onboarding_forms.xlsx',
-    uploaded_by: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    uploaded_at: new Date('2025-09-22T10:15:00+08:00'),
-  },
+interface CommentSpec {
+  task: string;
+  by: PersonaKey;
+  at: number;
+  text: string;
+}
+
+const COMMENTS: CommentSpec[] = [
+  { task: 'Customer portal v2 launch', by: 'daniel', at: -60, text: 'Kick-off done. Target is a soft launch to the three pilot customers first.' },
+  { task: 'Customer portal v2 launch', by: 'sofia', at: -21, text: 'Settings pages are merged. Invoices view is next.' },
+  { task: 'Customer portal v2 launch', by: 'weijie', at: -4, text: 'SSO is the only thing on the critical path now. Everything else is on track.' },
+  { task: 'Customer portal v2 launch', by: 'daniel', at: -1, text: 'Agreed. If certificates are not in by Friday we launch with password login and switch SSO on later.' },
+  { task: 'Integrate SSO with customer directory', by: 'marcus', at: -9, text: 'Pilot customer A sent metadata, still waiting on B and C.' },
+  { task: 'Integrate SSO with customer directory', by: 'weijie', at: -6, text: 'Marking as blocked until we have all three certificates.' },
+  { task: 'Portal accessibility audit', by: 'hannah', at: -2, text: 'Login and dashboard pass. Invoice table needs proper header cells.' },
+  { task: 'Sensor alert routing to on-call', by: 'omar', at: -5, text: 'On-call rota is in the paging tool now, you can point the webhook at it.' },
+  { task: 'Sensor alert routing to on-call', by: 'weijie', at: -1, text: 'Escalation works in staging. Testing the night-shift path tomorrow.' },
+  { task: 'Replace faulty gateway in Bay 4', by: 'kavya', at: -3, text: 'Vendor confirmed the RMA. Moving Bay 4 sensors to the Bay 3 gateway in the meantime.' },
+  { task: 'Install temperature sensors at Tuas warehouse', by: 'hannah', at: -44, text: 'All 48 sensors reporting. Two needed new batteries out of the box.' },
+  { task: 'Offline job sheet sync', by: 'sofia', at: -12, text: 'Conflict resolution is harder than expected when two technicians edit the same job.' },
+  { task: 'Offline job sheet sync', by: 'daniel', at: -2, text: "Last-write-wins per field is fine for the beta. Let's not over-engineer it." },
+  { task: 'Field app beta feedback triage', by: 'omar', at: -1, text: '41 of 60 sorted. Most common issue is the photo upload on older Android phones.' },
+  { task: 'Migrate nightly ETL to managed Postgres', by: 'ethan', at: -50, text: 'All 14 jobs green for five nights in a row.' },
+  { task: 'Data quality checks for finance marts', by: 'aisha', at: -3, text: 'Freshness check flagged the AR mart twice this week. Can we look at the load window?' },
+  { task: 'Data quality checks for finance marts', by: 'weijie', at: -3, text: 'The AR extract runs after the check. Moving the check to 06:30.' },
+  { task: 'FY26 budget submission', by: 'priya', at: -10, text: 'All departments except Sales have submitted.' },
+  { task: 'FY26 budget submission', by: 'ryan', at: -2, text: 'Consolidated draft is in the shared folder. Capex is 8% over the guideline.' },
+  { task: 'Engineering Ops capex estimate', by: 'daniel', at: -24, text: 'Attached the estimate. The sensor line can move to H2 if we need to cut.' },
+  { task: 'Q3 management report', by: 'priya', at: -2, text: 'Need the intercompany numbers before I can finish the commentary.' },
+  { task: 'Q3 management report', by: 'ryan', at: -1, text: 'Intercompany is done, numbers are in the pack.' },
+  { task: 'Automate vendor bank detail verification', by: 'farah', at: -7, text: 'Finance needs a manual override for vendors with no local bank account.' },
+  { task: 'Automate vendor bank detail verification', by: 'weijie', at: -2, text: 'Override added behind the approver role. Ready for UAT.' },
+  { task: 'Fixed asset register update', by: 'farah', at: -5, text: 'Waiting on the asset list from Engineering Ops.' },
+  { task: 'Escalation matrix for field incidents', by: 'daniel', at: -3, text: 'Add the warehouse duty manager for anything temperature related.' },
+  { task: 'Monthly patch rollout', by: 'kavya', at: -10, text: 'Last month went cleanly. Two laptops needed a second reboot.' },
 ];
 
-/* ======================== NOTIFICATIONS ======================== */
-export const notifications = [
-  {
-    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    title: 'New Task Assignment',
-    message: 'You have been assigned to "Implement task board drag/drop".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-19T10:22:05+08:00'),
-    updated_at: new Date('2025-09-19T10:22:05+08:00'),
-  },
-  {
-    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    title: 'Test Notification for Archive',
-    message: 'This notification will be archived during the test flow.',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-19T10:00:00+08:00'),
-    updated_at: new Date('2025-09-19T10:00:00+08:00'),
-  },
-  // Group 1: Comment Notifications (4)
-  {
-    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    title: 'New Comment',
-    message: 'Ryan commented on "Design budget dashboard layout": "Add KPI tiles (spend, forecast, burn rate)."',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-19T10:40:05+08:00'),
-    updated_at: new Date('2025-09-19T10:40:05+08:00'),
-  },
-  {
-    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    title: 'New Comment',
-    message: 'Kester commented on "Refactor data pipelines": "Added retry logic with exponential backoff."',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-10-26T15:15:05+08:00'),
-    updated_at: new Date('2025-10-26T15:15:05+08:00'),
-  },
-  {
-    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    title: 'New Comment',
-    message: 'Joel commented on "Create onboarding video": "Should we include a section on regional compliance requirements?"',
-    type: 'task_updated',
-    read: true,
-    is_archived: false,
-    created_at: new Date('2025-09-27T11:00:05+08:00'),
-    updated_at: new Date('2025-09-27T12:00:00+08:00'),
-  },
-  {
-    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
-    title: 'New Comment',
-    message: 'Mitch commented on "Setup analytics dashboards": "Connected to 3 data sources so far, working on CRM integration."',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-30T14:25:05+08:00'),
-    updated_at: new Date('2025-09-30T14:25:05+08:00'),
-  },
-  // Group 2: Attachment Notifications (3)
-  {
-    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    title: 'Attachment Added',
-    message: 'Mitch uploaded "wireframe.png" to "Design budget dashboard layout".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-19T11:10:05+08:00'),
-    updated_at: new Date('2025-09-19T11:10:05+08:00'),
-  },
-  {
-    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester
-    title: 'Attachment Added',
-    message: 'Garrison uploaded "etl_mapping.xlsx" to "Connect sales data source".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-20T09:20:05+08:00'),
-    updated_at: new Date('2025-09-20T09:20:05+08:00'),
-  },
-  {
-    user_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
-    title: 'Attachment Added',
-    message: 'Joel uploaded "onboarding_forms.xlsx" to "Design client onboarding forms".',
-    type: 'task_updated',
-    read: true,
-    is_archived: false,
-    created_at: new Date('2025-09-22T10:10:05+08:00'),
-    updated_at: new Date('2025-09-22T11:00:00+08:00'),
-  },
-  // Group 3: Task Assignment Notifications (3)
-  {
-    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    title: 'New Task Assignment',
-    message: 'Joel assigned you to "Design budget dashboard layout".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-19T10:20:05+08:00'),
-    updated_at: new Date('2025-09-19T10:20:05+08:00'),
-  },
-  {
-    user_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
-    title: 'New Task Assignment',
-    message: 'Joel assigned you to "Design client onboarding forms".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-22T10:06:05+08:00'),
-    updated_at: new Date('2025-09-22T10:06:05+08:00'),
-  },
-  {
-    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester
-    title: 'New Task Assignment',
-    message: 'Ryan assigned you to "Refactor data pipelines".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-10-26T15:10:05+08:00'),
-    updated_at: new Date('2025-10-26T15:10:05+08:00'),
-  },
-  // Group 4: Task Completion Notifications (3)
-  {
-    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch
-    title: 'Task Completed',
-    message: 'Ryan completed "Setup CI/CD pipeline".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-10-27T09:15:05+08:00'),
-    updated_at: new Date('2025-10-27T09:15:05+08:00'),
-  },
-  {
-    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester
-    title: 'Task Completed',
-    message: 'Ryan completed "Refactor data pipelines".',
-    type: 'task_updated',
-    read: true,
-    is_archived: false,
-    created_at: new Date('2025-10-26T15:20:05+08:00'),
-    updated_at: new Date('2025-10-26T16:00:00+08:00'),
-  },
-  {
-    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan
-    title: 'Task Completed',
-    message: 'Garrison completed "Connect sales data source".',
-    type: 'task_updated',
-    read: false,
-    is_archived: false,
-    created_at: new Date('2025-09-20T10:00:05+08:00'),
-    updated_at: new Date('2025-09-20T10:00:05+08:00'),
-  },
-  // Group 5: Additional Variety (2)
-  {
-    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel
-    title: 'Task Updated',
-    message: 'Ryan changed the status of "Automate invoice approval workflow" from "To Do" to "In Progress".',
-    type: 'task_updated',
-    read: true,
-    is_archived: false,
-    created_at: new Date('2025-09-24T10:30:05+08:00'),
-    updated_at: new Date('2025-09-24T11:00:00+08:00'),
-  },
-  {
-    user_id: '32635261-038c-4405-b6ed-2d446738f94c', // Garrison
-    title: 'Tag Added',
-    message: 'Joel added tag "Onboarding" to "Design client onboarding forms".',
-    type: 'task_updated',
-    read: true,
-    is_archived: false,
-    created_at: new Date('2025-09-22T10:20:05+08:00'),
-    updated_at: new Date('2025-09-22T11:00:00+08:00'),
-  },
+interface AttachmentSpec {
+  task: string;
+  by: PersonaKey;
+  at: number;
+  file: string;
+  contentType: string;
+}
+
+const ATTACHMENTS: AttachmentSpec[] = [
+  { task: 'Define portal information architecture', by: 'weijie', at: -56, file: 'portal-sitemap.csv', contentType: 'text/csv' },
+  { task: 'Integrate SSO with customer directory', by: 'marcus', at: -9, file: 'sso-certificate-checklist.txt', contentType: 'text/plain' },
+  { task: 'Calibrate sensor thresholds', by: 'hannah', at: -34, file: 'sensor-thresholds.csv', contentType: 'text/csv' },
+  { task: 'Engineering Ops capex estimate', by: 'daniel', at: -24, file: 'eng-ops-capex-fy26.csv', contentType: 'text/csv' },
+  { task: 'Customer portal v2 launch', by: 'daniel', at: -30, file: 'portal-launch-plan.txt', contentType: 'text/plain' },
+  { task: 'Q3 accruals reconciliation', by: 'aisha', at: -13, file: 'q3-accruals.csv', contentType: 'text/csv' },
+  { task: 'Vendor onboarding workflow design', by: 'priya', at: -44, file: 'vendor-onboarding-flow.txt', contentType: 'text/plain' },
+  { task: 'Firewall rule review', by: 'weijie', at: -32, file: 'firewall-review-notes.txt', contentType: 'text/plain' },
 ];
 
-/* ======================== COMMENTS ======================== */
-export const task_comments = [
-  {
-    task_title: 'Design budget dashboard layout',
-    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    content: 'Add KPI tiles (spend, forecast, burn rate).',
-    created_at: new Date('2025-09-19T10:40:00+08:00'),
-    updated_at: new Date('2025-09-19T10:40:00+08:00'),
-  },
-  {
-    task_title: 'Design budget dashboard layout',
-    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    content: "Yup, I'll draft a KPI list and metrics definitions.",
-    created_at: new Date('2025-09-19T11:00:00+08:00'),
-    updated_at: new Date('2025-09-19T11:00:00+08:00'),
-  },
-  {
-    task_title: 'Connect sales data source',
-    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    content: 'Need access to SG mart. Who can approve?',
-    created_at: new Date('2025-09-20T09:45:00+08:00'),
-    updated_at: new Date('2025-09-20T09:45:00+08:00'),
-  },
-  {
-    task_title: 'Implement login auth flow',
-    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    content: 'Remember to implement token refresh before expiry.',
-    created_at: new Date('2025-09-25T14:00:00+08:00'),
-    updated_at: new Date('2025-09-25T14:00:00+08:00'),
-  },
-  {
-    task_title: 'Setup CI/CD pipeline',
-    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    content: 'Pipeline configured with automatic deployment on PR merge.',
-    created_at: new Date('2025-09-25T15:30:00+08:00'),
-    updated_at: new Date('2025-09-25T15:30:00+08:00'),
-  },
-  {
-    task_title: 'Create onboarding video',
-    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    content: 'Should we include a section on regional compliance requirements?',
-    created_at: new Date('2025-09-26T13:00:00+08:00'),
-    updated_at: new Date('2025-09-26T13:00:00+08:00'),
-  },
-  {
-    task_title: 'Design API for mobile app',
-    user_id: '61ca6b82-6d42-4058-bb4c-9316e7079b24', // Ryan (SMU)
-    content: "Let's use OpenAPI spec for documentation.",
-    created_at: new Date('2025-09-27T14:00:00+08:00'),
-    updated_at: new Date('2025-09-27T14:00:00+08:00'),
-  },
-  {
-    task_title: 'Refactor data pipelines',
-    user_id: '67393282-3a06-452b-a05a-9c93a95b597f', // Kester (SMU)
-    content: 'Added retry logic with exponential backoff.',
-    created_at: new Date('2025-09-29T16:00:00+08:00'),
-    updated_at: new Date('2025-09-29T16:00:00+08:00'),
-  },
-  {
-    task_title: 'Prepare finance report',
-    user_id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a', // Joel (SMU)
-    content: 'Need Q3 actuals from accounting before finalizing.',
-    created_at: new Date('2025-09-30T12:00:00+08:00'),
-    updated_at: new Date('2025-09-30T12:00:00+08:00'),
-  },
-  {
-    task_title: 'Setup analytics dashboards',
-    user_id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964', // Mitch (SMU)
-    content: 'Connected to 3 data sources so far, working on CRM integration.',
-    created_at: new Date('2025-10-01T15:00:00+08:00'),
-    updated_at: new Date('2025-10-01T15:00:00+08:00'),
-  },
-];
+/* ======================== BUILDERS ======================== */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** now + days, pinned to a working hour so timestamps look human. */
+function at(now: Date, days: number, hour = 10): Date {
+  const whole = Math.trunc(days);
+  const frac = days - whole;
+  const d = new Date(now.getTime() + whole * DAY_MS);
+  d.setHours(hour, 0, 0, 0);
+  // Fractions shift within the day (e.g. -24.7 = 0.7 days earlier than -24).
+  const shifted = new Date(d.getTime() + frac * DAY_MS);
+  // Past offsets must never land in the future (e.g. "-1" when it is 08:00).
+  if (days <= 0 && shifted > now) return new Date(now.getTime() - 60 * 60 * 1000);
+  return shifted;
+}
+
+function fileBody(file: string): string {
+  if (file.endsWith('.csv')) {
+    return 'item,owner,amount,status\nLine item A,Engineering Ops,12000,approved\nLine item B,Finance,4500,in review\n';
+  }
+  return `${file}\n\nDemo attachment created by the NODAL seed. Contents are illustrative only.\n`;
+}
+
+export function buildSampleData(now: Date = new Date()) {
+  const personaList: Persona[] = Object.values(P);
+
+  const user_info = personaList.map((p) => ({
+    id: p.id,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    default_view: p.default_view,
+    department_name: p.department_name,
+  }));
+
+  const user_roles = personaList.flatMap((p) =>
+    p.roles.map((role) => ({ user_id: p.id, role }))
+  );
+
+  const tasks = TASKS.map((t) => ({
+    title: t.title,
+    description: t.description,
+    priority_bucket: t.priority,
+    status: t.status,
+    creator_id: P[t.creator].id,
+    project_name: t.project,
+    deadline: t.deadline === null ? null : at(now, t.deadline, 17),
+    notes: t.notes ?? null,
+    parent_task_external_key: t.parent ?? null,
+    is_archived: t.archived ?? false,
+    created_at: at(now, t.created, 9),
+    updated_at: at(now, t.updated, 15),
+    recurrence_interval: t.recurrence ?? 0,
+    recurrence_date: t.recurrence ? at(now, t.created, 9) : null,
+    logged_time: Math.round(t.hours * 3600),
+  }));
+
+  const task_tags = TASKS.flatMap((t) =>
+    (t.tags ?? []).map((tag_name) => ({ task_title: t.title, tag_name }))
+  );
+
+  const task_assignments = TASKS.flatMap((t) =>
+    t.assignees.map((a, i) => ({
+      task_title: t.title,
+      assignee_id: P[a].id,
+      assignor_id: P[t.creator].id,
+      created_at: new Date(at(now, t.created, 9).getTime() + (i + 1) * 60 * 1000),
+    }))
+  );
+
+  // Link every project to the departments of everyone working on it
+  // (the trg_update_project_departments trigger does the same at runtime).
+  const pd = new Set<string>();
+  for (const t of TASKS) {
+    for (const k of [t.creator, ...t.assignees]) {
+      pd.add(`${t.project}|${P[k].department_name}`);
+    }
+  }
+  const project_departments = [...pd].map((key) => {
+    const [project_name, department_name] = key.split('|');
+    return { project_name, department_name };
+  });
+
+  const task_comments = COMMENTS.map((c) => {
+    const ts = at(now, c.at, 11);
+    return { task_title: c.task, user_id: P[c.by].id, content: c.text, created_at: ts, updated_at: ts };
+  });
+
+  const task_attachments = ATTACHMENTS.map((a) => ({
+    task_title: a.task,
+    file_name: a.file,
+    content_type: a.contentType,
+    body: fileBody(a.file),
+    uploaded_by: P[a.by].id,
+    uploaded_at: at(now, a.at, 14),
+  }));
+
+  // Notifications mirror what the DB triggers would have produced for
+  // assignments and comments. Older ones are read, recent ones unread.
+  const byTitle = new Map(TASKS.map((t) => [t.title, t]));
+  const fullName = (k: PersonaKey) => `${P[k].first_name} ${P[k].last_name}`;
+  const notifications: Array<{
+    user_id: string;
+    title: string;
+    message: string;
+    type: string;
+    read: boolean;
+    is_archived: boolean;
+    created_at: Date;
+    updated_at: Date;
+  }> = [];
+
+  for (const t of TASKS) {
+    if (t.archived) continue;
+    for (const a of t.assignees) {
+      if (a === t.creator) continue;
+      const ts = at(now, t.created, 9);
+      notifications.push({
+        user_id: P[a].id,
+        title: 'New Task Assignment',
+        message: `${fullName(t.creator)} assigned you to task: "${t.title}"`,
+        type: 'task_updated',
+        read: t.created < -5,
+        is_archived: false,
+        created_at: ts,
+        updated_at: ts,
+      });
+    }
+  }
+  for (const c of COMMENTS) {
+    const t = byTitle.get(c.task)!;
+    for (const a of t.assignees) {
+      if (a === c.by) continue;
+      const ts = at(now, c.at, 11);
+      notifications.push({
+        user_id: P[a].id,
+        title: 'New Comment',
+        message: `${fullName(c.by)} commented on task: "${t.title}"`,
+        type: 'task_updated',
+        read: c.at < -3,
+        is_archived: false,
+        created_at: ts,
+        updated_at: ts,
+      });
+    }
+  }
+
+  return {
+    personas: personaList,
+    departments,
+    roles,
+    projects,
+    tags,
+    user_info,
+    user_roles,
+    project_departments,
+    tasks,
+    task_tags,
+    task_assignments,
+    task_comments,
+    task_attachments,
+    notifications,
+  };
+}
+
+export type SampleData = ReturnType<typeof buildSampleData>;

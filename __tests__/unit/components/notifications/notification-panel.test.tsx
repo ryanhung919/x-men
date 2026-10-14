@@ -33,7 +33,7 @@ describe('NotificationPanel', () => {
     {
       id: 2,
       title: 'Task Completed',
-      message: 'Ryan completed "Setup CI/CD pipeline".',
+      message: 'Aisha completed "Setup CI/CD pipeline".',
       type: 'task_updated',
       read: true,
       is_archived: false,
@@ -42,7 +42,7 @@ describe('NotificationPanel', () => {
     {
       id: 3,
       title: 'New Comment',
-      message: 'Mitch commented on "Setup analytics dashboards".',
+      message: 'Priya commented on "Setup analytics dashboards".',
       type: 'task_updated',
       read: false,
       is_archived: false,

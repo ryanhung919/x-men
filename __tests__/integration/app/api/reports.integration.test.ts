@@ -3,18 +3,19 @@ import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integr
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('Reports API Integration Tests', () => {
-  let joelClient: SupabaseClient;
-  let mitchClient: SupabaseClient;
-  let kesterClient: SupabaseClient;
-  let joelCookie: string;
-  let mitchCookie: string;
-  let kesterCookie: string;
+  let danielClient: SupabaseClient;
+  let priyaClient: SupabaseClient;
+  let weijieClient: SupabaseClient;
+  let danielCookie: string;
+  let priyaCookie: string;
+  let weijieCookie: string;
 
   const API_BASE = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   // Extract project reference from Supabase URL (move outside beforeAll)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  // Same rule supabase-js uses for its default storage key (works for local and hosted URLs)
+  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 
   // Helper function to format auth cookies (move outside beforeAll)
   const formatAuthCookie = (session: any) => {
@@ -31,25 +32,25 @@ describe('Reports API Integration Tests', () => {
 
   beforeAll(async () => {
     // Authenticate test users - all have admin role
-    const joel = await authenticateAs('joel');
-    const mitch = await authenticateAs('mitch');
-    const kester = await authenticateAs('kester');
+    const daniel = await authenticateAs('daniel');
+    const priya = await authenticateAs('priya');
+    const weijie = await authenticateAs('weijie');
 
-    joelClient = joel.client;
-    mitchClient = mitch.client;
-    kesterClient = kester.client;
+    danielClient = daniel.client;
+    priyaClient = priya.client;
+    weijieClient = weijie.client;
 
     // Get session cookies
-    joelCookie = formatAuthCookie(joel.session);
-    mitchCookie = formatAuthCookie(mitch.session);
-    kesterCookie = formatAuthCookie(kester.session);
+    danielCookie = formatAuthCookie(daniel.session);
+    priyaCookie = formatAuthCookie(priya.session);
+    weijieCookie = formatAuthCookie(weijie.session);
 
     // Verify admin roles
     console.log('Verifying admin roles for test users...');
     const users = [
-      { name: 'joel', user: joel, client: joelClient },
-      { name: 'mitch', user: mitch, client: mitchClient },
-      { name: 'kester', user: kester, client: kesterClient },
+      { name: 'daniel', user: daniel, client: danielClient },
+      { name: 'priya', user: priya, client: priyaClient },
+      { name: 'weijie', user: weijie, client: weijieClient },
     ];
 
     for (const { name, user, client } of users) {
@@ -75,12 +76,12 @@ describe('Reports API Integration Tests', () => {
 
     it('should return 403 when non-admin tries to access report actions', async () => {
       // Use personal account (staff only)
-      const joelPersonal = await authenticateAs('joelPersonal');
-      const joelPersonalCookie = formatAuthCookie(joelPersonal.session);
+      const hannah = await authenticateAs('hannah');
+      const hannahCookie = formatAuthCookie(hannah.session);
 
       const response = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: joelPersonalCookie,
+          Cookie: hannahCookie,
         },
       });
 
@@ -90,7 +91,7 @@ describe('Reports API Integration Tests', () => {
     it('should allow admins to access report actions', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -102,7 +103,7 @@ describe('Reports API Integration Tests', () => {
     it('should return departments for authenticated user', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=departments`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -116,34 +117,34 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should return different departments based on user context', async () => {
-      const joelResponse = await fetch(`${API_BASE}/api/reports?action=departments`, {
+      const danielResponse = await fetch(`${API_BASE}/api/reports?action=departments`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
-      const mitchResponse = await fetch(`${API_BASE}/api/reports?action=departments`, {
+      const priyaResponse = await fetch(`${API_BASE}/api/reports?action=departments`, {
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
         },
       });
 
-      expect(joelResponse.status).toBe(200);
-      expect(mitchResponse.status).toBe(200);
+      expect(danielResponse.status).toBe(200);
+      expect(priyaResponse.status).toBe(200);
 
-      const joelDepts = await joelResponse.json();
-      const mitchDepts = await mitchResponse.json();
+      const danielDepts = await danielResponse.json();
+      const priyaDepts = await priyaResponse.json();
 
-      expect(Array.isArray(joelDepts)).toBe(true);
-      expect(Array.isArray(mitchDepts)).toBe(true);
+      expect(Array.isArray(danielDepts)).toBe(true);
+      expect(Array.isArray(priyaDepts)).toBe(true);
 
       // They should see different departments based on their department hierarchy
-      expect(joelDepts).not.toEqual(mitchDepts);
+      expect(danielDepts).not.toEqual(priyaDepts);
     });
 
     it('should filter departments by projectIds', async () => {
       // Get a project ID first
-      const { data: projects } = await joelClient.from('projects').select('id').limit(1).single();
+      const { data: projects } = await danielClient.from('projects').select('id').limit(1).single();
 
       if (!projects) throw new Error('No projects found');
 
@@ -151,7 +152,7 @@ describe('Reports API Integration Tests', () => {
         `${API_BASE}/api/reports?action=departments&projectIds=${projects.id}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -166,7 +167,7 @@ describe('Reports API Integration Tests', () => {
     it('should return projects for authenticated user', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=projects`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -182,11 +183,11 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should filter projects by departmentIds', async () => {
-      // Get Joel's department ID
-      const { data: userInfo } = await joelClient
+      // Get Daniel's department ID
+      const { data: userInfo } = await danielClient
         .from('user_info')
         .select('department_id')
-        .eq('id', testUsers.joel.id)
+        .eq('id', testUsers.daniel.id)
         .single();
 
       if (!userInfo) throw new Error('User info not found');
@@ -195,7 +196,7 @@ describe('Reports API Integration Tests', () => {
         `${API_BASE}/api/reports?action=projects&departmentIds=${userInfo.department_id}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -210,7 +211,7 @@ describe('Reports API Integration Tests', () => {
     it('should generate logged time report with valid data structure', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -248,14 +249,14 @@ describe('Reports API Integration Tests', () => {
     it('should calculate metrics correctly based on sample data', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
       expect(response.status).toBe(200);
       const report = await response.json();
 
-      // Based on sample-data.ts, Joel should see:
+      // Based on sample-data.ts, Daniel should see:
       // - Completed tasks with logged time
       // - Tasks with various statuses
       expect(report.completedTasks).toBeGreaterThan(0);
@@ -264,7 +265,7 @@ describe('Reports API Integration Tests', () => {
 
     it('should filter report by projectIds', async () => {
       // Get a project ID
-      const { data: projects } = await joelClient.from('projects').select('id').limit(1).single();
+      const { data: projects } = await danielClient.from('projects').select('id').limit(1).single();
 
       if (!projects) throw new Error('No projects found');
 
@@ -272,7 +273,7 @@ describe('Reports API Integration Tests', () => {
         `${API_BASE}/api/reports?action=time&projectIds=${projects.id}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -283,14 +284,15 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should filter report by date range', async () => {
-      const startDate = '2025-09-01';
-      const endDate = '2025-10-31';
+      // Seed dates are relative to seed time, so use the last 90 days.
+      const startDate = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const endDate = new Date().toISOString().slice(0, 10);
 
       const response = await fetch(
         `${API_BASE}/api/reports?action=time&startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -312,7 +314,7 @@ describe('Reports API Integration Tests', () => {
         `${API_BASE}/api/reports?action=time&startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -326,23 +328,23 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should respect RLS and show different data for different users', async () => {
-      const joelResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
-        headers: { Cookie: joelCookie },
+      const danielResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
+        headers: { Cookie: danielCookie },
       });
 
-      const mitchResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
-        headers: { Cookie: mitchCookie },
+      const priyaResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
+        headers: { Cookie: priyaCookie },
       });
 
-      expect(joelResponse.status).toBe(200);
-      expect(mitchResponse.status).toBe(200);
+      expect(danielResponse.status).toBe(200);
+      expect(priyaResponse.status).toBe(200);
 
-      const joelReport = await joelResponse.json();
-      const mitchReport = await mitchResponse.json();
+      const danielReport = await danielResponse.json();
+      const priyaReport = await priyaResponse.json();
 
       // They should see different metrics based on their department access
-      expect(joelReport.completedTasks).toBeGreaterThanOrEqual(0);
-      expect(mitchReport.completedTasks).toBeGreaterThanOrEqual(0);
+      expect(danielReport.completedTasks).toBeGreaterThanOrEqual(0);
+      expect(priyaReport.completedTasks).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -350,7 +352,7 @@ describe('Reports API Integration Tests', () => {
     it('should generate team summary report with valid data structure', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=team`, {
         headers: {
-          Cookie: mitchCookie, // Using mitch for team reports
+          Cookie: priyaCookie, // Using priya for team reports
         },
       });
 
@@ -390,7 +392,7 @@ describe('Reports API Integration Tests', () => {
     it('should calculate team metrics correctly', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=team`, {
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
         },
       });
 
@@ -409,7 +411,7 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should filter team report by projectIds', async () => {
-      const { data: projects } = await mitchClient.from('projects').select('id').limit(1).single();
+      const { data: projects } = await priyaClient.from('projects').select('id').limit(1).single();
 
       if (!projects) throw new Error('No projects found');
 
@@ -417,7 +419,7 @@ describe('Reports API Integration Tests', () => {
         `${API_BASE}/api/reports?action=team&projectIds=${projects.id}`,
         {
           headers: {
-            Cookie: mitchCookie,
+            Cookie: priyaCookie,
           },
         }
       );
@@ -428,14 +430,15 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should filter team report by date range', async () => {
-      const startDate = '2025-09-01';
-      const endDate = '2025-10-31';
+      // Seed dates are relative to seed time, so use the last 90 days.
+      const startDate = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const endDate = new Date().toISOString().slice(0, 10);
 
       const response = await fetch(
         `${API_BASE}/api/reports?action=team&startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: mitchCookie,
+            Cookie: priyaCookie,
           },
         }
       );
@@ -449,7 +452,7 @@ describe('Reports API Integration Tests', () => {
     it('should serialize Maps to objects in JSON response', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=team`, {
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
         },
       });
 
@@ -468,7 +471,7 @@ describe('Reports API Integration Tests', () => {
     it('should aggregate weekly data correctly', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=team`, {
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
         },
       });
 
@@ -494,7 +497,7 @@ describe('Reports API Integration Tests', () => {
     it('should generate task completion report with valid data structure', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=task`, {
         headers: {
-          Cookie: joelCookie, 
+          Cookie: danielCookie, 
         },
       });
 
@@ -541,7 +544,7 @@ describe('Reports API Integration Tests', () => {
     it('should calculate completion metrics correctly', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=task`, {
         headers: {
-          Cookie: joelCookie, // Changed from kesterCookie
+          Cookie: danielCookie, // Changed from weijieCookie
         },
       });
 
@@ -562,7 +565,7 @@ describe('Reports API Integration Tests', () => {
     it('should include user statistics with correct metrics', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=task`, {
         headers: {
-          Cookie: joelCookie, // Changed from kesterCookie
+          Cookie: danielCookie, // Changed from weijieCookie
         },
       });
 
@@ -594,14 +597,15 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should filter task completion report by date range', async () => {
-      const startDate = '2025-09-01';
-      const endDate = '2025-10-31';
+      // Seed dates are relative to seed time, so use the last 90 days.
+      const startDate = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      const endDate = new Date().toISOString().slice(0, 10);
 
       const response = await fetch(
         `${API_BASE}/api/reports?action=task&startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie, // Changed from kesterCookie
+            Cookie: danielCookie, // Changed from weijieCookie
           },
         }
       );
@@ -612,7 +616,7 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should filter task completion report by projectIds', async () => {
-      const { data: projects } = await joelClient.from('projects').select('id').limit(1).single();
+      const { data: projects } = await danielClient.from('projects').select('id').limit(1).single();
 
       if (!projects) throw new Error('No projects found');
 
@@ -620,7 +624,7 @@ describe('Reports API Integration Tests', () => {
         `${API_BASE}/api/reports?action=task&projectIds=${projects.id}`,
         {
           headers: {
-            Cookie: joelCookie, // Changed from kesterCookie
+            Cookie: danielCookie, // Changed from weijieCookie
           },
         }
       );
@@ -633,7 +637,7 @@ describe('Reports API Integration Tests', () => {
     it('should aggregate completed tasks by project', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=task`, {
         headers: {
-          Cookie: joelCookie, // Changed from kesterCookie
+          Cookie: danielCookie, // Changed from weijieCookie
         },
       });
 
@@ -657,7 +661,7 @@ describe('Reports API Integration Tests', () => {
     it('should return 400 for invalid action parameter', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=invalid`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -669,7 +673,7 @@ describe('Reports API Integration Tests', () => {
     it('should handle invalid date formats gracefully', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=time&startDate=invalid-date`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -680,7 +684,7 @@ describe('Reports API Integration Tests', () => {
     it('should handle invalid projectIds gracefully', async () => {
       const response = await fetch(`${API_BASE}/api/reports?action=time&projectIds=999999`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -693,28 +697,28 @@ describe('Reports API Integration Tests', () => {
 
   describe('RLS Policy Enforcement', () => {
     it('should only return data visible to the authenticated user', async () => {
-      // Joel and Mitch are in different departments
-      const joelResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
+      // Daniel and Priya are in different departments
+      const danielResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
-      const mitchResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
+      const priyaResponse = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
         },
       });
 
-      expect(joelResponse.status).toBe(200);
-      expect(mitchResponse.status).toBe(200);
+      expect(danielResponse.status).toBe(200);
+      expect(priyaResponse.status).toBe(200);
 
-      const joelReport = await joelResponse.json();
-      const mitchReport = await mitchResponse.json();
+      const danielReport = await danielResponse.json();
+      const priyaReport = await priyaResponse.json();
 
       // They should see different data based on their department access
-      expect(joelReport).toHaveProperty('completedTasks');
-      expect(mitchReport).toHaveProperty('completedTasks');
+      expect(danielReport).toHaveProperty('completedTasks');
+      expect(priyaReport).toHaveProperty('completedTasks');
     });
 
     it('should respect department hierarchy in all report types', async () => {
@@ -724,7 +728,7 @@ describe('Reports API Integration Tests', () => {
       for (const action of reportTypes) {
         const response = await fetch(`${API_BASE}/api/reports?action=${action}`, {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         });
 
@@ -749,9 +753,9 @@ describe('Reports API Integration Tests', () => {
   describe('Role-Based Report Access', () => {
     it('should verify all test admin users can access reports', async () => {
       const adminUsers = [
-        { name: 'joel', id: testUsers.joel.id },
-        { name: 'mitch', id: testUsers.mitch.id },
-        { name: 'kester', id: testUsers.kester.id },
+        { name: 'daniel', id: testUsers.daniel.id },
+        { name: 'priya', id: testUsers.priya.id },
+        { name: 'weijie', id: testUsers.weijie.id },
       ];
 
       for (const admin of adminUsers) {
@@ -769,12 +773,12 @@ describe('Reports API Integration Tests', () => {
     });
 
     it('should deny non-admin users from accessing reports', async () => {
-      const joelPersonal = await authenticateAs('joelPersonal');
-      const joelPersonalCookie = formatAuthCookie(joelPersonal.session);
+      const hannah = await authenticateAs('hannah');
+      const hannahCookie = formatAuthCookie(hannah.session);
 
       const response = await fetch(`${API_BASE}/api/reports?action=time`, {
         headers: {
-          Cookie: joelPersonalCookie,
+          Cookie: hannahCookie,
         },
       });
 

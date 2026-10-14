@@ -3,16 +3,17 @@ import { authenticateAs } from '@/__tests__/setup/integration.setup';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('Schedule API Integration Tests', () => {
-  let joelClient: SupabaseClient;
-  let mitchClient: SupabaseClient;
-  let joelCookie: string;
-  let mitchCookie: string;
+  let danielClient: SupabaseClient;
+  let priyaClient: SupabaseClient;
+  let danielCookie: string;
+  let priyaCookie: string;
 
   const API_BASE = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   // Extract project reference from Supabase URL
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  // Same rule supabase-js uses for its default storage key (works for local and hosted URLs)
+  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 
   // Helper function to format auth cookies
   const formatAuthCookie = (session: any) => {
@@ -29,14 +30,14 @@ describe('Schedule API Integration Tests', () => {
 
   beforeAll(async () => {
     // Authenticate test users
-    const joel = await authenticateAs('joel');
-    const mitch = await authenticateAs('mitch');
+    const daniel = await authenticateAs('daniel');
+    const priya = await authenticateAs('priya');
 
-    joelClient = joel.client;
-    mitchClient = mitch.client;
+    danielClient = daniel.client;
+    priyaClient = priya.client;
 
-    joelCookie = formatAuthCookie(joel.session);
-    mitchCookie = formatAuthCookie(mitch.session);
+    danielCookie = formatAuthCookie(daniel.session);
+    priyaCookie = formatAuthCookie(priya.session);
   });
 
   describe('GET /api/schedule - Authentication', () => {
@@ -48,7 +49,7 @@ describe('Schedule API Integration Tests', () => {
     it('should allow authenticated users to access schedule', async () => {
       const response = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -65,7 +66,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -97,7 +98,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -111,7 +112,7 @@ describe('Schedule API Integration Tests', () => {
     it('should handle missing date parameters', async () => {
       const response = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -127,7 +128,7 @@ describe('Schedule API Integration Tests', () => {
       // First, get all tasks to find project IDs
       const allTasksResponse = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
       const allTasks = await allTasksResponse.json();
@@ -148,7 +149,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?projectIds=${projectId}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -169,7 +170,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?projectIds=1,2,3`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -185,7 +186,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?projectIds=99999`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -199,15 +200,15 @@ describe('Schedule API Integration Tests', () => {
 
   describe('GET /api/schedule - Staff Filtering', () => {
     it('should filter tasks by staff IDs', async () => {
-      // Get Joel's user ID
-      const { data: userData } = await joelClient.auth.getUser();
-      const joelUserId = userData.user?.id;
+      // Get Daniel's user ID
+      const { data: userData } = await danielClient.auth.getUser();
+      const danielUserId = userData.user?.id;
 
       const response = await fetch(
-        `${API_BASE}/api/schedule?staffIds=${joelUserId}`,
+        `${API_BASE}/api/schedule?staffIds=${danielUserId}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -217,27 +218,27 @@ describe('Schedule API Integration Tests', () => {
       
       expect(Array.isArray(data)).toBe(true);
       
-      // All tasks should have Joel as an assignee
+      // All tasks should have Daniel as an assignee
       data.forEach((task: any) => {
-        const hasJoel = task.assignees.some(
-          (assignee: any) => assignee.id === joelUserId
+        const hasDaniel = task.assignees.some(
+          (assignee: any) => assignee.id === danielUserId
         );
-        expect(hasJoel).toBe(true);
+        expect(hasDaniel).toBe(true);
       });
     });
 
     it('should filter by multiple staff IDs', async () => {
-      const { data: joelUser } = await joelClient.auth.getUser();
-      const { data: mitchUser } = await mitchClient.auth.getUser();
+      const { data: danielUser } = await danielClient.auth.getUser();
+      const { data: priyaUser } = await priyaClient.auth.getUser();
 
-      const joelId = joelUser.user?.id;
-      const mitchId = mitchUser.user?.id;
+      const danielId = danielUser.user?.id;
+      const priyaId = priyaUser.user?.id;
 
       const response = await fetch(
-        `${API_BASE}/api/schedule?staffIds=${joelId},${mitchId}`,
+        `${API_BASE}/api/schedule?staffIds=${danielId},${priyaId}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -250,7 +251,7 @@ describe('Schedule API Integration Tests', () => {
       // All tasks should have at least one of the specified assignees
       data.forEach((task: any) => {
         const hasTargetAssignee = task.assignees.some(
-          (assignee: any) => assignee.id === joelId || assignee.id === mitchId
+          (assignee: any) => assignee.id === danielId || assignee.id === priyaId
         );
         expect(hasTargetAssignee).toBe(true);
       });
@@ -261,7 +262,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?staffIds=00000000-0000-0000-0000-000000000000`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -282,7 +283,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?startDate=${startDate}&endDate=${endDate}&projectIds=1,2`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -294,7 +295,7 @@ describe('Schedule API Integration Tests', () => {
     });
 
     it('should apply all filters together', async () => {
-      const { data: userData } = await joelClient.auth.getUser();
+      const { data: userData } = await danielClient.auth.getUser();
       const userId = userData.user?.id;
 
       const startDate = '2025-10-01';
@@ -304,7 +305,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?startDate=${startDate}&endDate=${endDate}&projectIds=1&staffIds=${userId}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -320,7 +321,7 @@ describe('Schedule API Integration Tests', () => {
     it('should return tasks with required fields', async () => {
       const response = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -359,7 +360,7 @@ describe('Schedule API Integration Tests', () => {
     it('should return valid date formats', async () => {
       const response = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -384,7 +385,7 @@ describe('Schedule API Integration Tests', () => {
       
       const response = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -402,7 +403,7 @@ describe('Schedule API Integration Tests', () => {
       // First, get a task to update
       const getResponse = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
       const tasks = await getResponse.json();
@@ -419,7 +420,7 @@ describe('Schedule API Integration Tests', () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: JSON.stringify({
           taskId,
@@ -434,7 +435,7 @@ describe('Schedule API Integration Tests', () => {
       if (response.status === 200) {
         const verifyResponse = await fetch(`${API_BASE}/api/schedule`, {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         });
         const updatedTasks = await verifyResponse.json();
@@ -452,7 +453,7 @@ describe('Schedule API Integration Tests', () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: JSON.stringify({
           deadline: '2025-11-15T00:00:00.00Z',
@@ -467,7 +468,7 @@ describe('Schedule API Integration Tests', () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: JSON.stringify({
           taskId: 1,
@@ -497,7 +498,7 @@ describe('Schedule API Integration Tests', () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: JSON.stringify({
           taskId: 999999,
@@ -512,7 +513,7 @@ describe('Schedule API Integration Tests', () => {
     it('should handle invalid date format', async () => {
       const getResponse = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
       const tasks = await getResponse.json();
@@ -526,7 +527,7 @@ describe('Schedule API Integration Tests', () => {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: JSON.stringify({
           taskId: tasks[0].id,
@@ -541,29 +542,29 @@ describe('Schedule API Integration Tests', () => {
 
   describe('GET /api/schedule - RLS Security', () => {
     it('should allow different authenticated users to access schedule', async () => {
-      const joelResponse = await fetch(`${API_BASE}/api/schedule`, {
+      const danielResponse = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
-      expect(joelResponse.status).toBe(200);
-      const joelTasks = await joelResponse.json();
-      expect(Array.isArray(joelTasks)).toBe(true);
+      expect(danielResponse.status).toBe(200);
+      const danielTasks = await danielResponse.json();
+      expect(Array.isArray(danielTasks)).toBe(true);
 
-      // Authenticate mitch fresh for this test
-      const mitch = await authenticateAs('mitch');
-      const freshMitchCookie = formatAuthCookie(mitch.session);
+      // Authenticate priya fresh for this test
+      const priya = await authenticateAs('priya');
+      const freshPriyaCookie = formatAuthCookie(priya.session);
 
-      const mitchResponse = await fetch(`${API_BASE}/api/schedule`, {
+      const priyaResponse = await fetch(`${API_BASE}/api/schedule`, {
         headers: {
-          Cookie: freshMitchCookie,
+          Cookie: freshPriyaCookie,
         },
       });
 
-      expect(mitchResponse.status).toBe(200);
-      const mitchTasks = await mitchResponse.json();
-      expect(Array.isArray(mitchTasks)).toBe(true);
+      expect(priyaResponse.status).toBe(200);
+      const priyaTasks = await priyaResponse.json();
+      expect(Array.isArray(priyaTasks)).toBe(true);
     });
   });
 
@@ -576,7 +577,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -595,7 +596,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?startDate=${startDate}&endDate=${endDate}`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -611,7 +612,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?projectIds=invalid&staffIds=invalid`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );
@@ -625,7 +626,7 @@ describe('Schedule API Integration Tests', () => {
         `${API_BASE}/api/schedule?projectIds=&staffIds=`,
         {
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
         }
       );

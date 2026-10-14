@@ -12,20 +12,20 @@ import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integr
  * - Multi-user scenarios: Task assignments, comments
  */
 describe('Notifications Integration Tests', () => {
-  let kesterClient: any;
+  let weijieClient: any;
 
   beforeAll(async () => {
     // Authenticate test user for task updates (using direct Supabase client)
-    const kester = await authenticateAs('kester');
-    kesterClient = kester.client;
+    const weijie = await authenticateAs('weijie');
+    weijieClient = weijie.client;
   });
 
   
   describe('RLS Policies - User can only see own notifications', () => {
-    it('should only see own notifications for Joel', async () => {
-      const { client } = await authenticateAs('joel');
+    it('should only see own notifications for Daniel', async () => {
+      const { client } = await authenticateAs('daniel');
 
-      // Get Joel's notifications
+      // Get Daniel's notifications
       const { data: notifications, error } = await client
         .from('notifications')
         .select('id, user_id, title, message, type, read');
@@ -33,33 +33,33 @@ describe('Notifications Integration Tests', () => {
       expect(error).toBeNull();
       expect(notifications).toBeDefined();
 
-      // All notifications should belong to Joel
-      const allBelongToJoel = notifications?.every((n) => n.user_id === testUsers.joel.id);
-      expect(allBelongToJoel).toBe(true);
+      // All notifications should belong to Daniel
+      const allBelongToDaniel = notifications?.every((n) => n.user_id === testUsers.daniel.id);
+      expect(allBelongToDaniel).toBe(true);
     });
 
     it('should not see other users notifications', async () => {
-      const { client } = await authenticateAs('mitch');
+      const { client } = await authenticateAs('priya');
 
       // Try to get notifications for different user IDs
       const { data: notifications, error } = await client
         .from('notifications')
         .select('*')
-        .eq('user_id', testUsers.joel.id); // Try to access Joel's notifications
+        .eq('user_id', testUsers.daniel.id); // Try to access Daniel's notifications
 
       expect(error).toBeNull();
-      // Mitch should not see any of Joel's notifications due to RLS
+      // Priya should not see any of Daniel's notifications due to RLS
       expect(notifications?.length).toBe(0);
     });
 
     it('should get correct unread count for user', async () => {
-      const { client } = await authenticateAs('garrison');
+      const { client } = await authenticateAs('marcus');
 
       // Get unread count
       const { count: unreadCount, error: countError } = await client
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.garrison.id)
+        .eq('user_id', testUsers.marcus.id)
         .eq('read', false);
 
       expect(countError).toBeNull();
@@ -68,7 +68,7 @@ describe('Notifications Integration Tests', () => {
       const { data: allNotifs } = await client
         .from('notifications')
         .select('read')
-        .eq('user_id', testUsers.garrison.id);
+        .eq('user_id', testUsers.marcus.id);
 
       const expectedUnread = allNotifs?.filter((n) => !n.read).length || 0;
       expect(unreadCount).toBe(expectedUnread);
@@ -97,33 +97,33 @@ describe('Notifications Integration Tests', () => {
 
       expect(task).toBeDefined();
 
-      // Get Mitch's notification count before assignment
+      // Get Priya's notification count before assignment
       const { count: beforeCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.mitch.id);
+        .eq('user_id', testUsers.priya.id);
 
-      // Check if Mitch is already assigned to this task
+      // Check if Priya is already assigned to this task
       const { data: existing } = await adminClient
         .from('task_assignments')
         .select('id')
         .eq('task_id', task!.id)
-        .eq('assignee_id', testUsers.mitch.id)
+        .eq('assignee_id', testUsers.priya.id)
         .maybeSingle();
 
       if (existing) {
-        // Mitch already assigned, skip test
-        console.log('Mitch already assigned to task, skipping');
+        // Priya already assigned, skip test
+        console.log('Priya already assigned to task, skipping');
         return;
       }
 
-      // Assign Mitch to the task
+      // Assign Priya to the task
       const { data: assignment, error: assignError } = await adminClient
         .from('task_assignments')
         .insert({
           task_id: task!.id,
-          assignee_id: testUsers.mitch.id,
-          assignor_id: testUsers.joel.id,
+          assignee_id: testUsers.priya.id,
+          assignor_id: testUsers.daniel.id,
         })
         .select()
         .single();
@@ -139,7 +139,7 @@ describe('Notifications Integration Tests', () => {
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.mitch.id);
+        .eq('user_id', testUsers.priya.id);
 
       expect(afterCount).toBe((beforeCount || 0) + 1);
 
@@ -147,7 +147,7 @@ describe('Notifications Integration Tests', () => {
       const { data: newNotification } = await adminClient
         .from('notifications')
         .select('*')
-        .eq('user_id', testUsers.mitch.id)
+        .eq('user_id', testUsers.priya.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -163,29 +163,29 @@ describe('Notifications Integration Tests', () => {
     });
 
     it('should not create notification for self-assignment', async () => {
-      // Get a task created by Joel
+      // Get a task created by Daniel
       const { data: task } = await adminClient
         .from('tasks')
         .select('id, title')
-        .eq('creator_id', testUsers.joel.id)
+        .eq('creator_id', testUsers.daniel.id)
         .limit(1)
         .single();
 
       expect(task).toBeDefined();
 
-      // Get Joel's notification count before self-assignment
+      // Get Daniel's notification count before self-assignment
       const { count: beforeCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.joel.id);
+        .eq('user_id', testUsers.daniel.id);
 
-      // Joel assigns himself to the task
+      // Daniel assigns himself to the task
       const { data: assignment, error } = await adminClient
         .from('task_assignments')
         .insert({
           task_id: task!.id,
-          assignee_id: testUsers.joel.id,
-          assignor_id: testUsers.joel.id,
+          assignee_id: testUsers.daniel.id,
+          assignor_id: testUsers.daniel.id,
         })
         .select()
         .single();
@@ -196,7 +196,7 @@ describe('Notifications Integration Tests', () => {
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.joel.id);
+        .eq('user_id', testUsers.daniel.id);
 
       expect(afterCount).toBe(beforeCount);
 
@@ -205,33 +205,33 @@ describe('Notifications Integration Tests', () => {
     });
 
     it('should include assignor name in notification message', async () => {
-      // Ryan assigns Kester to a task
+      // Aisha assigns Wei Jie to a task
       const { data: task } = await adminClient
         .from('tasks')
         .select('id, title')
-        .eq('creator_id', testUsers.ryan.id)
+        .eq('creator_id', testUsers.aisha.id)
         .limit(1)
         .single();
 
       if (!task) {
-        // If Ryan has no tasks, skip this test
+        // If Aisha has no tasks, skip this test
         return;
       }
 
-      // Get Ryan's user info
-      const { data: ryanInfo } = await adminClient
+      // Get Aisha's user info
+      const { data: aishaInfo } = await adminClient
         .from('user_info')
         .select('first_name, last_name')
-        .eq('id', testUsers.ryan.id)
+        .eq('id', testUsers.aisha.id)
         .single();
 
-      // Assign Kester to Ryan's task
+      // Assign Wei Jie to Aisha's task
       const { data: assignment } = await adminClient
         .from('task_assignments')
         .insert({
           task_id: task.id,
-          assignee_id: testUsers.kester.id,
-          assignor_id: testUsers.ryan.id,
+          assignee_id: testUsers.weijie.id,
+          assignor_id: testUsers.aisha.id,
         })
         .select()
         .single();
@@ -240,13 +240,13 @@ describe('Notifications Integration Tests', () => {
       const { data: notification } = await adminClient
         .from('notifications')
         .select('*')
-        .eq('user_id', testUsers.kester.id)
+        .eq('user_id', testUsers.weijie.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
 
       expect(notification).toBeDefined();
-      expect(notification?.message).toContain(`${ryanInfo?.first_name} ${ryanInfo?.last_name}`);
+      expect(notification?.message).toContain(`${aishaInfo?.first_name} ${aishaInfo?.last_name}`);
 
       // Cleanup
       await adminClient.from('task_assignments').delete().eq('id', assignment!.id);
@@ -272,12 +272,12 @@ describe('Notifications Integration Tests', () => {
         .map((ta) => ta.assignee_id);
 
       
-      // Joel adds a comment to the task
+      // Daniel adds a comment to the task
       const { data: comment, error: commentError } = await adminClient
         .from('task_comments')
         .insert({
           task_id: taskId,
-          user_id: testUsers.joel.id,
+          user_id: testUsers.daniel.id,
           content: 'Integration test comment',
         })
         .select()
@@ -286,10 +286,10 @@ describe('Notifications Integration Tests', () => {
       expect(commentError).toBeNull();
       expect(comment).toBeDefined();
 
-      // Check notifications were created for assignees (excluding Joel if he's assigned)
+      // Check notifications were created for assignees (excluding Daniel if he's assigned)
       for (const assigneeId of assigneeIds) {
-        if (assigneeId === testUsers.joel.id) {
-          // Joel shouldn't receive notification for his own comment
+        if (assigneeId === testUsers.daniel.id) {
+          // Daniel shouldn't receive notification for his own comment
           continue;
         }
 
@@ -313,11 +313,11 @@ describe('Notifications Integration Tests', () => {
     });
 
     it('should not notify commenter about their own comment', async () => {
-      // Get a task where Garrison is assigned
+      // Get a task where Marcus is assigned
       const { data: assignment } = await adminClient
         .from('task_assignments')
         .select('task_id')
-        .eq('assignee_id', testUsers.garrison.id)
+        .eq('assignee_id', testUsers.marcus.id)
         .limit(1)
         .single();
 
@@ -325,29 +325,29 @@ describe('Notifications Integration Tests', () => {
         return;
       }
 
-      // Get Garrison's notification count before comment
+      // Get Marcus's notification count before comment
       const { count: beforeCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.garrison.id)
+        .eq('user_id', testUsers.marcus.id)
         .eq('type', 'task_updated');
 
-      // Garrison comments on the task
+      // Marcus comments on the task
       const { data: comment } = await adminClient
         .from('task_comments')
         .insert({
           task_id: assignment.task_id,
-          user_id: testUsers.garrison.id,
-          content: 'Test comment by Garrison',
+          user_id: testUsers.marcus.id,
+          content: 'Test comment by Marcus',
         })
         .select()
         .single();
 
-      // Check that Garrison didn't receive a notification for his own comment
+      // Check that Marcus didn't receive a notification for his own comment
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.garrison.id)
+        .eq('user_id', testUsers.marcus.id)
         .eq('type', 'task_updated');
 
       expect(afterCount).toBe(beforeCount);
@@ -359,13 +359,13 @@ describe('Notifications Integration Tests', () => {
 
   describe('CRUD Operations on Notifications', () => {
     it('should allow user to mark notification as read', async () => {
-      const { client } = await authenticateAs('mitch');
+      const { client } = await authenticateAs('priya');
 
-      // Get an unread notification for Mitch
+      // Get an unread notification for Priya
       const { data: unreadNotif } = await client
         .from('notifications')
         .select('*')
-        .eq('user_id', testUsers.mitch.id)
+        .eq('user_id', testUsers.priya.id)
         .eq('read', false)
         .limit(1)
         .single();
@@ -392,11 +392,11 @@ describe('Notifications Integration Tests', () => {
     });
 
     it('should allow user to delete own notification', async () => {
-      // Create a test notification for Kester
+      // Create a test notification for Wei Jie
       const { data: testNotif } = await adminClient
         .from('notifications')
         .insert({
-          user_id: testUsers.kester.id,
+          user_id: testUsers.weijie.id,
           title: 'Test Notification',
           message: 'This is a test notification for deletion',
           type: 'task_updated',
@@ -407,8 +407,8 @@ describe('Notifications Integration Tests', () => {
 
       expect(testNotif).toBeDefined();
 
-      // Kester deletes the notification
-      const { client } = await authenticateAs('kester');
+      // Wei Jie deletes the notification
+      const { client } = await authenticateAs('weijie');
       const { error } = await client.from('notifications').delete().eq('id', testNotif!.id);
 
       expect(error).toBeNull();
@@ -423,13 +423,13 @@ describe('Notifications Integration Tests', () => {
     });
 
     it('should allow user to mark all notifications as read', async () => {
-      const { client } = await authenticateAs('ryan');
+      const { client } = await authenticateAs('aisha');
 
       // Get unread count before
       const { count: beforeUnread } = await client
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.ryan.id)
+        .eq('user_id', testUsers.aisha.id)
         .eq('read', false);
 
       if (!beforeUnread || beforeUnread === 0) {
@@ -441,7 +441,7 @@ describe('Notifications Integration Tests', () => {
       const { error } = await client
         .from('notifications')
         .update({ read: true })
-        .eq('user_id', testUsers.ryan.id)
+        .eq('user_id', testUsers.aisha.id)
         .eq('read', false);
 
       expect(error).toBeNull();
@@ -450,7 +450,7 @@ describe('Notifications Integration Tests', () => {
       const { count: afterUnread } = await client
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.ryan.id)
+        .eq('user_id', testUsers.aisha.id)
         .eq('read', false);
 
       expect(afterUnread).toBe(0);
@@ -467,7 +467,7 @@ describe('Notifications Integration Tests', () => {
           description: 'Test task for multi-user notifications',
           priority_bucket: 5,
           status: 'To Do',
-          creator_id: testUsers.joel.id,
+          creator_id: testUsers.daniel.id,
           project_id: 1, // Assuming project 1 exists
         })
         .select()
@@ -478,43 +478,43 @@ describe('Notifications Integration Tests', () => {
       }
 
       // Get notification counts before assignment
-      const { count: mitchBefore } = await adminClient
+      const { count: priyaBefore } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.mitch.id);
+        .eq('user_id', testUsers.priya.id);
 
-      const { count: garrisonBefore } = await adminClient
+      const { count: marcusBefore } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.garrison.id);
+        .eq('user_id', testUsers.marcus.id);
 
       // Assign multiple users to the task
       await adminClient.from('task_assignments').insert([
         {
           task_id: task!.id,
-          assignee_id: testUsers.mitch.id,
-          assignor_id: testUsers.joel.id,
+          assignee_id: testUsers.priya.id,
+          assignor_id: testUsers.daniel.id,
         },
         {
           task_id: task!.id,
-          assignee_id: testUsers.garrison.id,
-          assignor_id: testUsers.joel.id,
+          assignee_id: testUsers.marcus.id,
+          assignor_id: testUsers.daniel.id,
         },
       ]);
 
       // Check both users received notifications
-      const { count: mitchAfter } = await adminClient
+      const { count: priyaAfter } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.mitch.id);
+        .eq('user_id', testUsers.priya.id);
 
-      const { count: garrisonAfter } = await adminClient
+      const { count: marcusAfter } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.garrison.id);
+        .eq('user_id', testUsers.marcus.id);
 
-      expect(mitchAfter).toBe((mitchBefore || 0) + 1);
-      expect(garrisonAfter).toBe((garrisonBefore || 0) + 1);
+      expect(priyaAfter).toBe((priyaBefore || 0) + 1);
+      expect(marcusAfter).toBe((marcusBefore || 0) + 1);
 
       // Cleanup
       await adminClient.from('tasks').delete().eq('id', task.id);
@@ -522,26 +522,26 @@ describe('Notifications Integration Tests', () => {
 
     it('should maintain notification isolation between users', async () => {
       // Get notifications for different users
-      const { client: joelClient } = await authenticateAs('joel');
-      const { client: mitchClient } = await authenticateAs('mitch');
+      const { client: danielClient } = await authenticateAs('daniel');
+      const { client: priyaClient } = await authenticateAs('priya');
 
-      const { data: joelNotifs } = await joelClient.from('notifications').select('user_id');
+      const { data: danielNotifs } = await danielClient.from('notifications').select('user_id');
 
-      const { data: mitchNotifs } = await mitchClient.from('notifications').select('user_id');
+      const { data: priyaNotifs } = await priyaClient.from('notifications').select('user_id');
 
-      // All of Joel's visible notifications should belong to Joel
-      const allJoelNotifs = joelNotifs?.every((n) => n.user_id === testUsers.joel.id);
-      expect(allJoelNotifs).toBe(true);
+      // All of Daniel's visible notifications should belong to Daniel
+      const allDanielNotifs = danielNotifs?.every((n) => n.user_id === testUsers.daniel.id);
+      expect(allDanielNotifs).toBe(true);
 
-      // All of Mitch's visible notifications should belong to Mitch
-      const allMitchNotifs = mitchNotifs?.every((n) => n.user_id === testUsers.mitch.id);
-      expect(allMitchNotifs).toBe(true);
+      // All of Priya's visible notifications should belong to Priya
+      const allPriyaNotifs = priyaNotifs?.every((n) => n.user_id === testUsers.priya.id);
+      expect(allPriyaNotifs).toBe(true);
     });
   });
 
   describe('Notification Content Validation', () => {
     it('should have correct notification structure', async () => {
-      const { client } = await authenticateAs('joel');
+      const { client } = await authenticateAs('daniel');
 
       const { data: notifications } = await client
         .from('notifications')
@@ -595,24 +595,24 @@ describe('Notifications Integration Tests', () => {
 
   //TESTING HERE
   async function ensureTaskWithAtLeastTwoAssignees() {
-    // Find a task that has both kester and ryan as assignees
-    const { data: kesterAssignments } = await adminClient
+    // Find a task that has both weijie and aisha as assignees
+    const { data: weijieAssignments } = await adminClient
       .from('task_assignments')
       .select('task_id')
-      .eq('assignee_id', testUsers.kester.id);
+      .eq('assignee_id', testUsers.weijie.id);
 
-    const { data: ryanAssignments } = await adminClient
+    const { data: aishaAssignments } = await adminClient
       .from('task_assignments')
       .select('task_id')
-      .eq('assignee_id', testUsers.ryan.id);
+      .eq('assignee_id', testUsers.aisha.id);
 
     // Find common task_id
-    const kesterTaskIds = kesterAssignments?.map((a) => a.task_id) || [];
-    const ryanTaskIds = ryanAssignments?.map((a) => a.task_id) || [];
-    const commonTaskId = kesterTaskIds.find((id) => ryanTaskIds.includes(id));
+    const weijieTaskIds = weijieAssignments?.map((a) => a.task_id) || [];
+    const aishaTaskIds = aishaAssignments?.map((a) => a.task_id) || [];
+    const commonTaskId = weijieTaskIds.find((id) => aishaTaskIds.includes(id));
 
     if (!commonTaskId) {
-      throw new Error('No task found with both kester and ryan as assignees');
+      throw new Error('No task found with both weijie and aisha as assignees');
     }
 
     // Get the task
@@ -634,8 +634,8 @@ describe('Notifications Integration Tests', () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee, not the updater)
+      const recipient = testUsers.aisha.id;
 
       // Record notification count before update
       const { count: beforeCount } = await adminClient
@@ -644,9 +644,9 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Update the task title as authenticated kester using direct client call
+      // Update the task title as authenticated weijie using direct client call
       const newTitle = `Test Title Updated ${Date.now()}`;
-      const { error: updateError } = await kesterClient
+      const { error: updateError } = await weijieClient
         .from('tasks')
         .update({ title: newTitle })
         .eq('id', task.id);
@@ -656,7 +656,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -681,15 +681,15 @@ describe('Notifications Integration Tests', () => {
       expect(notification?.read).toBe(false);
 
       // Restore original title
-      await kesterClient.from('tasks').update({ title: task.title }).eq('id', task.id);
+      await weijieClient.from('tasks').update({ title: task.title }).eq('id', task.id);
     });
 
     it('should create notifications when task status is updated', async () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee)
+      const recipient = testUsers.aisha.id;
 
       // Record notification count before update
       const { count: beforeCount } = await adminClient
@@ -698,9 +698,9 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Update the task status as authenticated kester using direct client call
+      // Update the task status as authenticated weijie using direct client call
       const newStatus = task.status === 'To Do' ? 'In Progress' : 'To Do';
-      const { error: updateError } = await kesterClient
+      const { error: updateError } = await weijieClient
         .from('tasks')
         .update({ status: newStatus })
         .eq('id', task.id);
@@ -710,7 +710,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 120));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -732,7 +732,7 @@ describe('Notifications Integration Tests', () => {
       expect(notification?.message).toContain('status');
 
       // Restore original status
-      await kesterClient.from('tasks').update({ status: task.status }).eq('id', task.id);
+      await weijieClient.from('tasks').update({ status: task.status }).eq('id', task.id);
     });
 
     it('should create notifications when task priority is updated', async () => {
@@ -811,8 +811,8 @@ describe('Notifications Integration Tests', () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee)
+      const recipient = testUsers.aisha.id;
 
       // Record notification count before update
       const { count: beforeCount } = await adminClient
@@ -821,12 +821,12 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Update the task deadline as authenticated kester using direct client call
+      // Update the task deadline as authenticated weijie using direct client call
       // Use a timestamp in the far future to ensure it's different from any existing deadline
       const futureDate = new Date();
       futureDate.setFullYear(futureDate.getFullYear() + 1); // 1 year from now
       const newDeadline = futureDate.toISOString();
-      const { error: updateError } = await kesterClient
+      const { error: updateError } = await weijieClient
         .from('tasks')
         .update({ deadline: newDeadline })
         .eq('id', task.id);
@@ -836,7 +836,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 120));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -859,7 +859,7 @@ describe('Notifications Integration Tests', () => {
 
       // Only restore if original deadline was not null to avoid creating extra notifications
       if (task.deadline !== null) {
-        await kesterClient.from('tasks').update({ deadline: task.deadline }).eq('id', task.id);
+        await weijieClient.from('tasks').update({ deadline: task.deadline }).eq('id', task.id);
       }
     });
 
@@ -867,8 +867,8 @@ describe('Notifications Integration Tests', () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee)
+      const recipient = testUsers.aisha.id;
 
       // Record notification count before update
       const { count: beforeCount } = await adminClient
@@ -877,9 +877,9 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Update the task notes as authenticated kester using direct client call
+      // Update the task notes as authenticated weijie using direct client call
       const newNotes = `Updated test notes ${Date.now()}`;
-      const { error: updateError } = await kesterClient
+      const { error: updateError } = await weijieClient
         .from('tasks')
         .update({ notes: newNotes })
         .eq('id', task.id);
@@ -889,7 +889,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -914,15 +914,15 @@ describe('Notifications Integration Tests', () => {
       expect(notification?.read).toBe(false);
 
       // Restore original notes
-      await kesterClient.from('tasks').update({ notes: task.notes }).eq('id', task.id);
+      await weijieClient.from('tasks').update({ notes: task.notes }).eq('id', task.id);
     });
 
     it('should create notifications when task is archived', async () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee)
+      const recipient = testUsers.aisha.id;
 
       // Record notification count before update
       const { count: beforeCount } = await adminClient
@@ -931,9 +931,9 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Archive the task as authenticated kester (who has admin role)
+      // Archive the task as authenticated weijie (who has admin role)
       // Note: Only admins can archive tasks per RLS policy
-      const { error: updateError } = await kesterClient
+      const { error: updateError } = await weijieClient
         .from('tasks')
         .update({ is_archived: true })
         .eq('id', task.id);
@@ -943,7 +943,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -968,7 +968,7 @@ describe('Notifications Integration Tests', () => {
       expect(notification?.read).toBe(false);
 
       // Restore original archived status (unarchive)
-      await kesterClient.from('tasks').update({ is_archived: false }).eq('id', task.id);
+      await weijieClient.from('tasks').update({ is_archived: false }).eq('id', task.id);
     });
 
     it('should not notify updater when they are also an assignee', async () => {
@@ -1040,8 +1040,8 @@ describe('Notifications Integration Tests', () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee)
+      const recipient = testUsers.aisha.id;
 
       // Record notification count before update
       const { count: beforeCount } = await adminClient
@@ -1050,10 +1050,10 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Update the task as authenticated kester using direct client call
+      // Update the task as authenticated weijie using direct client call
       // Use a different priority that's guaranteed to be different
       const newPriority = task.priority_bucket === 8 ? 5 : 8;
-      const { error: updateError } = await kesterClient
+      const { error: updateError } = await weijieClient
         .from('tasks')
         .update({ priority_bucket: newPriority })
         .eq('id', task.id);
@@ -1063,7 +1063,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 120));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -1073,7 +1073,7 @@ describe('Notifications Integration Tests', () => {
       expect(afterCount).toBe((beforeCount || 0) + 1);
 
       // Always restore original priority to maintain test isolation
-      await kesterClient
+      await weijieClient
         .from('tasks')
         .update({ priority_bucket: task.priority_bucket })
         .eq('id', task.id);
@@ -1083,8 +1083,8 @@ describe('Notifications Integration Tests', () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee, not the updater)
+      const recipient = testUsers.aisha.id;
 
       // Record original task state before any changes
       const { data: originalTask } = await adminClient
@@ -1133,7 +1133,7 @@ describe('Notifications Integration Tests', () => {
       ];
 
       for (const update of singleUpdates) {
-        const { error: updateError } = await kesterClient
+        const { error: updateError } = await weijieClient
           .from('tasks')
           .update({ [update.field]: update.value })
           .eq('id', task.id);
@@ -1160,7 +1160,7 @@ describe('Notifications Integration Tests', () => {
       expect(afterSingleUpdates).toBeGreaterThanOrEqual(minimumExpected);
 
       // Step 2: Batch update to restore original state
-      const { error: restoreError } = await kesterClient
+      const { error: restoreError } = await weijieClient
         .from('tasks')
         .update({
           priority_bucket: originalTask.priority_bucket,
@@ -1234,12 +1234,12 @@ describe('Notifications Integration Tests', () => {
         .filter((ta) => ta.task_id === taskId)
         .map((ta) => ta.assignee_id);
 
-      // Joel adds a comment first
+      // Daniel adds a comment first
       const { data: comment } = await adminClient
         .from('task_comments')
         .insert({
           task_id: taskId,
-          user_id: testUsers.joel.id,
+          user_id: testUsers.daniel.id,
           content: 'Test comment for removal scenario',
         })
         .select()
@@ -1247,7 +1247,7 @@ describe('Notifications Integration Tests', () => {
 
       expect(comment).toBeDefined();
 
-      // Kester (admin) removes the comment
+      // Wei Jie (admin) removes the comment
       const { data: removedComment } = await adminClient
         .from('task_comments')
         .delete()
@@ -1259,7 +1259,7 @@ describe('Notifications Integration Tests', () => {
 
       // Check notifications were created for assignees (excluding the remover if they're assigned)
       for (const assigneeId of assigneeIds) {
-        if (assigneeId === testUsers.kester.id) {
+        if (assigneeId === testUsers.weijie.id) {
           // Admin shouldn't receive notification for their own action
           continue;
         }
@@ -1279,7 +1279,7 @@ describe('Notifications Integration Tests', () => {
           expect(notifications[0].title).toBe('Comment Removed');
           expect(notifications[0].message).toContain('removed');
           expect(notifications[0].message).toContain(
-            testUsers.joel.id === assigneeId ? 'your' : "Joel's"
+            testUsers.daniel.id === assigneeId ? 'your' : "Daniel's"
           );
           expect(notifications[0].message).toContain('comment');
         }
@@ -1316,8 +1316,8 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', existingAssignment.assignee_id)
         .eq('type', 'task_updated');
 
-      // Check if the task assignment removal RLS policy allows kester to delete
-      const { data: canDelete } = await kesterClient
+      // Check if the task assignment removal RLS policy allows weijie to delete
+      const { data: canDelete } = await weijieClient
         .from('task_assignments')
         .select('id')
         .eq('id', existingAssignment.id)
@@ -1328,8 +1328,8 @@ describe('Notifications Integration Tests', () => {
         return;
       }
 
-      // Remove the assignment using authenticated kester client
-      const { data: removedAssignment } = await kesterClient
+      // Remove the assignment using authenticated weijie client
+      const { data: removedAssignment } = await weijieClient
         .from('task_assignments')
         .delete()
         .eq('id', existingAssignment.id)
@@ -1366,36 +1366,36 @@ describe('Notifications Integration Tests', () => {
       await adminClient.from('task_assignments').insert({
         task_id: existingAssignment.task_id,
         assignee_id: existingAssignment.assignee_id,
-        assignor_id: testUsers.kester.id,
+        assignor_id: testUsers.weijie.id,
       });
     });
   });
 
   describe('Notification Triggers - Task Attachments', () => {
     it('should create notifications when file is attached to task', async () => {
-      // Get a task where Joel is assigned (so he can add attachments)
+      // Get a task where Daniel is assigned (so he can add attachments)
       const { data: assignment } = await adminClient
         .from('task_assignments')
         .select('task_id, assignee_id')
-        .eq('assignee_id', testUsers.joel.id)
+        .eq('assignee_id', testUsers.daniel.id)
         .limit(1)
         .single();
 
       if (!assignment) {
-        console.log('Joel not assigned to any tasks, skipping attachment test');
+        console.log('Daniel not assigned to any tasks, skipping attachment test');
         return;
       }
 
-      // Get an authenticated client (joel) to add the attachment
-      const { client: joelClient } = await authenticateAs('joel');
+      // Get an authenticated client (daniel) to add the attachment
+      const { client: danielClient } = await authenticateAs('daniel');
 
       // Add file attachment using the correct path format
-      const { data: attachment } = await joelClient
+      const { data: attachment } = await danielClient
         .from('task_attachments')
         .insert({
           task_id: assignment.task_id,
           storage_path: 'task-attachments/test-file.pdf',
-          uploaded_by: testUsers.joel.id,
+          uploaded_by: testUsers.daniel.id,
         })
         .select()
         .single();
@@ -1403,7 +1403,7 @@ describe('Notifications Integration Tests', () => {
       expect(attachment).toBeDefined();
 
       // Check notification was created for assignee (not uploader)
-      if (assignment.assignee_id !== testUsers.joel.id) {
+      if (assignment.assignee_id !== testUsers.daniel.id) {
         const { data: notification } = await adminClient
           .from('notifications')
           .select('*')
@@ -1420,55 +1420,55 @@ describe('Notifications Integration Tests', () => {
       }
 
       // Cleanup
-      await joelClient.from('task_attachments').delete().eq('id', attachment!.id);
+      await danielClient.from('task_attachments').delete().eq('id', attachment!.id);
     });
 
     it('should create notifications when file is removed from task', async () => {
-      // Get a task where both Joel and Kester are assigned
-      const { data: joelAssignment } = await adminClient
+      // Get a task where both Daniel and Wei Jie are assigned
+      const { data: danielAssignment } = await adminClient
         .from('task_assignments')
         .select('task_id')
-        .eq('assignee_id', testUsers.joel.id)
+        .eq('assignee_id', testUsers.daniel.id)
         .limit(1)
         .single();
 
-      if (!joelAssignment) {
-        console.log('Joel not assigned to any tasks, skipping attachment removal test');
+      if (!danielAssignment) {
+        console.log('Daniel not assigned to any tasks, skipping attachment removal test');
         return;
       }
 
-      // Check if Kester is also assigned to the same task
-      const { data: kesterAssignment } = await adminClient
+      // Check if Wei Jie is also assigned to the same task
+      const { data: weijieAssignment } = await adminClient
         .from('task_assignments')
         .select('task_id, assignee_id')
-        .eq('task_id', joelAssignment.task_id)
-        .eq('assignee_id', testUsers.kester.id)
+        .eq('task_id', danielAssignment.task_id)
+        .eq('assignee_id', testUsers.weijie.id)
         .maybeSingle();
 
-      if (!kesterAssignment) {
-        console.log('Kester not assigned to the same task as Joel, skipping test');
+      if (!weijieAssignment) {
+        console.log('Wei Jie not assigned to the same task as Daniel, skipping test');
         return;
       }
 
       // Get authenticated clients
-      const { client: joelClient } = await authenticateAs('joel');
-      const { client: kesterClient } = await authenticateAs('kester');
+      const { client: danielClient } = await authenticateAs('daniel');
+      const { client: weijieClient } = await authenticateAs('weijie');
 
-      // First add an attachment using Joel's client
-      const { data: attachment } = await joelClient
+      // First add an attachment using Daniel's client
+      const { data: attachment } = await danielClient
         .from('task_attachments')
         .insert({
-          task_id: joelAssignment.task_id,
+          task_id: danielAssignment.task_id,
           storage_path: 'task-attachments/test-file-to-remove.pdf',
-          uploaded_by: testUsers.joel.id,
+          uploaded_by: testUsers.daniel.id,
         })
         .select()
         .single();
 
       expect(attachment).toBeDefined();
 
-      // Remove the attachment using Kester's client (different user)
-      const { data: removedAttachment } = await kesterClient
+      // Remove the attachment using Wei Jie's client (different user)
+      const { data: removedAttachment } = await weijieClient
         .from('task_attachments')
         .delete()
         .eq('id', attachment!.id)
@@ -1478,11 +1478,11 @@ describe('Notifications Integration Tests', () => {
       expect(removedAttachment).toBeDefined();
 
       // Check notification was created for assignee (not remover)
-      if (kesterAssignment.assignee_id !== testUsers.kester.id) {
+      if (weijieAssignment.assignee_id !== testUsers.weijie.id) {
         const { data: notification } = await adminClient
           .from('notifications')
           .select('*')
-          .eq('user_id', kesterAssignment.assignee_id)
+          .eq('user_id', weijieAssignment.assignee_id)
           .eq('type', 'task_updated')
           .order('created_at', { ascending: false })
           .limit(1)
@@ -1538,7 +1538,7 @@ describe('Notifications Integration Tests', () => {
 
       // Find a user who is assigned to the parent task (not the subtask creator)
       const assigneeIds = assignments.map(a => a.user_id);
-      const testRecipient = assigneeIds.find(id => id !== testUsers.kester.id);
+      const testRecipient = assigneeIds.find(id => id !== testUsers.weijie.id);
 
       if (!testRecipient) {
         console.log('No suitable recipient found for testing - skipping test');
@@ -1593,8 +1593,8 @@ describe('Notifications Integration Tests', () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee, not the updater)
+      const recipient = testUsers.aisha.id;
 
       // Get an available tag
       const { data: tag } = await adminClient.from('tags').select('id, name').limit(1).single();
@@ -1624,8 +1624,8 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Add tag to task using authenticated kester client
-      const { data: taskTag, error: addError } = await kesterClient
+      // Add tag to task using authenticated weijie client
+      const { data: taskTag, error: addError } = await weijieClient
         .from('task_tags')
         .insert({
           task_id: task.id,
@@ -1640,7 +1640,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -1666,15 +1666,15 @@ describe('Notifications Integration Tests', () => {
       expect(notification?.read).toBe(false);
 
       // Cleanup - remove the tag
-      await kesterClient.from('task_tags').delete().eq('task_id', task.id).eq('tag_id', tag.id);
+      await weijieClient.from('task_tags').delete().eq('task_id', task.id).eq('tag_id', tag.id);
     });
 
     it('should create notifications when tag is removed from task', async () => {
       // Get existing task with multi-assignees
       const task = await ensureTaskWithAtLeastTwoAssignees();
 
-      // Define the expected recipient (ryan - the OTHER assignee, not the updater)
-      const recipient = testUsers.ryan.id;
+      // Define the expected recipient (aisha - the OTHER assignee, not the updater)
+      const recipient = testUsers.aisha.id;
 
       // Get an available tag
       const { data: tag } = await adminClient.from('tags').select('id, name').limit(1).single();
@@ -1684,8 +1684,8 @@ describe('Notifications Integration Tests', () => {
         return;
       }
 
-      // First add the tag to the task using authenticated kester client
-      const { data: taskTag } = await kesterClient
+      // First add the tag to the task using authenticated weijie client
+      const { data: taskTag } = await weijieClient
         .from('task_tags')
         .insert({
           task_id: task.id,
@@ -1706,8 +1706,8 @@ describe('Notifications Integration Tests', () => {
         .eq('user_id', recipient)
         .eq('type', 'task_updated');
 
-      // Remove tag from task using authenticated kester client
-      const { error: removeError } = await kesterClient
+      // Remove tag from task using authenticated weijie client
+      const { error: removeError } = await weijieClient
         .from('task_tags')
         .delete()
         .eq('task_id', task.id)
@@ -1718,7 +1718,7 @@ describe('Notifications Integration Tests', () => {
       // Wait briefly for the trigger to execute
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Assert that ryan got +1 notification
+      // Assert that aisha got +1 notification
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
@@ -1756,15 +1756,15 @@ describe('Notifications Integration Tests', () => {
         return;
       }
 
-      // Record kester's notification count before tag addition
+      // Record weijie's notification count before tag addition
       const { count: beforeCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.kester.id)
+        .eq('user_id', testUsers.weijie.id)
         .eq('type', 'task_updated');
 
-      // Kester adds tag to the task (kester is an assignee)
-      const { data: taskTag } = await kesterClient
+      // Wei Jie adds tag to the task (weijie is an assignee)
+      const { data: taskTag } = await weijieClient
         .from('task_tags')
         .insert({
           task_id: task.id,
@@ -1778,17 +1778,17 @@ describe('Notifications Integration Tests', () => {
       // Wait for trigger
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      // Verify kester did NOT get a notification (self-action)
+      // Verify weijie did NOT get a notification (self-action)
       const { count: afterCount } = await adminClient
         .from('notifications')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', testUsers.kester.id)
+        .eq('user_id', testUsers.weijie.id)
         .eq('type', 'task_updated');
 
       expect(afterCount).toBe(beforeCount);
 
       // Cleanup
-      await kesterClient.from('task_tags').delete().eq('task_id', task.id).eq('tag_id', tag.id);
+      await weijieClient.from('task_tags').delete().eq('task_id', task.id).eq('tag_id', tag.id);
     });
   });
 });

@@ -20,7 +20,7 @@ describe('NotificationItem', () => {
   const mockNotificationRead: Notification = {
     id: 2,
     title: 'Task Completed',
-    message: 'Ryan completed "Setup CI/CD pipeline".',
+    message: 'Aisha completed "Setup CI/CD pipeline".',
     type: 'task_updated',
     read: true,
     is_archived: false,

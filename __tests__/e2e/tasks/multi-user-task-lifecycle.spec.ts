@@ -23,11 +23,11 @@ test.describe('Multi-User Task Lifecycle', () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     await tasksPage.createAdvancedTaskWithAttachments({
-      project: 'Data Warehouse Lift',
+      project: 'Data Platform Migration',
       title: taskTitle,
       description: 'Complete multi-assignee workflow test with notifications and calendar views',
       priority: '8',
-      assignees: ['Mitch Shona', 'Noel Tang'], // MULTIPLE ASSIGNEES (1st will check notifications)
+      assignees: ['Priya Nair', 'Hannah Lee'], // MULTIPLE ASSIGNEES (1st will check notifications)
       deadline: tomorrow, // Use tomorrow to match calendar navigation
       tags: ['multi-assignee-test', 'notifications', 'calendar'],
       attachments: ['__tests__/e2e/fixtures/e2e-testing-sample.pdf'],
@@ -81,8 +81,8 @@ test.describe('Multi-User Task Lifecycle', () => {
     // === TASK UPDATE NOTIFICATION TESTING ===
     console.log('Starting task update notification testing...');
 
-    // Step 1: Log in as unused assignee (Joel Staff) and perform updates
-    console.log('Switching to unused assignee (Joel Staff) for task updates...');
+    // Step 1: Log in as unused assignee (Daniel Staff) and perform updates
+    console.log('Switching to unused assignee (Daniel Staff) for task updates...');
 
     // Close notification panel first to avoid logout issues
     try {
@@ -93,7 +93,7 @@ test.describe('Multi-User Task Lifecycle', () => {
     }
 
     await logout(page);
-    await login(page, 'staff'); // Joel Wang (Personal) account
+    await login(page, 'staff'); // Hannah Lee account
 
     // Navigate to the created task
     await tasksPage.goto();
@@ -105,8 +105,8 @@ test.describe('Multi-User Task Lifecycle', () => {
     await tasksPage.addTaskComment('Starting analysis on this task');
     console.log('Comment added successfully');
 
-    // Step 3: Return to first assignee (Mitch Admin) and verify notifications
-    console.log('Switching back to first assignee (Mitch Admin) to verify notifications...');
+    // Step 3: Return to first assignee (Priya Admin) and verify notifications
+    console.log('Switching back to first assignee (Priya Admin) to verify notifications...');
 
     // Close any open panels first
     try {
@@ -117,7 +117,7 @@ test.describe('Multi-User Task Lifecycle', () => {
     }
 
     await logout(page);
-    await login(page, 'admin'); // Mitch Tiew Shona (SMU)
+    await login(page, 'admin'); // Priya Nair
 
     // Open notification panel and verify comment notification
     console.log('Opening notification panel to verify comment notification...');

@@ -107,7 +107,7 @@ test.describe('Report Export Functionality', () => {
     console.log('Selecting filters for report generation...');
     await reportPage.selectDepartments(['Finance Director']);
     await page.waitForTimeout(2000);
-    await reportPage.selectProjects(['Annual Budget FY25']);
+    await reportPage.selectProjects(['FY26 Budget Planning']);
     await page.waitForTimeout(2000);
     await reportPage.selectDateRangePreset('2 Weeks (±1 week)');
     await page.waitForTimeout(2000);

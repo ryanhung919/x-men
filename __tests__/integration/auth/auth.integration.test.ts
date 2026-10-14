@@ -12,16 +12,16 @@ describe('Auth Integration', () => {
     })
 
     const { data, error } = await anon.auth.signInWithPassword({
-      email: testUsers.joel.email,
-      password: testUsers.joel.password,
+      email: testUsers.daniel.email,
+      password: testUsers.daniel.password,
     })
 
     expect(error).toBeNull()
-    expect(data?.user?.id).toBe(testUsers.joel.id)
+    expect(data?.user?.id).toBe(testUsers.daniel.id)
 
     // Ensure session token present and password is not stored anywhere client-side
     expect(data?.session?.access_token).toBeTruthy()
-    expect(JSON.stringify(data)).not.toContain(testUsers.joel.password)
+    expect(JSON.stringify(data)).not.toContain(testUsers.daniel.password)
   })
 
   it('denies access for invalid password', async () => {
@@ -30,7 +30,7 @@ describe('Auth Integration', () => {
     })
 
     const { data, error } = await anon.auth.signInWithPassword({
-      email: testUsers.mitch.email,
+      email: testUsers.priya.email,
       password: 'wrong-password',
     })
 
@@ -52,7 +52,7 @@ describe('Auth Integration', () => {
     const anon = createAnonClient(appUrl, anonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
-    const staffCreds = { email: 'joel.wang.03@gmail.com', password: 'password123' }
+    const staffCreds = { email: testUsers.hannah.email, password: testUsers.hannah.password }
     const { data: staffAuth } = await anon.auth.signInWithPassword(staffCreds)
     expect(staffAuth.session).toBeTruthy()
 
@@ -76,8 +76,8 @@ describe('Auth Integration', () => {
       .eq('id', anyComment!.id)
     expect(countAfterStaff).toBe(1)
 
-    // Now authenticate as Mitch (admin) and verify he can see his own roles including admin
-    const { client, user } = await authenticateAs('mitch')
+    // Now authenticate as Priya (admin) and verify he can see his own roles including admin
+    const { client, user } = await authenticateAs('priya')
     const { data: roles, error } = await client
       .from('user_roles')
       .select('role')

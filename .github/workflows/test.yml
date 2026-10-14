@@ -119,26 +119,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Verify required secrets are set
-        run: |
-          echo "Checking required secrets..."
-          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
-            echo "❌ Error: NEXT_PUBLIC_SUPABASE_URL secret is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
-            echo "❌ Error: NEXT_PUBLIC_SUPABASE_ANON_KEY secret is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
-            echo "❌ Error: SUPABASE_SERVICE_ROLE_KEY secret is not set"
-            exit 1
-          fi
-          if [ -z "${{ secrets.POSTGRES_URL }}" ]; then
-            echo "❌ Error: POSTGRES_URL secret is not set"
-            exit 1
-          fi
-          echo "✅ All required secrets are set"
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -150,31 +130,49 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start ephemeral local Supabase
+        run: supabase start
+      - name: Point the job at the local Supabase only
+        # Integration/e2e tests seed through /seed, which DROPS and recreates the schema.
+        # They must never see hosted credentials, so no secrets.* are used in this job:
+        # every value below comes from the throwaway local stack or is generated per run.
+        run: |
+          supabase status -o json > "$RUNNER_TEMP/sb.json"
+          SEED=$(openssl rand -hex 16); DEMO=ci-demo-$(openssl rand -hex 6); GUEST=ci-guest-$(openssl rand -hex 6)
+          echo "::add-mask::$SEED"; echo "::add-mask::$DEMO"; echo "::add-mask::$GUEST"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL "$RUNNER_TEMP/sb.json")"
+            echo "SUPABASE_URL=$(jq -r .API_URL "$RUNNER_TEMP/sb.json")"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY "$RUNNER_TEMP/sb.json")"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(jq -r .SERVICE_ROLE_KEY "$RUNNER_TEMP/sb.json")"
+            echo "POSTGRES_URL=$(jq -r .DB_URL "$RUNNER_TEMP/sb.json")"
+            echo "POSTGRES_SSL=disable"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
+            echo "SEED_SECRET=$SEED"
+            echo "DEMO_PASSWORD=$DEMO"
+            echo "GUEST_PASSWORD=$GUEST"
+          } >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/sb.json"
+      - name: Refuse to run against a non-local database
+        run: |
+          for v in "$NEXT_PUBLIC_SUPABASE_URL" "$POSTGRES_URL"; do
+            case "$v" in
+              *127.0.0.1*|*localhost*) ;;
+              *) echo "Refusing to run: a Supabase URL is not local"; exit 1 ;;
+            esac
+          done
       - name: Check database status
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
         run: |
           echo "Checking database connection..."
           pnpm db:status || echo "⚠️ Database status check failed, will seed during tests"
       - name: Build Next.js app
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
         run: pnpm build
       - name: Start Next.js server in background
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
           PORT: 3000
         run: |
           echo "Starting Next.js server..."
@@ -187,25 +185,11 @@ jobs:
           done'
           echo "✅ Server is ready"
       - name: Seed database
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
         run: |
           echo "Seeding database..."
           pnpm db:seed
           echo "✅ Database seeded"
       - name: Run integration tests
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
         run: |
           echo "Running integration tests..."
           pnpm test:integration
@@ -217,6 +201,9 @@ jobs:
             kill $(cat .next-pid) || true
             rm .next-pid
           fi
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true
 
   test-summary:
     name: Test Summary
@@ -307,26 +294,50 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start ephemeral local Supabase
+        run: supabase start
+      - name: Point the job at the local Supabase only
+        # Integration/e2e tests seed through /seed, which DROPS and recreates the schema.
+        # They must never see hosted credentials, so no secrets.* are used in this job:
+        # every value below comes from the throwaway local stack or is generated per run.
+        run: |
+          supabase status -o json > "$RUNNER_TEMP/sb.json"
+          SEED=$(openssl rand -hex 16); DEMO=ci-demo-$(openssl rand -hex 6); GUEST=ci-guest-$(openssl rand -hex 6)
+          echo "::add-mask::$SEED"; echo "::add-mask::$DEMO"; echo "::add-mask::$GUEST"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL "$RUNNER_TEMP/sb.json")"
+            echo "SUPABASE_URL=$(jq -r .API_URL "$RUNNER_TEMP/sb.json")"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY "$RUNNER_TEMP/sb.json")"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$(jq -r .SERVICE_ROLE_KEY "$RUNNER_TEMP/sb.json")"
+            echo "POSTGRES_URL=$(jq -r .DB_URL "$RUNNER_TEMP/sb.json")"
+            echo "POSTGRES_SSL=disable"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
+            echo "SEED_SECRET=$SEED"
+            echo "DEMO_PASSWORD=$DEMO"
+            echo "GUEST_PASSWORD=$GUEST"
+          } >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/sb.json"
+      - name: Refuse to run against a non-local database
+        run: |
+          for v in "$NEXT_PUBLIC_SUPABASE_URL" "$POSTGRES_URL"; do
+            case "$v" in
+              *127.0.0.1*|*localhost*) ;;
+              *) echo "Refusing to run: a Supabase URL is not local"; exit 1 ;;
+            esac
+          done
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
 
       - name: Build Next.js app
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
         run: pnpm build
 
       - name: Start Next.js server in background
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
           PORT: 3000
         run: |
           echo "Starting Next.js server..."
@@ -343,12 +354,6 @@ jobs:
 
       - name: Run E2E tests (with built-in seeding via globalSetup)
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
-          SEED_SECRET: ${{ secrets.SEED_SECRET }}
           PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
         run: pnpm test:e2e
 
@@ -370,3 +375,6 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 30
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup || true

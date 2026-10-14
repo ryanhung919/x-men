@@ -29,7 +29,7 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
     console.log('Setting up filters for Finance Director department...');
     await reportPage.selectDepartments(['Finance Director']);
     await page.waitForTimeout(2000);
-    await reportPage.selectProjects(['Annual Budget FY25']);
+    await reportPage.selectProjects(['FY26 Budget Planning']);
     await page.waitForTimeout(2000);
     await reportPage.selectDateRangePreset('2 Weeks (±1 week)');
     await page.waitForTimeout(2000);
@@ -57,12 +57,12 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
     console.log('Creating completed task...');
     const today = new Date();
     await tasksPage.createAdvancedTaskWithAttachments({
-      project: 'Annual Budget FY25',
+      project: 'FY26 Budget Planning',
       title: completedTaskTitle,
       description: 'This task is completed for report testing',
       priority: '5',
       status: 'Completed',
-      assignees: ['Mitch Shona'],
+      assignees: ['Priya Nair'],
       deadline: today,
       tags: ['report-testing', 'completed'],
     });
@@ -72,12 +72,12 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     await tasksPage.createAdvancedTaskWithAttachments({
-      project: 'Annual Budget FY25',
+      project: 'FY26 Budget Planning',
       title: inProgressTaskTitle,
       description: 'This task is in progress for report testing',
       priority: '7',
       status: 'In Progress',
-      assignees: ['Noel Tang'],
+      assignees: ['Hannah Lee'],
       deadline: tomorrow,
       tags: ['report-testing', 'in-progress'],
     });
@@ -87,11 +87,11 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
     await tasksPage.createAdvancedTaskWithAttachments({
-      project: 'Annual Budget FY25',
+      project: 'FY26 Budget Planning',
       title: todoTaskTitle,
       description: 'This task is todo for report testing',
       priority: '6',
-      assignees: ['Ryan Hung'],
+      assignees: ['Aisha Rahman'],
       deadline: nextWeek,
       tags: ['report-testing', 'todo'],
     });
@@ -120,7 +120,7 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
     console.log('Setting up filters (same as BEFORE)...');
     await reportPage.selectDepartments(['Finance Director']);
     await page.waitForTimeout(2000);
-    await reportPage.selectProjects(['Annual Budget FY25']);
+    await reportPage.selectProjects(['FY26 Budget Planning']);
     await page.waitForTimeout(2000);
     await reportPage.selectDateRangePreset('2 Weeks (±1 week)');
     await page.waitForTimeout(2000);

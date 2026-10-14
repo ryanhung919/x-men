@@ -3,7 +3,7 @@ import { authenticateAs, adminClient } from '@/__tests__/setup/integration.setup
 
 describe('Settings integration', () => {
   it('updates user_info default_view for a user', async () => {
-    const { user } = await authenticateAs('joel');
+    const { user } = await authenticateAs('daniel');
 
     // Read current
     const { data: before, error: selErr } = await adminClient

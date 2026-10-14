@@ -11,10 +11,10 @@ import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integr
  */
 describe('Filter Integration Tests - Role-Based Department Access', () => {
   describe('Department Filtering - Managers vs Non-Managers', () => {
-    it('should return own department + descendants for Joel (Manager)', async () => {
-      const { client } = await authenticateAs('joel');
+    it('should return own department + descendants for Daniel (Manager)', async () => {
+      const { client } = await authenticateAs('daniel');
 
-      // Joel is a MANAGER in "Engineering Operations Division Director"
+      // Daniel is a MANAGER in "Engineering Operations Division Director"
       // He should see: his department + all child departments + departments from shared tasks
       const { data: departments, error } = await client
         .from('departments')
@@ -35,10 +35,10 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
       expect(deptNames.length).toBeGreaterThanOrEqual(5);
     });
 
-    it('should return ONLY own department for joelPersonal (Non-Manager)', async () => {
-      const { client } = await authenticateAs('joelPersonal');
+    it('should return ONLY own department for hannah (Non-Manager)', async () => {
+      const { client } = await authenticateAs('hannah');
 
-      // joelPersonal is STAFF ONLY (no manager role) in "Senior Engineers"
+      // hannah is STAFF ONLY (no manager role) in "Senior Engineers"
       // He should see: ONLY his own department + departments from shared tasks (NO descendants)
       const { data: departments, error } = await client.from('departments').select('id, name');
 
@@ -55,10 +55,10 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
       expect(deptNames.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should return own department + descendants for Ryan (Manager)', async () => {
-      const { client } = await authenticateAs('ryan');
+    it('should return own department + descendants for Aisha (Manager)', async () => {
+      const { client } = await authenticateAs('aisha');
 
-      // Ryan is a MANAGER in Finance Director department
+      // Aisha is a MANAGER in Finance Director department
       const { data: departments, error } = await client.from('departments').select('id, name');
 
       expect(error).toBeNull();
@@ -75,10 +75,10 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
       expect(deptNames.length).toBeGreaterThanOrEqual(3);
     });
 
-    it('should return ONLY own department for ryanPersonal (Non-Manager)', async () => {
-      const { client } = await authenticateAs('ryanPersonal');
+    it('should return ONLY own department for ryan (Non-Manager)', async () => {
+      const { client } = await authenticateAs('ryan');
 
-      // ryanPersonal is STAFF ONLY in "Finance Managers"
+      // ryan is STAFF ONLY in "Finance Managers"
       const { data: departments, error } = await client.from('departments').select('id, name');
 
       expect(error).toBeNull();
@@ -94,9 +94,9 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
     });
 
     it('should return own department + descendants', async () => {
-      const { client } = await authenticateAs('garrison');
+      const { client } = await authenticateAs('marcus');
 
-      // Garrison is a MANAGER in System Solutioning Division Director
+      // Marcus is a MANAGER in System Solutioning Division Director
       const { data: departments, error } = await client.from('departments').select('name');
 
       expect(error).toBeNull();
@@ -114,10 +114,10 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
   });
 
   describe('Project Filtering - Based on project_departments Table', () => {
-    it('should return projects linked to accessible departments for Joel (Manager)', async () => {
-      const { client } = await authenticateAs('joel');
+    it('should return projects linked to accessible departments for Daniel (Manager)', async () => {
+      const { client } = await authenticateAs('daniel');
 
-      // Get Joel's accessible departments first
+      // Get Daniel's accessible departments first
       const { data: departments } = await client.from('departments').select('id');
       expect(departments).toBeDefined();
 
@@ -134,27 +134,27 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
         new Set(projectLinks?.map((pl: { project_id: number }) => pl.project_id) || [])
       );
 
-      // Now check what Joel actually sees through RLS
+      // Now check what Daniel actually sees through RLS
       const { data: projects, error } = await client.from('projects').select('id, name');
 
       expect(error).toBeNull();
       expect(projects).toBeDefined();
 
-      const joelProjectIds = projects?.map((p) => p.id) || [];
+      const danielProjectIds = projects?.map((p) => p.id) || [];
 
-      // Joel should see projects linked to his accessible departments
-      expect(joelProjectIds.length).toBeGreaterThan(0);
+      // Daniel should see projects linked to his accessible departments
+      expect(danielProjectIds.length).toBeGreaterThan(0);
 
-      // Every project Joel sees should be in the expected set
-      joelProjectIds.forEach((id) => {
+      // Every project Daniel sees should be in the expected set
+      danielProjectIds.forEach((id) => {
         expect(expectedProjectIds).toContain(id);
       });
     });
 
-    it('should return projects linked to accessible departments for joelPersonal (Non-Manager)', async () => {
-      const { client } = await authenticateAs('joelPersonal');
+    it('should return projects linked to accessible departments for hannah (Non-Manager)', async () => {
+      const { client } = await authenticateAs('hannah');
 
-      // Get joelPersonal's accessible departments
+      // Get hannah's accessible departments
       const { data: departments } = await client.from('departments').select('id');
       expect(departments).toBeDefined();
 
@@ -171,24 +171,24 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
         new Set(projectLinks?.map((pl: { project_id: number }) => pl.project_id) || [])
       );
 
-      // Check what joelPersonal actually sees
+      // Check what hannah actually sees
       const { data: projects, error } = await client.from('projects').select('id, name');
 
       expect(error).toBeNull();
       expect(projects).toBeDefined();
 
-      const joelPersonalProjectIds = projects?.map((p) => p.id) || [];
+      const hannahProjectIds = projects?.map((p) => p.id) || [];
 
       // Every project he sees should be linked to his accessible departments
-      joelPersonalProjectIds.forEach((id) => {
+      hannahProjectIds.forEach((id) => {
         expect(expectedProjectIds).toContain(id);
       });
     });
 
     it('should see project_departments links for accessible projects', async () => {
-      const { client } = await authenticateAs('mitch');
+      const { client } = await authenticateAs('priya');
 
-      // Get Mitch's accessible departments
+      // Get Priya's accessible departments
       const { data: departments } = await client.from('departments').select('id');
       expect(departments).toBeDefined();
 
@@ -203,7 +203,7 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
     });
 
     it('should not see archived projects', async () => {
-      const { client } = await authenticateAs('mitch');
+      const { client } = await authenticateAs('priya');
 
       const { data: projects, error } = await client
         .from('projects')
@@ -220,7 +220,7 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
 
   describe('Task Assignment and RLS', () => {
     it('should see tasks assigned to accessible departments', async () => {
-      const { client } = await authenticateAs('joel');
+      const { client } = await authenticateAs('daniel');
 
       const { data: tasks, error } = await client.from('tasks').select('id, title, status');
 
@@ -230,9 +230,9 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
     });
 
     it('should see task assignments for visible tasks', async () => {
-      const { client } = await authenticateAs('mitch');
+      const { client } = await authenticateAs('priya');
 
-      // Get tasks Mitch can see
+      // Get tasks Priya can see
       const { data: tasks } = await client.from('tasks').select('id').limit(5);
 
       expect(tasks).toBeDefined();
@@ -252,7 +252,7 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
     });
 
     it('should not see all tasks (RLS is working)', async () => {
-      const { client } = await authenticateAs('garrison');
+      const { client } = await authenticateAs('marcus');
 
       const { data: visibleTasks } = await client.from('tasks').select('id, title');
 
@@ -263,7 +263,7 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
         .from('tasks')
         .select('*', { count: 'exact', head: true });
 
-      // Garrison should see fewer or equal tasks than total (RLS is filtering)
+      // Marcus should see fewer or equal tasks than total (RLS is filtering)
       expect(visibleTasks!.length).toBeLessThanOrEqual(totalTasks!);
     });
   });
@@ -320,11 +320,11 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
   });
 
   describe('Role-Based Access Control Verification', () => {
-    it('should verify joel has manager role', async () => {
+    it('should verify daniel has manager role', async () => {
       const { data: roles, error } = await adminClient
         .from('user_roles')
         .select('role')
-        .eq('user_id', testUsers.joel.id);
+        .eq('user_id', testUsers.daniel.id);
 
       expect(error).toBeNull();
       expect(roles).toBeDefined();
@@ -335,11 +335,11 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
       expect(roleNames).toContain('staff');
     });
 
-    it('should verify joelPersonal does NOT have manager role', async () => {
+    it('should verify hannah does NOT have manager role', async () => {
       const { data: roles, error } = await adminClient
         .from('user_roles')
         .select('role')
-        .eq('user_id', testUsers.joelPersonal.id);
+        .eq('user_id', testUsers.hannah.id);
 
       expect(error).toBeNull();
       expect(roles).toBeDefined();
@@ -349,11 +349,11 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
       expect(roleNames).toContain('staff');
     });
 
-    it('should verify mitch has manager role', async () => {
+    it('should verify priya has manager role', async () => {
       const { data: roles, error } = await adminClient
         .from('user_roles')
         .select('role')
-        .eq('user_id', testUsers.mitch.id);
+        .eq('user_id', testUsers.priya.id);
 
       expect(error).toBeNull();
       expect(roles).toBeDefined();
@@ -362,11 +362,11 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
       expect(roleNames).toContain('manager');
     });
 
-    it('should verify mitchPersonal does NOT have manager role', async () => {
+    it('should verify farah does NOT have manager role', async () => {
       const { data: roles, error } = await adminClient
         .from('user_roles')
         .select('role')
-        .eq('user_id', testUsers.mitchPersonal.id);
+        .eq('user_id', testUsers.farah.id);
 
       expect(error).toBeNull();
       expect(roles).toBeDefined();
@@ -379,7 +379,7 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
 
   describe('Filter Service Integration', () => {
     it('should return deduplicated and sorted projects when filtering by departments', async () => {
-      const { client } = await authenticateAs('joel');
+      const { client } = await authenticateAs('daniel');
 
       // Get accessible departments
       const { data: departments } = await client.from('departments').select('id');
@@ -404,7 +404,7 @@ describe('Filter Integration Tests - Role-Based Department Access', () => {
     });
 
     it('should return sorted departments when filtering by projects', async () => {
-      const { client } = await authenticateAs('mitch');
+      const { client } = await authenticateAs('priya');
 
       // Get accessible projects
       const { data: projects } = await client.from('projects').select('id').limit(3);

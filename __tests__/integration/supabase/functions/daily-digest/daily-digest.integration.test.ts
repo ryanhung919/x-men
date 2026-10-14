@@ -42,7 +42,7 @@ describe('Send Daily Digest - Integration Tests', () => {
     it('should fetch all users from user_info table', async () => {
       // FIX: user_info has (id, first_name, last_name, default_view, department_id)
       // Email is in auth.users table, not user_info
-      const userIds = [testUsers.joel.id, testUsers.mitch.id, testUsers.garrison.id];
+      const userIds = [testUsers.daniel.id, testUsers.priya.id, testUsers.marcus.id];
 
       for (const userId of userIds) {
         const { data: userInfo, error } = await adminClient
@@ -64,7 +64,7 @@ describe('Send Daily Digest - Integration Tests', () => {
       const { data: assignments, error: assignError } = await adminClient
         .from('task_assignments')
         .select('task_id, task:tasks(title, deadline, status)')
-        .eq('assignee_id', testUsers.joel.id);
+        .eq('assignee_id', testUsers.daniel.id);
 
       expect(assignError).toBeNull();
       expect(assignments).not.toBeNull();
@@ -77,7 +77,7 @@ describe('Send Daily Digest - Integration Tests', () => {
           url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
           serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
         },
-        [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+        [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
       );
 
       expect(result.success).toBe(true);
@@ -85,7 +85,7 @@ describe('Send Daily Digest - Integration Tests', () => {
 
       if (mockEmailsSent.length > 0) {
         const email = mockEmailsSent[0];
-        expect(email.to).toBe(testUsers.joel.email);
+        expect(email.to).toBe(testUsers.daniel.email);
         expect(email.subject).toBeDefined();
         expect(email.isHtml).toBe(true);
 
@@ -101,9 +101,9 @@ describe('Send Daily Digest - Integration Tests', () => {
 
     it('should send digests to multiple users with their own assigned tasks', async () => {
       const users = [
-        { id: testUsers.joel.id, email: testUsers.joel.email },
-        { id: testUsers.mitch.id, email: testUsers.mitch.email },
-        { id: testUsers.garrison.id, email: testUsers.garrison.email },
+        { id: testUsers.daniel.id, email: testUsers.daniel.email },
+        { id: testUsers.priya.id, email: testUsers.priya.email },
+        { id: testUsers.marcus.id, email: testUsers.marcus.email },
       ];
 
       const { data: allAssignments } = await adminClient
@@ -193,7 +193,7 @@ describe('Send Daily Digest - Integration Tests', () => {
             url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
             serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
           },
-          [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+          [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
         );
 
         if (mockEmailsSent.length > 0) {
@@ -235,7 +235,7 @@ describe('Send Daily Digest - Integration Tests', () => {
           url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
           serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
         },
-        [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+        [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
       );
 
       if (mockEmailsSent.length > 0) {
@@ -270,7 +270,7 @@ describe('Send Daily Digest - Integration Tests', () => {
             url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
             serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
           },
-          [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+          [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
         );
 
         if (mockEmailsSent.length > 0) {
@@ -304,7 +304,7 @@ describe('Send Daily Digest - Integration Tests', () => {
             url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
             serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
           },
-          [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+          [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
         );
 
         if (mockEmailsSent.length > 0) {
@@ -339,7 +339,7 @@ describe('Send Daily Digest - Integration Tests', () => {
             url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
             serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
           },
-          [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+          [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
         );
 
         if (mockEmailsSent.length > 0) {
@@ -353,8 +353,8 @@ describe('Send Daily Digest - Integration Tests', () => {
 
     it('should continue processing even if one email fails', async () => {
       const users = [
-        { id: testUsers.joel.id, email: testUsers.joel.email },
-        { id: testUsers.mitch.id, email: testUsers.mitch.email },
+        { id: testUsers.daniel.id, email: testUsers.daniel.email },
+        { id: testUsers.priya.id, email: testUsers.priya.email },
       ];
 
       const { data: assignments, error: assignError } = await adminClient
@@ -408,22 +408,22 @@ describe('Send Daily Digest - Integration Tests', () => {
       expect(adminError).toBeNull();
       expect(adminTasks).not.toBeNull();
 
-      const { client: joelClient } = await authenticateAs('joel');
-      const { data: joelTasks, error: joelError } = await joelClient
+      const { client: danielClient } = await authenticateAs('daniel');
+      const { data: danielTasks, error: danielError } = await danielClient
         .from('tasks')
         .select('id')
         .limit(50);
 
-      expect(joelError).toBeNull();
-      expect(joelTasks).not.toBeNull();
+      expect(danielError).toBeNull();
+      expect(danielTasks).not.toBeNull();
 
       console.log(`
         Access Control Comparison:
         - Service Role (digest job): ${adminTasks?.length} tasks (ALL, no filtering)
-        - Joel (user role): ${joelTasks?.length} tasks (RLS filtered)
+        - Daniel (user role): ${danielTasks?.length} tasks (RLS filtered)
       `);
 
-      expect(adminTasks!.length).toBeGreaterThanOrEqual(joelTasks!.length);
+      expect(adminTasks!.length).toBeGreaterThanOrEqual(danielTasks!.length);
     });
   });
 
@@ -446,7 +446,7 @@ describe('Send Daily Digest - Integration Tests', () => {
           url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
           serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
         },
-        [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+        [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
       );
 
       if (mockEmailsSent.length > 0) {
@@ -481,7 +481,7 @@ describe('Send Daily Digest - Integration Tests', () => {
           url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
           serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
         },
-        [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+        [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
       );
 
       if (mockEmailsSent.length > 0) {
@@ -511,7 +511,7 @@ describe('Send Daily Digest - Integration Tests', () => {
             url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
             serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
           },
-          [{ id: testUsers.joel.id, email: testUsers.joel.email }]
+          [{ id: testUsers.daniel.id, email: testUsers.daniel.email }]
         );
 
         if (mockEmailsSent.length > 0) {

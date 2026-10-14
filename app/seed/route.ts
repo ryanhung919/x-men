@@ -1,27 +1,73 @@
 import postgres from 'postgres';
 import { createClient } from '@supabase/supabase-js';
-import type { User } from '@supabase/supabase-js';
-import {
-  auth_users,
-  user_info,
-  roles,
-  user_roles,
-  departments,
-  projects,
-  project_departments,
-  tasks,
-  tags,
-  task_tags,
-  task_assignments,
-  task_attachments,
-  task_comments,
-  notifications,
-} from '../../lib/sample-data';
+import { buildSampleData, type SampleData } from '../../lib/sample-data';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
 );
+
+/** Demo data for the current seed run (dates are relative to seed time). */
+let D: SampleData;
+
+/**
+ * SSL for the seed's direct Postgres connection.
+ * POSTGRES_SSL=disable|require|prefer|allow|verify-full overrides; otherwise
+ * local hosts (localhost / 127.0.0.1, i.e. `supabase start`) connect without
+ * SSL and everything else, including hosted Supabase, requires it.
+ */
+function postgresSslOption(url: string): postgres.Options<{}>['ssl'] {
+  const mode = process.env.POSTGRES_SSL?.trim().toLowerCase();
+  if (mode === 'disable' || mode === 'false' || mode === 'off') return false;
+  if (mode) return mode as 'require' | 'allow' | 'prefer' | 'verify-full';
+  try {
+    const host = new URL(url).hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return false;
+  } catch {
+    // Unparseable URL: fall through to the safe default.
+  }
+  return 'require';
+}
+
+/**
+ * Create (or update) the auth.users rows the demo data references, with the
+ * fixed ids from lib/sample-data.ts. Idempotent: existing users get their
+ * email confirmed and their password reset to the value from the env.
+ */
+async function ensureAuthUsers(data: SampleData) {
+  const missing = [...new Set(data.personas.map((p) => p.password_env))].filter(
+    (name) => !process.env[name]
+  );
+  if (missing.length) {
+    throw new Error(`Missing env var(s) for demo passwords: ${missing.join(', ')}`);
+  }
+
+  for (const p of data.personas) {
+    const password = process.env[p.password_env]!;
+    const attrs = {
+      email: p.email,
+      password,
+      email_confirm: true,
+      user_metadata: { first_name: p.first_name, last_name: p.last_name },
+    };
+
+    const { data: existing } = await supabase.auth.admin.getUserById(p.id);
+    if (existing?.user) {
+      const { error } = await supabase.auth.admin.updateUserById(p.id, attrs);
+      if (error) throw new Error(`Could not update auth user ${p.email}: ${error.message}`);
+    } else {
+      const { error } = await supabase.auth.admin.createUser({ id: p.id, ...attrs });
+      if (error) {
+        throw new Error(
+          `Could not create auth user ${p.email} (${p.id}): ${error.message}. ` +
+            'If the email already exists under another id, delete that user first.'
+        );
+      }
+    }
+  }
+  console.log(`Ensured ${data.personas.length} auth users`);
+}
 
 async function teardownSchema(sql: postgres.Sql) {
   console.log('⚠️ Dropping all app tables, functions, and triggers...');
@@ -107,11 +153,11 @@ async function seedUserInfo(sql: postgres.Sql, nameToDeptId: Map<string, number>
   await sql`TRUNCATE TABLE user_info CASCADE;`;
 
   await Promise.all(
-    user_info.map((ui) => {
+    D.user_info.map((ui) => {
       const depId = nameToDeptId.get(ui.department_name);
       if (!depId) throw new Error(`Unknown department: ${ui.department_name}`);
 
-      const defaultView = (ui.default_view === 'calendar') ? 'schedule' : (ui.default_view ?? 'tasks');
+      const defaultView = ui.default_view ?? 'tasks';
       return sql`
         INSERT INTO user_info (id, first_name, last_name, default_view, department_id)
         VALUES (${ui.id}, ${ui.first_name}, ${ui.last_name}, ${defaultView}, ${depId})
@@ -140,7 +186,7 @@ async function seedDepartments(sql: postgres.Sql) {
   type DeptRow = { id: number; name: string };
   // First, insert all departments without parent relationships
   const inserted = await Promise.all(
-    departments.map(
+    D.departments.map(
       (d) => sql<DeptRow[]>`
       INSERT INTO departments (name)
       VALUES (${d.name})
@@ -153,7 +199,7 @@ async function seedDepartments(sql: postgres.Sql) {
   const nameToId = new Map<string, number>(rows.map((r) => [r.name, Number(r.id)]));
 
   // Update parent relationships after all departments are inserted
-  for (const dept of departments) {
+  for (const dept of D.departments) {
     if (dept.parent_department_name) {
       const deptId = nameToId.get(dept.name);
       const parentId = nameToId.get(dept.parent_department_name);
@@ -186,10 +232,10 @@ async function seedProjectDepartments(
   `;
   await sql`TRUNCATE TABLE project_departments;`;
 
-  if (!project_departments.length) return;
+  if (!D.project_departments.length) return;
 
   await Promise.all(
-    project_departments.map((pd) => {
+    D.project_departments.map((pd) => {
       const projId = nameToProjId.get(pd.project_name);
       const deptId = nameToDeptId.get(pd.department_name);
 
@@ -216,7 +262,7 @@ async function seedRoles(sql: postgres.Sql) {
   await sql`TRUNCATE TABLE roles CASCADE;`;
 
   await Promise.all(
-    roles.map((r) => sql`INSERT INTO roles (role) VALUES (${r.role}) ON CONFLICT (role) DO NOTHING`)
+    D.roles.map((r) => sql`INSERT INTO roles (role) VALUES (${r.role}) ON CONFLICT (role) DO NOTHING`)
   );
 }
 
@@ -232,7 +278,7 @@ async function seedUserRoles(sql: postgres.Sql, nameToDeptId: Map<string, number
   await sql`TRUNCATE TABLE user_roles;`;
 
   await Promise.all(
-    user_roles.map((ur) => {
+    D.user_roles.map((ur) => {
       return sql`
           INSERT INTO user_roles (user_id, role)
           VALUES (${ur.user_id}, ${ur.role})
@@ -253,7 +299,7 @@ async function seedTags(sql: postgres.Sql) {
   await sql`TRUNCATE TABLE tags RESTART IDENTITY CASCADE;`;
 
   await Promise.all(
-    tags.map((t) => sql`INSERT INTO tags (name) VALUES (${t.name}) ON CONFLICT (name) DO NOTHING`)
+    D.tags.map((t) => sql`INSERT INTO tags (name) VALUES (${t.name}) ON CONFLICT (name) DO NOTHING`)
   );
 }
 
@@ -272,7 +318,7 @@ async function seedProjects(sql: postgres.Sql) {
 
   type ProjRow = { id: number; name: string };
   const inserted = await Promise.all(
-    projects.map((p) => {
+    D.projects.map((p) => {
       return sql<ProjRow[]>`
         INSERT INTO projects (name, is_archived)
         VALUES (${p.name}, ${p.is_archived ?? false})
@@ -314,7 +360,7 @@ async function seedTasks(sql: postgres.Sql, deps: { projKeyToId: Map<string, num
   await sql`TRUNCATE TABLE tasks RESTART IDENTITY CASCADE;`;
 
   const titleToTaskId = new Map<string, number>();
-  const pendingTasks = [...tasks];
+  const pendingTasks = [...D.tasks];
 
   while (pendingTasks.length) {
     const readyTasks = pendingTasks.filter(
@@ -381,7 +427,7 @@ async function seedTaskTags(sql: postgres.Sql) {
   `;
   await sql`TRUNCATE TABLE task_tags;`;
 
-  if (!task_tags.length) return;
+  if (!D.task_tags.length) return;
 
   const taskRows = await sql`SELECT id, title FROM tasks`;
   const tagRows = await sql`SELECT id, name  FROM tags`;
@@ -390,7 +436,7 @@ async function seedTaskTags(sql: postgres.Sql) {
   const nameToTagId = new Map(tagRows.map((r: any) => [r.name as string, Number(r.id)]));
 
   const pairs: Array<{ task_id: number; tag_id: number }> = [];
-  for (const tt of task_tags) {
+  for (const tt of D.task_tags) {
     const taskId = titleToTaskId.get(tt.task_title);
     const tagId = nameToTagId.get(tt.tag_name);
     if (taskId && tagId) pairs.push({ task_id: taskId, tag_id: tagId });
@@ -410,62 +456,46 @@ async function seedTaskTags(sql: postgres.Sql) {
 }
 
 /* --------------------- STORAGE BUCKET --------------------- */
-async function resetTaskAttachmentsBucket(sql: postgres.Sql) {
-  console.log('Resetting storage bucket: task-attachments');
+const ATTACHMENTS_BUCKET = 'task-attachments';
 
-  // First, delete all files from the bucket using Supabase client
-  try {
-    const { data: files, error: listError } = await supabase.storage
-      .from('task-attachments')
-      .list();
+/**
+ * Make sure the public attachments bucket exists and is empty.
+ * Uses the Storage API (not SQL on storage.*), which newer Storage versions
+ * require, and works the same on local and hosted Supabase.
+ */
+async function resetTaskAttachmentsBucket() {
+  console.log(`Resetting storage bucket: ${ATTACHMENTS_BUCKET}`);
 
-    if (listError) {
-      console.warn('Could not list files in bucket (bucket may not exist):', listError.message);
-    } else if (files && files.length > 0) {
-      console.log(`Deleting ${files.length} files from task-attachments bucket...`);
-      const filePaths = files.map((file) => file.name);
-      const { error: deleteError } = await supabase.storage
-        .from('task-attachments')
-        .remove(filePaths);
-
-      if (deleteError) {
-        console.warn('Error deleting some files:', deleteError.message);
-      } else {
-        console.log('Successfully deleted all files from bucket');
-      }
-    }
-  } catch (e) {
-    console.warn('Error during file cleanup:', e);
+  const { data: bucket } = await supabase.storage.getBucket(ATTACHMENTS_BUCKET);
+  if (!bucket) {
+    const { error } = await supabase.storage.createBucket(ATTACHMENTS_BUCKET, { public: true });
+    if (error) throw new Error(`Could not create bucket ${ATTACHMENTS_BUCKET}: ${error.message}`);
+    return;
   }
 
-  // Remove objects referencing the bucket from storage.objects table
-  // (Different self-hosted versions may use bucket_id or bucketId; handle both defensively)
-  try {
-    await sql`DELETE FROM storage.objects WHERE bucket_id = 'task-attachments'`;
-  } catch (e) {
-    console.warn(
-      'Attempted delete on storage.objects.bucket_id failed (maybe column named bucketId). Proceeding.',
-      e
-    );
-    try {
-      // @ts-ignore fallback column name
-      await sql`DELETE FROM storage.objects WHERE "bucketId" = 'task-attachments'`;
-    } catch (e2) {
-      console.warn(
-        'Fallback delete on storage.objects.bucketId also failed (may be no objects table).',
-        e2
-      );
+  // emptyBucket only removes a batch at a time, so repeat until nothing is left.
+  for (let i = 0; i < 20; i++) {
+    const { data: top } = await supabase.storage.from(ATTACHMENTS_BUCKET).list('', { limit: 1 });
+    if (!top || top.length === 0) break;
+    const { error } = await supabase.storage.emptyBucket(ATTACHMENTS_BUCKET);
+    if (error) {
+      console.warn('Could not empty attachments bucket:', error.message);
+      break;
     }
   }
+}
 
-  // Now drop bucket if exists
-  await sql`DELETE FROM storage.buckets WHERE id = 'task-attachments'`;
-
-  // Recreate bucket (public for easy file access)
-  await sql`
-    INSERT INTO storage.buckets (id, name, public)
-    VALUES ('task-attachments', 'task-attachments', true)
-  `;
+/** Upload the small demo files referenced by task_attachments rows. */
+async function uploadSeedAttachments(files: Array<{ path: string; body: string; contentType: string }>) {
+  for (const f of files) {
+    const { error } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .upload(f.path, new Blob([f.body], { type: f.contentType }), {
+        contentType: f.contentType,
+        upsert: true,
+      });
+    if (error) console.warn(`Could not upload ${f.path}:`, error.message);
+  }
 }
 
 /* --------------------- TASK_ATTACHMENTS --------------------- */
@@ -482,23 +512,26 @@ async function seedTaskAttachments(sql: postgres.Sql) {
   `;
   await sql`TRUNCATE TABLE task_attachments RESTART IDENTITY CASCADE;`;
 
-  if (!task_attachments.length) return;
+  const uploads: Array<{ path: string; body: string; contentType: string }> = [];
+  if (!D.task_attachments.length) return uploads;
 
   const taskRows = await sql`SELECT id, title FROM tasks`;
   const titleToTaskId = new Map(taskRows.map((r: any) => [r.title as string, Number(r.id)]));
 
-  await Promise.all(
-    task_attachments.map((ta) => {
-      const taskId = titleToTaskId.get(ta.task_title);
-      if (!taskId) throw new Error(`Unknown task: ${ta.task_title}`);
+  for (const ta of D.task_attachments) {
+    const taskId = titleToTaskId.get(ta.task_title);
+    if (!taskId) throw new Error(`Unknown task: ${ta.task_title}`);
 
-      return sql`
-        INSERT INTO task_attachments (task_id, storage_path, uploaded_by, uploaded_at)
-        VALUES (${taskId}, ${ta.storage_path}, ${ta.uploaded_by}, ${ta.uploaded_at ?? new Date()})
-        ON CONFLICT (task_id, storage_path) DO NOTHING
-      `;
-    })
-  );
+    // Same layout the app uses for uploads (lib/db/tasks.ts): tasks/<taskId>/<file>
+    const storagePath = `tasks/${taskId}/${ta.file_name}`;
+    await sql`
+      INSERT INTO task_attachments (task_id, storage_path, uploaded_by, uploaded_at)
+      VALUES (${taskId}, ${storagePath}, ${ta.uploaded_by}, ${ta.uploaded_at})
+      ON CONFLICT (task_id, storage_path) DO NOTHING
+    `;
+    uploads.push({ path: storagePath, body: ta.body, contentType: ta.content_type });
+  }
+  return uploads;
 }
 
 /* --------------------- NOTIFICATIONS --------------------- */
@@ -548,10 +581,10 @@ async function seedNotifications(sql: postgres.Sql) {
     }
   }
 
-  if (!notifications.length) return;
+  if (!D.notifications.length) return;
 
   await Promise.all(
-    notifications.map(
+    D.notifications.map(
       (n) =>
         sql`
         INSERT INTO notifications (user_id, title, message, type, read, is_archived, created_at, updated_at)
@@ -575,13 +608,13 @@ async function seedTaskAssignments(sql: postgres.Sql) {
   `;
   await sql`TRUNCATE TABLE task_assignments RESTART IDENTITY CASCADE;`;
 
-  if (!task_assignments.length) return;
+  if (!D.task_assignments.length) return;
 
   const taskRows = await sql`SELECT id, title FROM tasks`;
   const titleToTaskId = new Map(taskRows.map((r: any) => [r.title as string, Number(r.id)]));
 
   await Promise.all(
-    task_assignments.map((ta) => {
+    D.task_assignments.map((ta) => {
       const taskId = titleToTaskId.get(ta.task_title);
       if (!taskId) throw new Error(`Unknown task: ${ta.task_title}`);
       return sql`
@@ -608,13 +641,13 @@ async function seedTaskComments(sql: postgres.Sql) {
   `;
   await sql`TRUNCATE TABLE task_comments RESTART IDENTITY CASCADE;`;
 
-  if (!task_comments.length) return;
+  if (!D.task_comments.length) return;
 
   const taskRows = await sql`SELECT id, title FROM tasks`;
   const titleToTaskId = new Map(taskRows.map((r: any) => [r.title as string, Number(r.id)]));
 
   await Promise.all(
-    task_comments.map((tc) => {
+    D.task_comments.map((tc) => {
       const taskId = titleToTaskId.get(tc.task_title);
       if (!taskId) throw new Error(`Unknown task: ${tc.task_title}`);
       return sql`
@@ -2382,11 +2415,17 @@ async function createTriggers(sql: postgres.Sql) {
 
 /* --------------------- GET ROUTE --------------------- */
 export async function GET() {
-  const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+  const postgresUrl = process.env.POSTGRES_URL!;
+  const sql = postgres(postgresUrl, { ssl: postgresSslOption(postgresUrl) });
+  D = buildSampleData(new Date());
 
   try {
+    await ensureAuthUsers(D);
+
     await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
     await teardownSchema(sql);
+
+    let attachmentUploads: Awaited<ReturnType<typeof seedTaskAttachments>> = [];
 
     await sql.begin(async (sql) => {
       // Seed base tables
@@ -2416,20 +2455,23 @@ export async function GET() {
       await seedTasks(sql, { projKeyToId });
 
       // Seed dependent tables
-      await Promise.all([
+      const [, , , uploads] = await Promise.all([
         seedTaskTags(sql),
         seedTaskAssignments(sql),
         seedTaskComments(sql),
         seedTaskAttachments(sql),
         seedNotifications(sql),
       ]);
-
-      // Reset storage bucket for attachments
-      await resetTaskAttachmentsBucket(sql);
+      attachmentUploads = uploads;
 
       await enableRLS(sql);
       await createTriggers(sql);
     });
+
+    // Storage is outside the SQL transaction: reset the bucket, then upload
+    // the demo files the attachment rows point at.
+    await resetTaskAttachmentsBucket();
+    await uploadSeedAttachments(attachmentUploads);
 
     await sql.end();
     return Response.json({ message: 'Database seeded successfully.' });

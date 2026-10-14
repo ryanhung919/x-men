@@ -195,16 +195,16 @@ describe('Send Task Reminders - Integration Tests', () => {
   describe('Service Role vs User Role Access', () => {
     it('should demonstrate service role gets ALL tasks', async () => {
       const { data: adminTasks } = await adminClient.from('tasks').select('id');
-      const { client: joelClient } = await authenticateAs('joel');
-      const { data: joelTasks } = await joelClient.from('tasks').select('id');
+      const { client: danielClient } = await authenticateAs('daniel');
+      const { data: danielTasks } = await danielClient.from('tasks').select('id');
 
       console.log(`
         Access Control Comparison:
         - Service Role (cron job): ${adminTasks?.length} tasks (ALL, no filtering)
-        - Joel (user role): ${joelTasks?.length} tasks (RLS filtered)
+        - Daniel (user role): ${danielTasks?.length} tasks (RLS filtered)
       `);
 
-      expect(adminTasks!.length).toBeGreaterThanOrEqual(joelTasks!.length);
+      expect(adminTasks!.length).toBeGreaterThanOrEqual(danielTasks!.length);
     });
   });
 });
