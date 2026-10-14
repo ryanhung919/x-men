@@ -1,4 +1,6 @@
-This is a Smart Task Management System created for our client All-In-One.
+# NODAL
+
+NODAL is a Smart Task Management System created for our client All-In-One.
 
 It's a Next.js application backed by Supabase (Postgres + Auth), styled with Tailwind, and deployed on Vercel.
 

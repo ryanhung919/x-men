@@ -129,7 +129,7 @@ export function Navbar() {
           href="/tasks"
           className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
         >
-          TaskFlow
+          NODAL
         </Link>
         <div className="flex-1" />
         <div className="text-sm text-muted-foreground">Loading...</div>
@@ -144,7 +144,7 @@ export function Navbar() {
           href="/"
           className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
         >
-          TaskFlow
+          NODAL
         </Link>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
@@ -167,7 +167,7 @@ export function Navbar() {
         href="/tasks"
         className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
       >
-        TaskFlow
+        NODAL
       </Link>
 
       {/* Desktop Navigation */}
