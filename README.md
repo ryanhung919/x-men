@@ -4,7 +4,7 @@ It's a Next.js application backed by Supabase (Postgres + Auth), styled with Tai
 
 **Production URL**: https://x-men-rosy.vercel.app/
 
-> **Note**: If you see a security warning, click the last underlined link and select "visit this unsafe website", or visit our main branch URL.
+<!-- DEMO CREDENTIALS: add the guest login (guest@nodal.demo + its GUEST_PASSWORD) here once the hosted project is reseeded. -->
 
 Access the our GitHub Repository [here](https://github.com/ryanhung919/x-men)
 
@@ -18,6 +18,7 @@ Access the our GitHub Repository [here](https://github.com/ryanhung919/x-men)
 	- SUPABASE_SERVICE_ROLE_KEY (server-only)
 	- POSTGRES_URL (direct connection string for seeding)
 	- NEXT_PUBLIC_APP_URL
+	- DEMO_PASSWORD and GUEST_PASSWORD (passwords the seed gives the demo accounts)
 
 Create a `.env` in the project root using .env.example with values like:
 
@@ -27,7 +28,23 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...   # from Supabase project settings
 SUPABASE_SERVICE_ROLE_KEY=...       # service role (keep secret)
 POSTGRES_URL=...                    # e.g. postgres://user:pass@host:5432/postgres
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+DEMO_PASSWORD=...                   # password for every demo persona
+GUEST_PASSWORD=...                  # password for guest@nodal.demo
+# POSTGRES_SSL=disable              # optional; defaults to off for localhost, require elsewhere
 ```
+
+### Running against a local Supabase
+
+With Docker running and the Supabase CLI installed:
+
+```bash
+supabase start                      # uses supabase/config.toml (creates the task-attachments bucket)
+supabase status -o env              # copy API_URL, ANON_KEY, SERVICE_ROLE_KEY and DB_URL into .env
+```
+
+Point `NEXT_PUBLIC_SUPABASE_URL` at the local API URL and `POSTGRES_URL` at the local DB URL
+(port 54322). Keep credentials for any hosted project out of `.env` while working locally,
+because `/seed` drops and recreates the schema of whatever database `POSTGRES_URL` points at.
 
 ## Getting Started
 
@@ -50,6 +67,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to see the a
 ## Seeding the Database
 
 We ship a full seed endpoint at `/seed` that (re)creates schema, policies, triggers, and sample data.
+It also creates (or updates) the demo auth users from `lib/sample-data.ts`, using `DEMO_PASSWORD`
+and `GUEST_PASSWORD`. All demo personas are fictional `@nodal.demo` accounts, and all sample dates
+are relative to the time you seed.
 
 With the dev server running, run:
 
