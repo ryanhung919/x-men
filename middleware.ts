@@ -12,9 +12,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - google*.html (Google Search Console site verification)
      * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
      * We can modify this pattern to exclude more paths that don't require passing through middleware to check authentication, jwt token etc.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|google[0-9a-f]+\.html|.*.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
