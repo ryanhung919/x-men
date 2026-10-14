@@ -94,7 +94,7 @@ describe('lib/services/tasks', () => {
         description: 'Test description',
         priority_bucket: 2,
         status: 'In Progress',
-        deadline: '2025-12-31T23:59:59.000Z',
+        deadline: '2099-12-31T23:59:59.000Z',
         notes: 'Some notes',
         project: { id: 1, name: 'Test Project' },
         parent_task_id: null,
@@ -113,7 +113,7 @@ describe('lib/services/tasks', () => {
         description: 'Test description',
         priority: 2,
         status: 'In Progress',
-        deadline: '2025-12-31T23:59:59.000Z',
+        deadline: '2099-12-31T23:59:59.000Z',
         notes: 'Some notes',
         recurrence_interval: 0,
         recurrence_date: null,
@@ -1613,7 +1613,7 @@ describe('lib/services/tasks', () => {
     describe('updateRecurrence', () => {
       it('should update task recurrence successfully', async () => {
         const recurrenceInterval = 7;
-        const recurrenceDate = '2025-12-20T00:00:00.000Z';
+        const recurrenceDate = '2099-12-20T00:00:00.000Z';
   
         vi.mocked(getTaskPermissionDataDB).mockResolvedValue({
           creator_id: 'user1',
@@ -1652,7 +1652,7 @@ describe('lib/services/tasks', () => {
         const validIntervals = [0, 1, 7, 30];
         for (const interval of validIntervals) {
           await expect(
-            updateRecurrence(1, interval, '2025-12-20T00:00:00.000Z', 'user1')
+            updateRecurrence(1, interval, '2099-12-20T00:00:00.000Z', 'user1')
           ).resolves.not.toThrow();
         }
       });
