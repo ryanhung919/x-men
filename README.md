@@ -6,7 +6,14 @@ It's a Next.js application backed by Supabase (Postgres + Auth), styled with Tai
 
 **Production URL**: https://x-men-rosy.vercel.app/
 
-<!-- DEMO CREDENTIALS: add the guest login (guest@nodal.demo + its GUEST_PASSWORD) here once the hosted project is reseeded. -->
+## Try it
+
+Open https://x-men-rosy.vercel.app/ and log in with the guest account:
+
+- Email: `guest@nodal.demo`
+- Password: `nodal91guest`
+
+The guest is a staff-role demo account. It can browse and work on tasks, the calendar and the schedule, but not the manager/admin reports (`/report` shows an unauthorized page). The data is shared demo data and may be reset at any time.
 
 Access the our GitHub Repository [here](https://github.com/ryanhung919/x-men)
 
