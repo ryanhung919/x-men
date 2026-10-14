@@ -23,7 +23,7 @@ test.describe('Multi-User Task Lifecycle', () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     await tasksPage.createAdvancedTaskWithAttachments({
-      project: 'Data Warehouse Lift',
+      project: 'Data Platform Migration',
       title: taskTitle,
       description: 'Complete multi-assignee workflow test with notifications and calendar views',
       priority: '8',
