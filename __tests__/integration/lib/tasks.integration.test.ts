@@ -26,7 +26,7 @@ vi.mock('@supabase/supabase-js', () => ({
 describe('Tasks Integration Tests', () => {
   describe('getUserTasks', () => {
     it('should fetch all tasks with related data', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       expect(result).toBeDefined();
       expect(result.tasks).toBeInstanceOf(Array);
@@ -36,7 +36,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should return tasks ordered by deadline ascending', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       if (result.tasks.length < 2) {
         // Skip if not enough tasks to verify ordering
@@ -59,7 +59,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should include task properties', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       if (result.tasks.length === 0) {
         return;
@@ -82,7 +82,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should include recurring task properties', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       // Find a recurring task from the seeded data
       const recurringTask = result.tasks.find((t: any) => t.recurrence_interval > 0);
@@ -96,7 +96,7 @@ describe('Tasks Integration Tests', () => {
             description: 'Integration test recurring task',
             priority_bucket: 5,
             status: 'To Do',
-            creator_id: testUsers.joel.id,
+            creator_id: testUsers.daniel.id,
             project_id: 1,
             recurrence_interval: 7,
             recurrence_date: new Date().toISOString(),
@@ -105,7 +105,7 @@ describe('Tasks Integration Tests', () => {
           .single();
 
         if (newTask) {
-          const updatedResult = await getUserTasks(testUsers.joel.id);
+          const updatedResult = await getUserTasks(testUsers.daniel.id);
           const createdTask = updatedResult.tasks.find((t: any) => t.id === newTask.id);
 
           expect(createdTask).toBeDefined();
@@ -124,7 +124,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should map subtasks to parent tasks correctly', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       // Find tasks that have subtasks
       const taskIds = result.tasks.map((t: any) => t.id);
@@ -143,7 +143,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should include attachments for tasks', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       if (result.attachments.length === 0) {
         // No attachments in seeded data, skip
@@ -161,7 +161,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should include assignee information', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       if (result.assignees.length === 0) {
         return;
@@ -182,7 +182,7 @@ describe('Tasks Integration Tests', () => {
           description: 'Should not appear in results',
           priority_bucket: 5,
           status: 'Completed',
-          creator_id: testUsers.joel.id,
+          creator_id: testUsers.daniel.id,
           project_id: 1,
           is_archived: true,
         })
@@ -193,7 +193,7 @@ describe('Tasks Integration Tests', () => {
         return;
       }
 
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       // Verify archived task is not in results
       const foundArchivedTask = result.tasks.find((t: any) => t.id === archivedTask.id);
@@ -204,7 +204,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should handle tasks with no subtasks', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       // Find a task with no subtasks
       const taskWithNoSubtasks = result.tasks.find((t: any) => {
@@ -221,7 +221,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should handle tasks with no attachments', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       // Find a task with no attachments
       const taskWithNoAttachments = result.tasks.find((t: any) => {
@@ -238,7 +238,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should include project information', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       if (result.tasks.length === 0) {
         return;
@@ -253,7 +253,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should include task tags', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       if (result.tasks.length === 0) {
         return;
@@ -455,7 +455,7 @@ describe('Tasks Integration Tests', () => {
           description: 'Should return null',
           priority_bucket: 5,
           status: 'Completed',
-          creator_id: testUsers.joel.id,
+          creator_id: testUsers.daniel.id,
           project_id: 1,
           is_archived: true,
         })
@@ -495,7 +495,7 @@ describe('Tasks Integration Tests', () => {
             description: 'Test recurring task for getTaskById',
             priority_bucket: 5,
             status: 'To Do',
-            creator_id: testUsers.joel.id,
+            creator_id: testUsers.daniel.id,
             project_id: 1,
             recurrence_interval: 14,
             recurrence_date: new Date('2025-10-16T00:00:00Z').toISOString(),
@@ -568,7 +568,7 @@ describe('Tasks Integration Tests', () => {
           description: 'Task with no assignees',
           priority_bucket: 5,
           status: 'To Do',
-          creator_id: testUsers.joel.id,
+          creator_id: testUsers.daniel.id,
           project_id: 1,
         })
         .select()
@@ -621,7 +621,7 @@ describe('Tasks Integration Tests', () => {
 
   describe('Data Integrity', () => {
     it('should ensure subtasks reference valid parent tasks', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       const taskIds = result.tasks.map((t: any) => t.id);
 
@@ -631,7 +631,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should ensure attachments reference valid tasks', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       const taskIds = result.tasks.map((t: any) => t.id);
 
@@ -641,7 +641,7 @@ describe('Tasks Integration Tests', () => {
     });
 
     it('should ensure task assignments reference valid users', async () => {
-      const result = await getUserTasks(testUsers.joel.id);
+      const result = await getUserTasks(testUsers.daniel.id);
 
       const assigneeIds = result.assignees.map((a: any) => a.id);
 
@@ -669,7 +669,7 @@ describe('Tasks Integration Tests', () => {
           description: 'Occurs every 7 days',
           priority_bucket: 5,
           status: 'To Do',
-          creator_id: testUsers.joel.id,
+          creator_id: testUsers.daniel.id,
           project_id: 1,
           recurrence_interval: 7,
           recurrence_date: new Date('2025-10-16T00:00:00Z').toISOString(),
@@ -705,7 +705,7 @@ describe('Tasks Integration Tests', () => {
             description: `Occurs every ${interval} days`,
             priority_bucket: 5,
             status: 'To Do',
-            creator_id: testUsers.joel.id,
+            creator_id: testUsers.daniel.id,
             project_id: 1,
             recurrence_interval: interval,
             recurrence_date: new Date().toISOString(),
@@ -756,11 +756,11 @@ describe('Tasks Integration Tests', () => {
         description: 'Task created by integration test',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.mitch.id],
+        assignee_ids: [testUsers.priya.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       expect(taskId).toBeDefined();
@@ -779,7 +779,7 @@ describe('Tasks Integration Tests', () => {
       expect(task?.description).toBe(payload.description);
       expect(task?.priority_bucket).toBe(payload.priority_bucket);
       expect(task?.status).toBe(payload.status);
-      expect(task?.creator_id).toBe(testUsers.joel.id);
+      expect(task?.creator_id).toBe(testUsers.daniel.id);
     });
 
     it('should create task assignments for selected assignees only', async () => {
@@ -789,11 +789,11 @@ describe('Tasks Integration Tests', () => {
         description: 'Testing multiple assignees',
         priority_bucket: 6,
         status: 'To Do',
-        assignee_ids: [testUsers.mitch.id, testUsers.garrison.id],
+        assignee_ids: [testUsers.priya.id, testUsers.marcus.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       // Verify assignments
@@ -807,9 +807,9 @@ describe('Tasks Integration Tests', () => {
       expect(assignments?.length).toBe(2); // Only selected assignees, creator NOT auto-added
 
       const assigneeIds = assignments?.map((a) => a.assignee_id) || [];
-      expect(assigneeIds).toContain(testUsers.mitch.id);
-      expect(assigneeIds).toContain(testUsers.garrison.id);
-      expect(assigneeIds).not.toContain(testUsers.joel.id); // Creator NOT auto-added
+      expect(assigneeIds).toContain(testUsers.priya.id);
+      expect(assigneeIds).toContain(testUsers.marcus.id);
+      expect(assigneeIds).not.toContain(testUsers.daniel.id); // Creator NOT auto-added
     });
 
     it('should not duplicate creator if already in assignees', async () => {
@@ -819,11 +819,11 @@ describe('Tasks Integration Tests', () => {
         description: 'Creator is in assignees list',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id, testUsers.mitch.id], // Creator already included
+        assignee_ids: [testUsers.daniel.id, testUsers.priya.id], // Creator already included
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       const { data: assignments, error } = await adminClient
@@ -834,8 +834,8 @@ describe('Tasks Integration Tests', () => {
       expect(error).toBeNull();
       expect(assignments?.length).toBe(2); // Creator should not be duplicated
 
-      const joelAssignments = assignments?.filter((a) => a.assignee_id === testUsers.joel.id);
-      expect(joelAssignments?.length).toBe(1);
+      const danielAssignments = assignments?.filter((a) => a.assignee_id === testUsers.daniel.id);
+      expect(danielAssignments?.length).toBe(1);
     });
 
     it('should create task with tags', async () => {
@@ -845,12 +845,12 @@ describe('Tasks Integration Tests', () => {
         description: 'Testing tag creation',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.mitch.id],
+        assignee_ids: [testUsers.priya.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
         tags: ['integration-test', 'automated', 'temporary'],
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       // Verify tags were created
@@ -877,13 +877,13 @@ describe('Tasks Integration Tests', () => {
         description: 'This task recurs every 7 days',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.mitch.id],
+        assignee_ids: [testUsers.priya.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
         recurrence_interval: 7,
         recurrence_date: recurrenceDate,
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       const { data: task, error } = await adminClient
@@ -906,17 +906,17 @@ describe('Tasks Integration Tests', () => {
         priority_bucket: 5,
         status: 'To Do',
         assignee_ids: [
-          testUsers.joel.id,
-          testUsers.mitch.id,
-          testUsers.garrison.id,
-          testUsers.ryan.id,
-          testUsers.kester.id,
-          testUsers.joelPersonal.id, // 6th assignee to exceed the limit
+          testUsers.daniel.id,
+          testUsers.priya.id,
+          testUsers.marcus.id,
+          testUsers.aisha.id,
+          testUsers.weijie.id,
+          testUsers.hannah.id, // 6th assignee to exceed the limit
         ],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      await expect(createTask(adminClient, payload, testUsers.joelPersonal.id)).rejects.toThrow(
+      await expect(createTask(adminClient, payload, testUsers.hannah.id)).rejects.toThrow(
         'Cannot assign more than 5 users to a task'
       );
     });
@@ -939,18 +939,18 @@ describe('Tasks Integration Tests', () => {
         description: 'Testing automatic project-department linking',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.mitch.id], // Mitch is in Finance Director department
+        assignee_ids: [testUsers.priya.id], // Priya is in Finance Director department
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       // Verify project_departments link was created
       const { data: userInfo } = await adminClient
         .from('user_info')
         .select('department_id')
-        .eq('id', testUsers.mitch.id)
+        .eq('id', testUsers.priya.id)
         .single();
 
       const { data: projectDept, error } = await adminClient
@@ -973,11 +973,11 @@ describe('Tasks Integration Tests', () => {
         description: 'Should pass trigger validation',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.mitch.id],
+        assignee_ids: [testUsers.priya.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       expect(taskId).toBeDefined();
@@ -998,14 +998,14 @@ describe('Tasks Integration Tests', () => {
         description: 'Testing optional fields',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.mitch.id],
+        assignee_ids: [testUsers.priya.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
         notes: 'These are some notes',
         recurrence_interval: undefined,
         recurrence_date: undefined,
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       const { data: task, error } = await adminClient
@@ -1047,8 +1047,8 @@ describe('Tasks Integration Tests', () => {
       const users = await getAllUsers();
       const userIds = users.map((u) => u.id);
 
-      expect(userIds).toContain(testUsers.joel.id);
-      expect(userIds).toContain(testUsers.mitch.id);
+      expect(userIds).toContain(testUsers.daniel.id);
+      expect(userIds).toContain(testUsers.priya.id);
     });
   });
 
@@ -1107,11 +1107,11 @@ describe('Tasks Integration Tests', () => {
         const { data: userExists } = await adminClient
           .from('user_info')
           .select('id')
-          .eq('id', testUsers.joel.id)
+          .eq('id', testUsers.daniel.id)
           .single();
 
         if (!userExists) {
-          console.warn('Test user joel not found, skipping task creation');
+          console.warn('Test user daniel not found, skipping task creation');
           testTaskId = -1; // Mark as invalid
           return;
         }
@@ -1137,7 +1137,7 @@ describe('Tasks Integration Tests', () => {
               description: 'Original description',
               priority_bucket: 5,
               status: 'To Do',
-            creator_id: testUsers.joel.id,
+            creator_id: testUsers.daniel.id,
               project_id: 1,
               deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
               notes: 'Original notes',
@@ -1158,8 +1158,8 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .insert({
             task_id: testTaskId,
-            assignee_id: testUsers.mitch.id,
-            assignor_id: testUsers.joel.id,
+            assignee_id: testUsers.priya.id,
+            assignor_id: testUsers.daniel.id,
           });
 
         if (assignError) {
@@ -1664,8 +1664,8 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .insert({
             task_id: testTaskId,
-            assignee_id: testUsers.garrison.id,
-            assignor_id: testUsers.joel.id,
+            assignee_id: testUsers.marcus.id,
+            assignor_id: testUsers.daniel.id,
           });
   
         expect(error).toBeNull();
@@ -1675,7 +1675,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .select('*')
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.garrison.id);
+          .eq('assignee_id', testUsers.marcus.id);
   
         expect(assignments?.length).toBe(1);
       });
@@ -1688,7 +1688,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .select('*')
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.mitch.id);
+          .eq('assignee_id', testUsers.priya.id);
   
         expect(beforeDelete?.length).toBeGreaterThan(0);
   
@@ -1697,7 +1697,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .delete()
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.mitch.id);
+          .eq('assignee_id', testUsers.priya.id);
   
         expect(error).toBeNull();
   
@@ -1706,7 +1706,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .select('*')
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.mitch.id);
+          .eq('assignee_id', testUsers.priya.id);
   
         expect(afterDelete?.length).toBe(0);
       });
@@ -1716,10 +1716,10 @@ describe('Tasks Integration Tests', () => {
 
         // Add 4 more assignees (1 already exists = 5 total)
         const assigneeIds = [
-          testUsers.garrison.id,
-          testUsers.ryan.id,
-          testUsers.kester.id,
-          testUsers.joelPersonal.id,
+          testUsers.marcus.id,
+          testUsers.aisha.id,
+          testUsers.weijie.id,
+          testUsers.hannah.id,
         ];
   
         for (const assigneeId of assigneeIds) {
@@ -1728,7 +1728,7 @@ describe('Tasks Integration Tests', () => {
             .insert({
               task_id: testTaskId,
               assignee_id: assigneeId,
-              assignor_id: testUsers.joel.id,
+              assignor_id: testUsers.daniel.id,
             });
         }
   
@@ -1746,8 +1746,8 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .insert({
             task_id: testTaskId,
-            assignee_id: testUsers.ryan.id, // Different user
-            assignor_id: testUsers.joel.id,
+            assignee_id: testUsers.aisha.id, // Different user
+            assignor_id: testUsers.daniel.id,
           });
   
         // This should fail due to trigger (if trigger is enforced)
@@ -1765,8 +1765,8 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .insert({
             task_id: testTaskId,
-            assignee_id: testUsers.mitch.id,
-            assignor_id: testUsers.joel.id,
+            assignee_id: testUsers.priya.id,
+            assignor_id: testUsers.daniel.id,
           });
 
         // Should fail (UNIQUE constraint on task_id + assignee_id)
@@ -1780,11 +1780,11 @@ describe('Tasks Integration Tests', () => {
           .from('task_assignments')
           .select('*')
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.mitch.id)
+          .eq('assignee_id', testUsers.priya.id)
           .single();
   
         expect(error).toBeNull();
-        expect(data?.assignor_id).toBe(testUsers.joel.id);
+        expect(data?.assignor_id).toBe(testUsers.daniel.id);
       });
     });
   
@@ -1857,7 +1857,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_comments')
           .insert({
             task_id: testTaskId,
-            user_id: testUsers.joel.id,
+            user_id: testUsers.daniel.id,
             content: commentContent,
           })
           .select('id, content, user_id, task_id')
@@ -1866,7 +1866,7 @@ describe('Tasks Integration Tests', () => {
         expect(error).toBeNull();
         expect(data?.content).toBe(commentContent);
         expect(data?.task_id).toBe(testTaskId);
-        expect(data?.user_id).toBe(testUsers.joel.id);
+        expect(data?.user_id).toBe(testUsers.daniel.id);
   
         // Cleanup
         await adminClient.from('task_comments').delete().eq('id', data!.id);
@@ -1880,7 +1880,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_comments')
           .insert({
             task_id: testTaskId,
-            user_id: testUsers.joel.id,
+            user_id: testUsers.daniel.id,
             content: 'Original comment',
           })
           .select('id')
@@ -1910,7 +1910,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_comments')
           .insert({
             task_id: testTaskId,
-            user_id: testUsers.joel.id,
+            user_id: testUsers.daniel.id,
             content: 'Comment to delete',
           })
           .select('id')
@@ -1942,7 +1942,7 @@ describe('Tasks Integration Tests', () => {
           .from('task_comments')
           .insert({
             task_id: testTaskId,
-            user_id: testUsers.joel.id,
+            user_id: testUsers.daniel.id,
             content: 'Timestamp test',
           })
           .select('created_at')
@@ -1969,7 +1969,7 @@ describe('Tasks Integration Tests', () => {
             description: 'A subtask',
             priority_bucket: 5,
             status: 'To Do',
-            creator_id: testUsers.joel.id,
+            creator_id: testUsers.daniel.id,
             project_id: 1,
             parent_task_id: null, // Initially null
           })
@@ -2010,7 +2010,7 @@ describe('Tasks Integration Tests', () => {
               description: 'Test subtask',
               priority_bucket: 5,
               status: 'To Do',
-              creator_id: testUsers.joel.id,
+              creator_id: testUsers.daniel.id,
               project_id: 1,
               parent_task_id: testTaskId,
             })

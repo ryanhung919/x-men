@@ -3,11 +3,11 @@ import { authenticateAs, testUsers, adminClient } from '@/__tests__/setup/integr
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('Tasks Archive API Integration Tests', () => {
-  let joelClient: SupabaseClient;
-  let mitchClient: SupabaseClient;
-  let joelCookie: string;
-  let mitchCookie: string;
-  let joelPersonalCookie: string;
+  let danielClient: SupabaseClient;
+  let priyaClient: SupabaseClient;
+  let danielCookie: string;
+  let priyaCookie: string;
+  let hannahCookie: string;
   let testProjectId: number;
   let testTaskId: number;
   let testTaskWithSubtasksId: number;
@@ -17,7 +17,8 @@ describe('Tasks Archive API Integration Tests', () => {
 
   // Extract project reference from Supabase URL
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  // Same rule supabase-js uses for its default storage key (works for local and hosted URLs)
+  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 
   // Helper function to format auth cookies
   const formatAuthCookie = (session: any) => {
@@ -34,19 +35,19 @@ describe('Tasks Archive API Integration Tests', () => {
 
   beforeAll(async () => {
     // Authenticate test users (managers)
-    const joel = await authenticateAs('joel');
-    const mitch = await authenticateAs('mitch');
-    const joelPersonal = await authenticateAs('joelPersonal'); // Staff only, not manager
+    const daniel = await authenticateAs('daniel');
+    const priya = await authenticateAs('priya');
+    const hannah = await authenticateAs('hannah'); // Staff only, not manager
 
-    joelClient = joel.client;
-    mitchClient = mitch.client;
+    danielClient = daniel.client;
+    priyaClient = priya.client;
 
-    joelCookie = formatAuthCookie(joel.session);
-    mitchCookie = formatAuthCookie(mitch.session);
-    joelPersonalCookie = formatAuthCookie(joelPersonal.session);
+    danielCookie = formatAuthCookie(daniel.session);
+    priyaCookie = formatAuthCookie(priya.session);
+    hannahCookie = formatAuthCookie(hannah.session);
 
     // Get a test project ID
-    const { data: project } = await joelClient
+    const { data: project } = await danielClient
       .from('projects')
       .select('id')
       .limit(1)
@@ -64,14 +65,14 @@ describe('Tasks Archive API Integration Tests', () => {
       priority_bucket: 5,
       status: 'To Do',
       project_id: testProjectId,
-      assignee_ids: [testUsers.joel.id],
+      assignee_ids: [testUsers.daniel.id],
       deadline: '2025-12-31T23:59:59Z',
     }));
 
     const createResponse = await fetch(`${API_BASE}/api/tasks`, {
       method: 'POST',
       headers: {
-        Cookie: joelCookie,
+        Cookie: danielCookie,
       },
       body: formData,
     });
@@ -97,14 +98,14 @@ describe('Tasks Archive API Integration Tests', () => {
       priority_bucket: 5,
       status: 'To Do',
       project_id: testProjectId,
-      assignee_ids: [testUsers.joel.id],
+      assignee_ids: [testUsers.daniel.id],
       deadline: '2025-12-31T23:59:59Z',
     }));
 
     const secondResponse = await fetch(`${API_BASE}/api/tasks`, {
       method: 'POST',
       headers: {
-        Cookie: joelCookie,
+        Cookie: danielCookie,
       },
       body: secondFormData,
     });
@@ -138,7 +139,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
@@ -179,7 +180,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: false }),
@@ -208,7 +209,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskWithSubtasksId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
@@ -251,12 +252,12 @@ describe('Tasks Archive API Integration Tests', () => {
     });
 
     it('should return 401 when user is not a manager', async () => {
-      // Note: joelPersonal cookie authentication currently returns 401 instead of 403
+      // Note: hannah cookie authentication currently returns 401 instead of 403
       // This could be improved to return 403 for authenticated non-managers
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelPersonalCookie, // Staff only, not manager
+          Cookie: hannahCookie, // Staff only, not manager
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
@@ -271,7 +272,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/invalid/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
@@ -286,7 +287,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: 'yes' }), // String instead of boolean
@@ -301,7 +302,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({}), // Missing is_archived
@@ -318,7 +319,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${nonExistentTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
@@ -331,17 +332,17 @@ describe('Tasks Archive API Integration Tests', () => {
     });
 
     it('should allow different managers to archive tasks', async () => {
-      // Joel archives
-      const joelResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
+      // Daniel archives
+      const danielResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
       });
 
-      expect(joelResponse.status).toBe(200);
+      expect(danielResponse.status).toBe(200);
 
       // Verify archived
       const { data: archivedTask } = await adminClient
@@ -352,17 +353,17 @@ describe('Tasks Archive API Integration Tests', () => {
 
       expect(archivedTask?.is_archived).toBe(true);
 
-      // Mitch unarchives
-      const mitchResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
+      // Priya unarchives
+      const priyaResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: false }),
       });
 
-      expect(mitchResponse.status).toBe(200);
+      expect(priyaResponse.status).toBe(200);
 
       // Verify unarchived
       const { data: unarchivedTask } = await adminClient
@@ -385,7 +386,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
@@ -413,7 +414,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: false }),
@@ -432,7 +433,7 @@ describe('Tasks Archive API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelPersonalCookie,
+          Cookie: hannahCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
@@ -442,18 +443,18 @@ describe('Tasks Archive API Integration Tests', () => {
     });
 
     it('should enforce RLS policies on archive operation', async () => {
-      // Both Joel and Mitch are managers, but may have different department access
+      // Both Daniel and Priya are managers, but may have different department access
       // However, since they're both managers, they should both be able to archive
-      const joelResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
+      const danielResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
       });
 
-      expect(joelResponse.status).toBe(200);
+      expect(danielResponse.status).toBe(200);
 
       // Restore
       await adminClient
@@ -461,16 +462,16 @@ describe('Tasks Archive API Integration Tests', () => {
         .update({ is_archived: false })
         .eq('id', testTaskId);
 
-      const mitchResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
+      const priyaResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}/archive`, {
         method: 'PATCH',
         headers: {
-          Cookie: mitchCookie,
+          Cookie: priyaCookie,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_archived: true }),
       });
 
-      expect(mitchResponse.status).toBe(200);
+      expect(priyaResponse.status).toBe(200);
 
       // Restore for cleanup
       await adminClient

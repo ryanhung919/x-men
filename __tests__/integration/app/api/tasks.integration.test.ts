@@ -3,12 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 describe('Tasks API Integration Tests', () => {
-  let joelClient: SupabaseClient;
-  let mitchClient: SupabaseClient;
-  let kesterClient: SupabaseClient;
-  let joelCookie: string;
-  let mitchCookie: string;
-  let kesterCookie: string;
+  let danielClient: SupabaseClient;
+  let priyaClient: SupabaseClient;
+  let weijieClient: SupabaseClient;
+  let danielCookie: string;
+  let priyaCookie: string;
+  let weijieCookie: string;
   let testProjectId: number;
   let createdTaskIds: number[] = [];
 
@@ -16,7 +16,8 @@ describe('Tasks API Integration Tests', () => {
 
   // Extract project reference from Supabase URL
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  // Same rule supabase-js uses for its default storage key (works for local and hosted URLs)
+  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 
   // Helper function to format auth cookies
   const formatAuthCookie = (session: any) => {
@@ -33,21 +34,21 @@ describe('Tasks API Integration Tests', () => {
 
   beforeAll(async () => {
     // Authenticate test users
-    const joel = await authenticateAs('joel');
-    const mitch = await authenticateAs('mitch');
-    const kester = await authenticateAs('kester');
+    const daniel = await authenticateAs('daniel');
+    const priya = await authenticateAs('priya');
+    const weijie = await authenticateAs('weijie');
 
-    joelClient = joel.client;
-    mitchClient = mitch.client;
-    kesterClient = kester.client;
+    danielClient = daniel.client;
+    priyaClient = priya.client;
+    weijieClient = weijie.client;
 
     // Get session cookies
-    joelCookie = formatAuthCookie(joel.session);
-    mitchCookie = formatAuthCookie(mitch.session);
-    kesterCookie = formatAuthCookie(kester.session);
+    danielCookie = formatAuthCookie(daniel.session);
+    priyaCookie = formatAuthCookie(priya.session);
+    weijieCookie = formatAuthCookie(weijie.session);
 
     // Get a test project ID
-    const { data: project } = await joelClient
+    const { data: project } = await danielClient
       .from('projects')
       .select('id')
       .limit(1)
@@ -180,14 +181,14 @@ describe('Tasks API Integration Tests', () => {
         description: 'Test task created via integration test',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id],
+        assignee_ids: [testUsers.daniel.id],
         deadline: '2025-12-31T23:59:59Z',
       }));
 
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: formData,
       });
@@ -223,7 +224,7 @@ describe('Tasks API Integration Tests', () => {
         description: 'Testing file uploads',
         priority_bucket: 3,
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id],
+        assignee_ids: [testUsers.daniel.id],
         deadline: '2025-12-31T23:59:59Z',
       }));
 
@@ -236,7 +237,7 @@ describe('Tasks API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: formData,
       });
@@ -264,7 +265,7 @@ describe('Tasks API Integration Tests', () => {
         description: 'Should fail',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id],
+        assignee_ids: [testUsers.daniel.id],
         deadline: '2025-12-31T23:59:59Z',
       }));
 
@@ -282,7 +283,7 @@ describe('Tasks API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: formData,
       });
@@ -302,7 +303,7 @@ describe('Tasks API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: formData,
       });
@@ -320,14 +321,14 @@ describe('Tasks API Integration Tests', () => {
         description: 'Invalid priority',
         priority_bucket: 15, // Out of range
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id],
+        assignee_ids: [testUsers.daniel.id],
         deadline: '2025-12-31T23:59:59Z',
       }));
 
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: formData,
       });
@@ -352,7 +353,7 @@ describe('Tasks API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: formData,
       });
@@ -371,11 +372,11 @@ describe('Tasks API Integration Tests', () => {
         priority_bucket: 5,
         status: 'To Do',
         assignee_ids: [
-          testUsers.joel.id,
-          testUsers.mitch.id,
-          testUsers.kester.id,
-          testUsers.ryan.id,
-          testUsers.garrison.id,
+          testUsers.daniel.id,
+          testUsers.priya.id,
+          testUsers.weijie.id,
+          testUsers.aisha.id,
+          testUsers.marcus.id,
           'extra-user-id', // 6th assignee
         ],
         deadline: '2025-12-31T23:59:59Z',
@@ -384,7 +385,7 @@ describe('Tasks API Integration Tests', () => {
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
         body: formData,
       });
@@ -406,14 +407,14 @@ describe('Tasks API Integration Tests', () => {
           description: `Testing ${status} status`,
           priority_bucket: 5,
           status,
-          assignee_ids: [testUsers.joel.id],
+          assignee_ids: [testUsers.daniel.id],
           deadline: '2025-12-31T23:59:59Z',
         }));
 
         const response = await fetch(`${API_BASE}/api/tasks`, {
           method: 'POST',
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: formData,
         });
@@ -442,7 +443,7 @@ describe('Tasks API Integration Tests', () => {
     it('should return users when authenticated', async () => {
       const response = await fetch(`${API_BASE}/api/tasks?action=users`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -468,26 +469,26 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return different users based on RLS policies', async () => {
-      const joelResponse = await fetch(`${API_BASE}/api/tasks?action=users`, {
-        headers: { Cookie: joelCookie },
+      const danielResponse = await fetch(`${API_BASE}/api/tasks?action=users`, {
+        headers: { Cookie: danielCookie },
       });
 
-      const mitchResponse = await fetch(`${API_BASE}/api/tasks?action=users`, {
-        headers: { Cookie: mitchCookie },
+      const priyaResponse = await fetch(`${API_BASE}/api/tasks?action=users`, {
+        headers: { Cookie: priyaCookie },
       });
 
-      expect(joelResponse.status).toBe(200);
-      expect(mitchResponse.status).toBe(200);
+      expect(danielResponse.status).toBe(200);
+      expect(priyaResponse.status).toBe(200);
 
-      const joelData = await joelResponse.json();
-      const mitchData = await mitchResponse.json();
+      const danielData = await danielResponse.json();
+      const priyaData = await priyaResponse.json();
 
-      expect(joelData.users).toBeDefined();
-      expect(mitchData.users).toBeDefined();
+      expect(danielData.users).toBeDefined();
+      expect(priyaData.users).toBeDefined();
 
       // Both should have users, but potentially different based on department access
-      expect(joelData.users.length).toBeGreaterThan(0);
-      expect(mitchData.users.length).toBeGreaterThan(0);
+      expect(danielData.users.length).toBeGreaterThan(0);
+      expect(priyaData.users.length).toBeGreaterThan(0);
     });
   });
 
@@ -495,7 +496,7 @@ describe('Tasks API Integration Tests', () => {
     it('should return projects when authenticated', async () => {
       const response = await fetch(`${API_BASE}/api/tasks?action=projects`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -520,26 +521,26 @@ describe('Tasks API Integration Tests', () => {
     });
 
     it('should return different projects based on RLS policies', async () => {
-      const joelResponse = await fetch(`${API_BASE}/api/tasks?action=projects`, {
-        headers: { Cookie: joelCookie },
+      const danielResponse = await fetch(`${API_BASE}/api/tasks?action=projects`, {
+        headers: { Cookie: danielCookie },
       });
 
-      const mitchResponse = await fetch(`${API_BASE}/api/tasks?action=projects`, {
-        headers: { Cookie: mitchCookie },
+      const priyaResponse = await fetch(`${API_BASE}/api/tasks?action=projects`, {
+        headers: { Cookie: priyaCookie },
       });
 
-      expect(joelResponse.status).toBe(200);
-      expect(mitchResponse.status).toBe(200);
+      expect(danielResponse.status).toBe(200);
+      expect(priyaResponse.status).toBe(200);
 
-      const joelData = await joelResponse.json();
-      const mitchData = await mitchResponse.json();
+      const danielData = await danielResponse.json();
+      const priyaData = await priyaResponse.json();
 
-      expect(joelData.projects).toBeDefined();
-      expect(mitchData.projects).toBeDefined();
+      expect(danielData.projects).toBeDefined();
+      expect(priyaData.projects).toBeDefined();
 
       // Both should have projects
-      expect(joelData.projects.length).toBeGreaterThan(0);
-      expect(mitchData.projects.length).toBeGreaterThan(0);
+      expect(danielData.projects.length).toBeGreaterThan(0);
+      expect(priyaData.projects.length).toBeGreaterThan(0);
     });
   });
 
@@ -547,7 +548,7 @@ describe('Tasks API Integration Tests', () => {
     it('should return 400 for invalid action parameter', async () => {
       const response = await fetch(`${API_BASE}/api/tasks?action=invalid`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -559,7 +560,7 @@ describe('Tasks API Integration Tests', () => {
     it('should return 400 when action parameter is missing', async () => {
       const response = await fetch(`${API_BASE}/api/tasks`, {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       });
 
@@ -581,14 +582,14 @@ describe('Tasks API Integration Tests', () => {
         description: 'Original description',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id, testUsers.mitch.id],
+        assignee_ids: [testUsers.daniel.id, testUsers.priya.id],
         deadline: '2025-12-31T23:59:59Z',
         notes: 'Original notes',
       }));
 
       const response = await fetch(`${API_BASE}/api/tasks`, {
         method: 'POST',
-        headers: { Cookie: joelCookie },
+        headers: { Cookie: danielCookie },
         body: formData,
       });
 
@@ -611,7 +612,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateTitle',
@@ -638,7 +639,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateTitle',
@@ -673,7 +674,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateDescription',
@@ -691,7 +692,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateDescription',
@@ -709,7 +710,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateDescription',
@@ -732,7 +733,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateStatus',
@@ -753,7 +754,7 @@ describe('Tasks API Integration Tests', () => {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
-              Cookie: joelCookie,
+              Cookie: danielCookie,
             },
             body: JSON.stringify({
               action: 'updateStatus',
@@ -772,7 +773,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateStatus',
@@ -794,7 +795,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updatePriority',
@@ -813,7 +814,7 @@ describe('Tasks API Integration Tests', () => {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
-              Cookie: joelCookie,
+              Cookie: danielCookie,
             },
             body: JSON.stringify({
               action: 'updatePriority',
@@ -832,7 +833,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updatePriority',
@@ -852,7 +853,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateDeadline',
@@ -870,7 +871,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateDeadline',
@@ -893,7 +894,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateNotes',
@@ -911,7 +912,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateNotes',
@@ -932,12 +933,12 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateRecurrence',
             recurrenceInterval: 7,
-            recurrenceDate: '2026-01-20T00:00:00Z',
+            recurrenceDate: '2099-01-20T00:00:00Z',
           }),
         });
 
@@ -955,12 +956,12 @@ describe('Tasks API Integration Tests', () => {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
-              Cookie: joelCookie,
+              Cookie: danielCookie,
             },
             body: JSON.stringify({
               action: 'updateRecurrence',
               recurrenceInterval: interval,
-              recurrenceDate: interval > 0 ? '2026-01-20T00:00:00Z' : null,
+              recurrenceDate: interval > 0 ? '2099-01-20T00:00:00Z' : null,
             }),
           });
 
@@ -975,11 +976,11 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateRecurrence',
-            recurrenceDate: '2025-10-20T00:00:00Z',
+            recurrenceDate: '2099-10-20T00:00:00Z',
           }),
         });
 
@@ -994,25 +995,25 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addAssignee',
-            assignee_id: testUsers.kester.id,
+            assignee_id: testUsers.weijie.id,
           }),
         });
 
         expect(response.status).toBe(200);
         const data = await response.json();
         expect(data.success).toBe(true);
-        expect(data.assignee_id).toBe(testUsers.kester.id);
+        expect(data.assignee_id).toBe(testUsers.weijie.id);
 
         // Verify in database
         const { data: assignment } = await adminClient
           .from('task_assignments')
           .select('*')
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.kester.id)
+          .eq('assignee_id', testUsers.weijie.id)
           .single();
 
         expect(assignment).toBeDefined();
@@ -1023,7 +1024,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addAssignee',
@@ -1044,7 +1045,7 @@ describe('Tasks API Integration Tests', () => {
           .from('task_assignments')
           .select('*')
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.mitch.id);
+          .eq('assignee_id', testUsers.priya.id);
 
         expect(assignments?.length).toBeGreaterThan(0);
 
@@ -1053,11 +1054,11 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'removeAssignee',
-            assignee_id: testUsers.mitch.id,
+            assignee_id: testUsers.priya.id,
           }),
         });
 
@@ -1070,7 +1071,7 @@ describe('Tasks API Integration Tests', () => {
           .from('task_assignments')
           .select('*')
           .eq('task_id', testTaskId)
-          .eq('assignee_id', testUsers.mitch.id);
+          .eq('assignee_id', testUsers.priya.id);
 
         expect(afterRemoval?.length).toBe(0);
       });
@@ -1083,7 +1084,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addTag',
@@ -1102,7 +1103,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addTag',
@@ -1123,7 +1124,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addTag',
@@ -1136,7 +1137,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'removeTag',
@@ -1160,7 +1161,7 @@ describe('Tasks API Integration Tests', () => {
         const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
           method: 'PATCH',
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: formData,
         });
@@ -1179,7 +1180,7 @@ describe('Tasks API Integration Tests', () => {
         const response = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
           method: 'PATCH',
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: formData,
         });
@@ -1201,7 +1202,7 @@ describe('Tasks API Integration Tests', () => {
         const addResponse = await fetch(`${API_BASE}/api/tasks/${testTaskId}`, {
           method: 'PATCH',
           headers: {
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: formData,
         });
@@ -1214,7 +1215,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'removeAttachment',
@@ -1235,7 +1236,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addComment',
@@ -1255,7 +1256,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addComment',
@@ -1272,7 +1273,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addComment',
@@ -1294,7 +1295,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addComment',
@@ -1310,7 +1311,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateComment',
@@ -1334,7 +1335,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'addComment',
@@ -1350,7 +1351,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'deleteComment',
@@ -1376,13 +1377,13 @@ describe('Tasks API Integration Tests', () => {
           description: 'A subtask',
           priority_bucket: 5,
           status: 'To Do',
-          assignee_ids: [testUsers.joel.id],
+          assignee_ids: [testUsers.daniel.id],
           deadline: '2025-12-31T23:59:59Z',
         }));
 
         const createResponse = await fetch(`${API_BASE}/api/tasks`, {
           method: 'POST',
-          headers: { Cookie: joelCookie },
+          headers: { Cookie: danielCookie },
           body: formData,
         });
 
@@ -1394,7 +1395,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'linkSubtask',
@@ -1421,7 +1422,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'linkSubtask',
@@ -1441,7 +1442,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'updateTitle',
@@ -1459,7 +1460,7 @@ describe('Tasks API Integration Tests', () => {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            Cookie: joelCookie,
+            Cookie: danielCookie,
           },
           body: JSON.stringify({
             action: 'invalidAction',

@@ -62,7 +62,7 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
       description: 'This task is completed for report testing',
       priority: '5',
       status: 'Completed',
-      assignees: ['Mitch Shona'],
+      assignees: ['Priya Nair'],
       deadline: today,
       tags: ['report-testing', 'completed'],
     });
@@ -77,7 +77,7 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
       description: 'This task is in progress for report testing',
       priority: '7',
       status: 'In Progress',
-      assignees: ['Noel Tang'],
+      assignees: ['Hannah Lee'],
       deadline: tomorrow,
       tags: ['report-testing', 'in-progress'],
     });
@@ -91,7 +91,7 @@ test.describe('Admin Reporting Workflows with Real Task Data', () => {
       title: todoTaskTitle,
       description: 'This task is todo for report testing',
       priority: '6',
-      assignees: ['Ryan Hung'],
+      assignees: ['Aisha Rahman'],
       deadline: nextWeek,
       tags: ['report-testing', 'todo'],
     });

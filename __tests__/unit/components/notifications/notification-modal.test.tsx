@@ -11,7 +11,7 @@ describe('NotificationModal', () => {
   const mockNotification: Notification = {
     id: 1,
     title: 'New Task Assignment',
-    message: 'Ryan assigned you to task: "Design budget dashboard layout"',
+    message: 'Aisha assigned you to task: "Design budget dashboard layout"',
     type: 'task_assigned',
     read: false,
     is_archived: false,
@@ -139,7 +139,7 @@ describe('NotificationModal', () => {
     it('should format task assignment message', () => {
       const notification = {
         ...mockNotification,
-        message: 'Ryan assigned you to task: "Design budget dashboard layout"',
+        message: 'Aisha assigned you to task: "Design budget dashboard layout"',
       };
       render(
         <NotificationModal
@@ -152,7 +152,7 @@ describe('NotificationModal', () => {
 
       expect(
         screen.getByText(
-          'You have been assigned to task "Design budget dashboard layout" by Ryan'
+          'You have been assigned to task "Design budget dashboard layout" by Aisha'
         )
       ).toBeInTheDocument();
     });

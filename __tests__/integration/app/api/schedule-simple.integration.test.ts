@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { authenticateAs } from '@/__tests__/setup/integration.setup';
 
 describe('Schedule API - Basic Tests', () => {
-  let joelCookie: string;
+  let danielCookie: string;
   const API_BASE = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   // Extract project reference from Supabase URL
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  // Same rule supabase-js uses for its default storage key (works for local and hosted URLs)
+  const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
 
   // Helper function to format auth cookies
   const formatAuthCookie = (session: any) => {
@@ -24,8 +25,8 @@ describe('Schedule API - Basic Tests', () => {
 
   beforeEach(async () => {
     // Authenticate fresh for each test
-    const joel = await authenticateAs('joel');
-    joelCookie = formatAuthCookie(joel.session);
+    const daniel = await authenticateAs('daniel');
+    danielCookie = formatAuthCookie(daniel.session);
   });
 
   it('should return 401 when no auth cookie provided', async () => {
@@ -36,7 +37,7 @@ describe('Schedule API - Basic Tests', () => {
   it('should allow authenticated users to access schedule', async () => {
     const response = await fetch(`${API_BASE}/api/schedule`, {
       headers: {
-        Cookie: joelCookie,
+        Cookie: danielCookie,
       },
     });
 
@@ -50,7 +51,7 @@ describe('Schedule API - Basic Tests', () => {
       `${API_BASE}/api/schedule?startDate=2025-10-01&endDate=2025-10-31`,
       {
         headers: {
-          Cookie: joelCookie,
+          Cookie: danielCookie,
         },
       }
     );

@@ -4,6 +4,7 @@ dotenv.config();
 
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
+import { personas, type PersonaKey } from '@/lib/sample-data';
 
 // Create admin Supabase client for setup/teardown operations
 const adminClient = createClient(
@@ -17,66 +18,32 @@ const adminClient = createClient(
   }
 );
 
-// Test user credentials from sample-data.ts
-// All SMU accounts have admin role in the seeded data
+// Test users are the fictional demo personas from lib/sample-data.ts.
+// Passwords are never hardcoded: they come from DEMO_PASSWORD (and
+// GUEST_PASSWORD for the guest), the same env vars the seed route uses.
+function demoUser(key: PersonaKey) {
+  const p = personas[key];
+  return {
+    id: p.id,
+    email: p.email,
+    password: process.env[p.password_env] ?? '',
+    department: p.department_name,
+    roles: [...p.roles] as string[],
+  };
+}
+
 export const testUsers = {
-  joel: {
-    id: '8d7a0c21-17ba-40f3-9e6d-dac4ae3cbe2a',
-    email: 'joel.wang.2023@scis.smu.edu.sg',
-    password: 'password123',
-    department: 'Engineering Operations Division Director',
-    roles: ['admin', 'manager', 'staff'], 
-  },
-  mitch: {
-    id: 'e1aa6307-0985-4f5b-b25b-0b37fbb8d964',
-    email: 'mitch.shona.2023@scis.smu.edu.sg',
-    password: 'password123',
-    department: 'Finance Director',
-    roles: ['admin', 'manager', 'staff'],
-  },
-  garrison: {
-    id: '32635261-038c-4405-b6ed-2d446738f94c',
-    email: 'garrisonkoh.2023@scis.smu.edu.sg',
-    password: 'password123',
-    department: 'System Solutioning Division Director',
-    roles: ['admin', 'manager', 'staff'],
-  },
-  ryan: {
-    id: '61ca6b82-6d42-4058-bb4c-9316e7079b24',
-    email: 'ryan.hung.2023@scis.smu.edu.sg',
-    password: 'password123',
-    department: 'Finance Director',
-    roles: ['admin', 'manager', 'staff'],
-  },
-  kester: {
-    id: '67393282-3a06-452b-a05a-9c93a95b597f',
-    email: 'kester.yeo.2024@computing.smu.edu.sg',
-    password: 'password123',
-    department: 'Engineering Operations Division Director',
-    roles: ['admin', 'manager', 'staff'],
-  },
-  // Personal accounts (staff only) - for testing non-admin access
-  joelPersonal: {
-    id: 'baa47e05-2dba-4f12-8321-71769a9a3702',
-    email: 'joel.wang.03@gmail.com',
-    password: 'password123',
-    department: 'Senior Engineers',
-    roles: ['staff'],
-  },
-  mitchPersonal: {
-    id: 'aa344933-c44b-4097-b0ac-56987a10734b',
-    email: 'mitchshonaaa@gmail.com',
-    password: 'password123',
-    department: 'Finance Executive',
-    roles: ['staff'],
-  },
-  ryanPersonal: {
-    id: 'aa6209a7-be3b-477e-8426-62b8cfd7043b',
-    email: 'ryanhung919@gmail.com',
-    password: 'password123',
-    departnent: 'Finance Managers',
-    roles: ['staff'],
-  },
+  // admin + manager + staff
+  daniel: demoUser('daniel'), // Engineering Operations Division Director
+  weijie: demoUser('weijie'), // Engineering Operations Division Director
+  priya: demoUser('priya'), // Finance Director
+  aisha: demoUser('aisha'), // Finance Director
+  marcus: demoUser('marcus'), // System Solutioning Division Director
+  // staff only - for testing non-admin access
+  hannah: demoUser('hannah'), // Senior Engineers
+  farah: demoUser('farah'), // Finance Executive
+  // project owner's account: staff + admin, Finance Managers
+  ryan: demoUser('ryan'),
 };
 
 /**
@@ -234,6 +201,7 @@ beforeAll(async () => {
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
+    'DEMO_PASSWORD',
   ];
 
   for (const envVar of requiredEnvVars) {

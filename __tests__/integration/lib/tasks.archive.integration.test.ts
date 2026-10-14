@@ -34,11 +34,11 @@ describe('Task Archive Integration Tests', () => {
       description: 'Parent task for archive testing',
       priority_bucket: 5,
       status: 'To Do',
-      assignee_ids: [testUsers.joel.id],
+      assignee_ids: [testUsers.daniel.id],
       deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
     };
 
-    const parentId = await createTask(adminClient, parentPayload, testUsers.joel.id);
+    const parentId = await createTask(adminClient, parentPayload, testUsers.daniel.id);
     createdTaskIds.push(parentId);
 
     const subtaskIds: number[] = [];
@@ -49,11 +49,11 @@ describe('Task Archive Integration Tests', () => {
         description: `Subtask ${i + 1} for archive testing`,
         priority_bucket: 5,
         status: i % 2 === 0 ? 'To Do' : 'In Progress',
-        assignee_ids: [testUsers.joel.id],
+        assignee_ids: [testUsers.daniel.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const subtaskId = await createTask(adminClient, subtaskPayload, testUsers.joel.id);
+      const subtaskId = await createTask(adminClient, subtaskPayload, testUsers.daniel.id);
 
       // Update to set parent_task_id
       await adminClient.from('tasks').update({ parent_task_id: parentId }).eq('id', subtaskId);
@@ -112,11 +112,11 @@ describe('Task Archive Integration Tests', () => {
         description: 'Task with no subtasks',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id],
+        assignee_ids: [testUsers.daniel.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       // Archive the standalone task
@@ -163,7 +163,7 @@ describe('Task Archive Integration Tests', () => {
       const { parentId } = await createTaskWithSubtasks(2);
 
       // Get tasks before archiving
-      const resultBefore = await getUserTasks(testUsers.joel.id);
+      const resultBefore = await getUserTasks(testUsers.daniel.id);
       const taskIdsBefore = resultBefore.tasks.map((t: any) => t.id);
 
       // Verify our test task is present
@@ -173,7 +173,7 @@ describe('Task Archive Integration Tests', () => {
       await archiveTask(parentId, true);
 
       // Get tasks after archiving
-      const resultAfter = await getUserTasks(testUsers.joel.id);
+      const resultAfter = await getUserTasks(testUsers.daniel.id);
       const taskIdsAfter = resultAfter.tasks.map((t: any) => t.id);
 
       // Verify archived task is not in results
@@ -187,7 +187,7 @@ describe('Task Archive Integration Tests', () => {
       await archiveTask(parentId, true);
 
       // Verify task is not in results
-      const resultArchived = await getUserTasks(testUsers.joel.id);
+      const resultArchived = await getUserTasks(testUsers.daniel.id);
       const archivedTaskIds = resultArchived.tasks.map((t: any) => t.id);
       expect(archivedTaskIds).not.toContain(parentId);
 
@@ -195,7 +195,7 @@ describe('Task Archive Integration Tests', () => {
       await archiveTask(parentId, false);
 
       // Verify task is back in results
-      const resultUnarchived = await getUserTasks(testUsers.joel.id);
+      const resultUnarchived = await getUserTasks(testUsers.daniel.id);
       const unarchivedTaskIds = resultUnarchived.tasks.map((t: any) => t.id);
       expect(unarchivedTaskIds).toContain(parentId);
     });
@@ -242,11 +242,11 @@ describe('Task Archive Integration Tests', () => {
         description: 'Task without subtasks',
         priority_bucket: 5,
         status: 'To Do',
-        assignee_ids: [testUsers.joel.id],
+        assignee_ids: [testUsers.daniel.id],
         deadline: new Date('2025-12-31T23:59:59Z').toISOString(),
       };
 
-      const taskId = await createTask(adminClient, payload, testUsers.joel.id);
+      const taskId = await createTask(adminClient, payload, testUsers.daniel.id);
       createdTaskIds.push(taskId);
 
       const affectedCount = await archiveTask(taskId, true);
