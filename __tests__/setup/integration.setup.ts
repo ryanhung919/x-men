@@ -44,6 +44,8 @@ export const testUsers = {
   farah: demoUser('farah'), // Finance Executive
   // project owner's account: staff + admin, Finance Managers
   ryan: demoUser('ryan'),
+  // public guest: staff + read-only demo_viewer
+  guest: demoUser('guest'),
 };
 
 /**

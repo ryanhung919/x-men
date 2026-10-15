@@ -249,6 +249,52 @@ describe('lib/supabase/middleware', () => {
       expect(response.status).toBe(200);
     });
 
+    it('should allow the read-only demo viewer to access /report routes', async () => {
+      mockSupabase.auth.getClaims.mockResolvedValue({
+        data: {
+          claims: { sub: 'user-123' },
+        },
+      });
+
+      const mockSelect = vi.fn().mockReturnThis();
+      const mockEq = vi.fn().mockReturnThis();
+
+      // Mock user_info query
+      const mockSingleUserInfo = vi.fn().mockResolvedValue({
+        data: { department_id: 1 },
+        error: null,
+      });
+
+      // Mock user_roles query
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'user_info') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: mockSingleUserInfo,
+              }),
+            }),
+          };
+        }
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ role: 'staff' }, { role: 'demo_viewer' }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        return {};
+      });
+
+      const request = new NextRequest('http://localhost:3000/report');
+      const response = await updateSession(request);
+
+      expect(response.status).toBe(200);
+    });
+
     it('should redirect non-admin users to /unauthorized for /report routes', async () => {
       mockSupabase.auth.getClaims.mockResolvedValue({
         data: {

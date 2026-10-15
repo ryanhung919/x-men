@@ -4,6 +4,8 @@ import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getScheduleTasks } from '@/lib/db/tasks';
 
+vi.mock('@/lib/db/demo-viewer', () => ({ rejectIfDemoViewer: vi.fn(async () => null) }));
+
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/db/tasks');
 

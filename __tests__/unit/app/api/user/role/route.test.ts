@@ -3,6 +3,8 @@ import { GET, PATCH } from '@/app/api/user/role/route';
 import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+vi.mock('@/lib/db/demo-viewer', () => ({ rejectIfDemoViewer: vi.fn(async () => null) }));
+
 vi.mock('@/lib/supabase/server');
 
 describe('app/api/user/role/route', () => {

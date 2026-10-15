@@ -4,6 +4,8 @@ import { getAllUsers, getAllProjects } from '@/lib/db/tasks';
 import { createTaskService } from '@/lib/services/tasks';
 import { NextRequest } from 'next/server';
 
+vi.mock('@/lib/db/demo-viewer', () => ({ rejectIfDemoViewer: vi.fn(async () => null) }));
+
 // Mock the service layer
 vi.mock('@/lib/services/tasks', () => ({
   createTaskService: vi.fn(),

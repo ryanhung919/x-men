@@ -1,3 +1,4 @@
+import { rejectIfDemoViewer } from '@/lib/db/demo-viewer';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { archiveTaskService } from '@/lib/services/tasks';
@@ -33,6 +34,9 @@ export async function PATCH(
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const readOnly = await rejectIfDemoViewer(supabase, user.id);
+    if (readOnly) return readOnly;
 
     // Parse task ID from params - handle both Promise and non-Promise
     const resolvedParams = context.params instanceof Promise

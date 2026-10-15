@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { canViewReports } from '@/lib/demo-viewer'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -132,9 +133,8 @@ export async function updateSession(request: NextRequest) {
     }
 
     const roles = roleRows?.map((r: { role: string }) => r.role) || []
-    const isAdmin = roles.includes('admin')
-
-    if (!isAdmin) {
+    // Admins and the read-only demo viewer (public guest) may open reports
+    if (!canViewReports(roles)) {
       const url = request.nextUrl.clone()
       url.pathname = '/unauthorized'
       return NextResponse.redirect(url)

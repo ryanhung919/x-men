@@ -15,14 +15,12 @@ export async function GET(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (!projectIds.length) {
-    return NextResponse.json([]);
-  }
-
   try {
     // Get all assignees from tasks in the selected projects
     // This respects RLS policies - users can only see staff assigned to tasks they can view
-    const { data: taskAssignments, error: assignmentsError } = await supabase
+    // With no project selected, list the staff on every task the user can see, so the
+    // staff filter is populated by default instead of reading "No staff available".
+    let assignmentsQuery: any = supabase
       .from('task_assignments')
       .select(`
         assignee_id,
@@ -30,9 +28,12 @@ export async function GET(req: NextRequest) {
           project_id,
           is_archived
         )
-      `)
-      .in('tasks.project_id', projectIds)
-      .eq('tasks.is_archived', false);
+      `);
+    if (projectIds.length) {
+      assignmentsQuery = assignmentsQuery.in('tasks.project_id', projectIds);
+    }
+    assignmentsQuery = assignmentsQuery.eq('tasks.is_archived', false);
+    const { data: taskAssignments, error: assignmentsError } = await assignmentsQuery;
 
     if (assignmentsError) {
       console.error('Error fetching task assignments:', assignmentsError);

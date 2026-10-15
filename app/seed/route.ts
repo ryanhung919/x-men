@@ -256,7 +256,7 @@ async function seedRoles(sql: postgres.Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS roles (
       role VARCHAR(50) PRIMARY KEY,
-      CONSTRAINT roles_allowed_chk CHECK (role IN ('staff','manager','admin'))
+      CONSTRAINT roles_allowed_chk CHECK (role IN ('staff','manager','admin','demo_viewer'))
     );
   `;
   await sql`TRUNCATE TABLE roles CASCADE;`;
@@ -803,6 +803,12 @@ async function enableRLS(sql: postgres.Sql) {
       v_task_id BIGINT;
       v_assignee_id UUID;
     BEGIN
+      -- The read-only demo viewer may never create tasks, even by calling this RPC directly.
+      -- (auth.uid() is NULL for service-role callers, which are guarded in the API routes.)
+      IF auth.uid() IS NOT NULL AND is_demo_viewer(auth.uid()) THEN
+        RAISE EXCEPTION 'The demo account is read-only';
+      END IF;
+
       -- Insert the task
       INSERT INTO tasks (
         title, description, priority_bucket, status, deadline, notes,
@@ -1391,6 +1397,61 @@ USING (
           AND pd.department_id = (SELECT department_id FROM user_info WHERE id = auth.uid())
       )
     )
+  `;
+
+  /* ---------------- READ-ONLY DEMO VIEWER ---------------- */
+  // The public guest holds the 'demo_viewer' role. RESTRICTIVE policies are AND-ed with every
+  // permissive policy above, so whatever else a policy allows, a demo viewer cannot write.
+  // They are split per command (not FOR ALL) so that SELECT stays untouched.
+  await sql`
+    CREATE OR REPLACE FUNCTION is_demo_viewer(u uuid)
+    RETURNS boolean
+    LANGUAGE sql
+    STABLE
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+      SELECT EXISTS (
+        SELECT 1 FROM user_roles ur
+        WHERE ur.user_id = u AND ur.role = 'demo_viewer'
+      );
+    $$;
+  `;
+
+  const demoViewerWriteTables = [
+    'tasks',
+    'task_assignments',
+    'task_comments',
+    'task_attachments',
+    'task_tags',
+    'tags',
+    'projects',
+    'project_departments',
+    'user_info',
+    'user_roles',
+  ];
+  for (const table of demoViewerWriteTables) {
+    await sql.unsafe(`DROP POLICY IF EXISTS "Demo viewer cannot insert" ON ${table}`);
+    await sql.unsafe(`DROP POLICY IF EXISTS "Demo viewer cannot update" ON ${table}`);
+    await sql.unsafe(`DROP POLICY IF EXISTS "Demo viewer cannot delete" ON ${table}`);
+    await sql.unsafe(
+      `CREATE POLICY "Demo viewer cannot insert" ON ${table} AS RESTRICTIVE FOR INSERT WITH CHECK (NOT is_demo_viewer(auth.uid()))`
+    );
+    await sql.unsafe(
+      `CREATE POLICY "Demo viewer cannot update" ON ${table} AS RESTRICTIVE FOR UPDATE USING (NOT is_demo_viewer(auth.uid()))`
+    );
+    await sql.unsafe(
+      `CREATE POLICY "Demo viewer cannot delete" ON ${table} AS RESTRICTIVE FOR DELETE USING (NOT is_demo_viewer(auth.uid()))`
+    );
+  }
+
+  // Notifications: the demo viewer may mark its own as read, but must not forge notifications
+  // for other people (the "System can create notifications" policy is otherwise WITH CHECK true).
+  await sql`DROP POLICY IF EXISTS "Demo viewer cannot insert" ON notifications`;
+  await sql`
+    CREATE POLICY "Demo viewer cannot insert" ON notifications
+    AS RESTRICTIVE FOR INSERT
+    WITH CHECK (NOT is_demo_viewer(auth.uid()))
   `;
 }
 /* --------------------- TRIGGERS --------------------- */

@@ -28,7 +28,7 @@ export interface Persona {
   first_name: string;
   last_name: string;
   department_name: string;
-  roles: Array<'staff' | 'manager' | 'admin'>;
+  roles: Array<'staff' | 'manager' | 'admin' | 'demo_viewer'>;
   default_view: 'tasks' | 'schedule';
   password_env: PasswordEnv;
 }
@@ -161,14 +161,15 @@ export const personas = {
     password_env: 'DEMO_PASSWORD',
   },
 
-  // Public guest account (credentials go in the README). Staff only.
+  // Public guest account (credentials go in the README). Staff plus the read-only
+  // demo_viewer role: can open /report and see its RLS scope, but cannot write anything.
   guest: {
     id: 'b782f303-d0a5-401f-9dec-3abbf5c753c2',
     email: 'guest@nodal.demo',
     first_name: 'Guest',
     last_name: 'Visitor',
     department_name: 'Engineering Operations Division Director',
-    roles: ['staff'],
+    roles: ['staff', 'demo_viewer'],
     default_view: 'tasks',
     password_env: 'GUEST_PASSWORD',
   },
@@ -214,7 +215,12 @@ export const departments = [
   { name: 'Finance Executive', parent_department_name: 'Finance Managers' },
 ];
 
-export const roles = [{ role: 'staff' }, { role: 'manager' }, { role: 'admin' }];
+export const roles = [
+  { role: 'staff' },
+  { role: 'manager' },
+  { role: 'admin' },
+  { role: 'demo_viewer' },
+];
 
 export const projects = [
   { name: 'Customer Portal Revamp', is_archived: false },
