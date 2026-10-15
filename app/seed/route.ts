@@ -2414,6 +2414,10 @@ async function createTriggers(sql: postgres.Sql) {
 }
 
 /* --------------------- GET ROUTE --------------------- */
+// A full hosted seed takes ~170 s. 300 s is the Vercel Functions maximum on
+// the Hobby plan with Fluid compute (and the default on Pro/Enterprise).
+export const maxDuration = 300;
+
 export async function GET() {
   const postgresUrl = process.env.POSTGRES_URL!;
   const sql = postgres(postgresUrl, { ssl: postgresSslOption(postgresUrl) });
