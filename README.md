@@ -13,7 +13,7 @@ Open https://x-men-rosy.vercel.app/ and log in with the guest account:
 - Email: `guest@nodal.demo`
 - Password: `nodal91guest`
 
-The guest is a staff-role demo account. It can browse and work on tasks, the calendar and the schedule, but not the manager/admin reports (`/report` shows an unauthorized page). The data is shared demo data and may be reset at any time.
+The guest is a read-only demo account (staff plus the `demo_viewer` role). It can browse tasks, the calendar, the schedule and the reports (`/report`), but every write is rejected by the database (restrictive RLS policies) and by the API. The data is shared demo data and may be reset at any time.
 
 Access the our GitHub Repository [here](https://github.com/ryanhung919/x-men)
 
