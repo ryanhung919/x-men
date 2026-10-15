@@ -24,6 +24,8 @@ vi.mock('@/lib/supabase/server', () => {
 // Import after mock
 import { PATCH } from '@/app/api/user/role/route';
 
+vi.mock('@/lib/db/demo-viewer', () => ({ rejectIfDemoViewer: vi.fn(async () => null) }));
+
 // Minimal mock NextRequest-like object for calling PATCH
 const makeReq = (body: any) => ({
   json: async () => body,

@@ -168,6 +168,38 @@ describe('app/api/reports/route', () => {
       });
     });
 
+    describe('demo viewer access', () => {
+      function asUser(roles: string[]) {
+        mockSupabaseClient.auth = {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: authUsersFixtures.alice.id } },
+            error: null,
+          }),
+        } as any;
+        mockUserRoles(authUsersFixtures.alice.id, roles);
+      }
+
+      it('lets a demo viewer read reports', async () => {
+        asUser(['staff', 'demo_viewer']);
+        vi.mocked(generateTeamSummaryReport).mockResolvedValue({
+          kind: 'teamSummary',
+          totalTasks: 0,
+          totalUsers: 0,
+          weeklyBreakdown: [],
+          userTotals: new Map(),
+          weekTotals: new Map(),
+        });
+        const response = await GET(createMockRequest('/api/reports?action=team'));
+        expect(response.status).toBe(200);
+      });
+
+      it('still rejects plain staff with 403', async () => {
+        asUser(['staff']);
+        const response = await GET(createMockRequest('/api/reports?action=team'));
+        expect(response.status).toBe(403);
+      });
+    });
+
     describe('action=time (loggedTime report)', () => {
       it('should generate logged time report with JSON response', async () => {
         const mockReportData = {

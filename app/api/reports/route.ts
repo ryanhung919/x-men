@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { canViewReports } from '@/lib/demo-viewer';
 import { filterDepartments, filterProjects } from '@/lib/services/filter';
 import {
   generateLoggedTimeReport,
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admins can access reports
+    // Only admins (and the read-only demo viewer) can access reports
     if (['time', 'team', 'task'].includes(action)) {
       const { data: roleRows, error: roleError } = await supabase
         .from('user_roles')
@@ -51,9 +52,7 @@ export async function GET(req: NextRequest) {
       }
 
       const roles = roleRows?.map((r: { role: string }) => r.role) || [];
-      const isAdmin = roles.includes('admin');
-
-      if (!isAdmin) {
+      if (!canViewReports(roles)) {
         return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
       }
     }

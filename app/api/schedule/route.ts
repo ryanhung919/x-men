@@ -1,3 +1,4 @@
+import { rejectIfDemoViewer } from '@/lib/db/demo-viewer';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getScheduleTasks } from '@/lib/db/tasks';
@@ -60,6 +61,9 @@ export async function PATCH(req: NextRequest) {
     error,
   } = await supabase.auth.getUser();
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const readOnly = await rejectIfDemoViewer(supabase, user.id);
+  if (readOnly) return readOnly;
 
   try {
     const { error: updateError } = await supabase

@@ -1,3 +1,4 @@
+import { rejectIfDemoViewer } from '@/lib/db/demo-viewer';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAllUsers, getAllProjects } from '@/lib/db/tasks';
@@ -26,6 +27,9 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const readOnly = await rejectIfDemoViewer(supabase, user.id);
+    if (readOnly) return readOnly;
 
     // Parse multipart form data
     const formData = await request.formData();

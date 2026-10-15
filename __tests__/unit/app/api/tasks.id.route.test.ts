@@ -21,6 +21,8 @@ import {
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/lib/db/demo-viewer', () => ({ rejectIfDemoViewer: vi.fn(async () => null) }));
+
 // Mock all service functions
 vi.mock('@/lib/services/tasks', () => ({
   updateTitle: vi.fn(),

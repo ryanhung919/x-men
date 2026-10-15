@@ -62,15 +62,9 @@ export default function ScheduleView() {
   // Load available staff when projects change
   useEffect(() => {
     const loadStaff = async () => {
-      if (selectedProjects.length === 0) {
-        setAvailableStaff([]);
-        setSelectedStaffIds([]);
-        return;
-      }
-
       try {
         const params = new URLSearchParams();
-        params.set('projectIds', selectedProjects.join(','));
+        if (selectedProjects.length) params.set('projectIds', selectedProjects.join(','));
         const res = await fetch(`/api/schedule/staff?${params.toString()}`);
         const data = await res.json();
         setAvailableStaff(data || []);

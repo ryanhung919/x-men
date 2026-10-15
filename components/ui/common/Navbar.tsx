@@ -1,5 +1,6 @@
 'use client';
 
+import { canViewReports } from '@/lib/demo-viewer';
 import { LogOut, User2, Settings, Menu, X } from 'lucide-react';
 import { NotificationPanel } from '@/components/notifications/notification-panel';
 import Link from 'next/link';
@@ -96,6 +97,7 @@ export function Navbar() {
   };
 
   const isAdmin = roles.includes('admin');
+  const showReports = canViewReports(roles);
 
   const handleDefaultViewChange = async (value: string) => {
     if (value !== 'tasks' && value !== 'schedule') return;
@@ -188,7 +190,7 @@ export function Navbar() {
         >
           <Link href="/schedule">Schedule</Link>
         </Button>
-        {isAdmin && (
+        {showReports && (
           <Button
             variant="ghost"
             size="sm"
@@ -300,7 +302,7 @@ export function Navbar() {
                 >
                   <Link href="/schedule">Schedule</Link>
                 </Button>
-                {isAdmin && (
+                {showReports && (
                   <Button
                     variant="ghost"
                     asChild

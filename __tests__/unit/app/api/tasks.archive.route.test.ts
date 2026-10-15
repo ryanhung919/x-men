@@ -3,6 +3,8 @@ import { PATCH } from '@/app/api/tasks/[id]/archive/route';
 import { archiveTaskService } from '@/lib/services/tasks';
 import { NextRequest } from 'next/server';
 
+vi.mock('@/lib/db/demo-viewer', () => ({ rejectIfDemoViewer: vi.fn(async () => null) }));
+
 // Mock the service layer
 vi.mock('@/lib/services/tasks', () => ({
   archiveTaskService: vi.fn(),

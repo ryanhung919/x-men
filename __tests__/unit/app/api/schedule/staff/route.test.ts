@@ -35,30 +35,38 @@ describe('app/api/schedule/staff/route', () => {
       expect(data.error).toBe('Unauthorized');
     });
 
-    it('should return empty array when no projectIds provided', async () => {
+    it('should return empty array when no projectIds provided (no visible assignments)', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
       });
+      const eq = vi.fn().mockResolvedValue({ data: [], error: null });
+      const inFn = vi.fn();
+      mockSupabase.from.mockReturnValue({ select: vi.fn().mockReturnValue({ in: inFn, eq }) });
 
       const request = new NextRequest('http://localhost:3000/api/schedule/staff');
       const response = await GET(request);
-      const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual([]);
+      expect(await response.json()).toEqual([]);
+      // no project filter is applied, so every visible assignee is considered
+      expect(inFn).not.toHaveBeenCalled();
     });
 
-    it('should return empty array when projectIds is empty string', async () => {
+    it('should return empty array when projectIds is empty string (no visible assignments)', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
       });
+      const eq = vi.fn().mockResolvedValue({ data: [], error: null });
+      const inFn = vi.fn();
+      mockSupabase.from.mockReturnValue({ select: vi.fn().mockReturnValue({ in: inFn, eq }) });
 
       const request = new NextRequest('http://localhost:3000/api/schedule/staff?projectIds=');
       const response = await GET(request);
-      const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual([]);
+      expect(await response.json()).toEqual([]);
+      // no project filter is applied, so every visible assignee is considered
+      expect(inFn).not.toHaveBeenCalled();
     });
 
     it('should return staff list for valid projectIds', async () => {

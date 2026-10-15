@@ -1,3 +1,4 @@
+import { rejectIfDemoViewer } from '@/lib/db/demo-viewer';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
@@ -46,6 +47,9 @@ export async function PATCH(req: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const readOnly = await rejectIfDemoViewer(supabase, user.id);
+    if (readOnly) return readOnly;
 
     const body = await req.json().catch(() => ({}));
     const defaultView = body?.defaultView as string | undefined;
