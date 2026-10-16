@@ -6,6 +6,10 @@
 
 **Status:** ready-for-agent
 
+## Owner scope revision — 2026-10-17
+
+Prioritize presentable design and the portfolio recording; implement only necessary supporting logic. See the revised delivery priority in `../spec.md`. Broad library migrations, unrelated correctness cleanup, and exhaustive regression/failure-path testing are deferred. Use both-theme Playwright CLI visual checks, build/type checks, and targeted demo-path validation. Record completion against this revised scope and distinguish unverified original checklist items from verified work.
+
 ## Spec coverage
 
 Approved prerequisite added after the parent spec.
