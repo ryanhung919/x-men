@@ -25,6 +25,10 @@ The parent spec remains unchanged. The user subsequently approved project-scoped
 
 Each ticket contains its own acceptance criteria and spec-story coverage. Main workflow tickets must validate both themes and relevant accessibility/responsive states before completion; ticket 15 verifies their integration, and ticket 16 creates the portfolio showcase.
 
+## Delivery priority
+
+The owner revised scope on 2026-10-17: prioritize the visual overhaul and recording, with minimal supporting logic. Finish the current coherent toolchain changes; hold unrelated application migrations. See the scope revision in the spec and each ticket. Completion is assessed against the revised scope, with actual verification recorded.
+
 ## Implementation record
 
 - Baseline: `cefe280` preserves the approved spec, tickets, and adopted Oxlint/Oxfmt setup.

@@ -2,6 +2,12 @@
 
 Status: ready-for-agent
 
+## Delivery priority revised by the owner — 2026-10-17
+
+The site is no longer actively used. Prioritize a polished visual overhaul and the one-minute portfolio recording. Keep logic changes to the minimum required for the showcased screens and interactions to work. Preserve existing data and permissions, but defer broad correctness cleanup, exhaustive failure-path coverage, unrelated refactoring, and additional product depth. Validate through Playwright CLI screenshots in both themes, type/build checks, and the actual recorded walkthrough; reuse targeted existing tests where useful instead of expanding a comprehensive regression program.
+
+Finish the coherent toolchain upgrade already underway. Hold unrelated application major-version migrations unless required by the visual work or compatibility. The original design direction, feature-group coverage, silent recording, and FFmpeg/portfolio delivery remain the target. Existing detailed checklists serve as design guidance; exhaustive behavior/testing requirements are superseded by this delivery priority. Document actual checks and remaining limitations honestly.
+
 ## Problem Statement
 
 NODAL already supports substantial workforce and project management workflows, but inconsistent visual hierarchy, dense task metadata, disconnected views, and generic component styling obscure that depth. Its owner wants a sophisticated, distinctive SaaS interface suitable for a personal portfolio without sacrificing everyday usability.
