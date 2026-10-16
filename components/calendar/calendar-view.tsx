@@ -20,13 +20,14 @@ const WeekView = dynamic(() => import('./week-view'), {
 
 interface CalendarViewProps {
   tasks: Task[];
+  scopeManaged?: boolean;
 }
 
 /**
  * Main calendar view container that containing all calendar subviews.
  * Manages state for current date, view mode, filters, and task selection.
  */
-export default function CalendarView({ tasks }: CalendarViewProps) {
+export default function CalendarView({ tasks, scopeManaged = false }: CalendarViewProps) {
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -43,22 +44,23 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
     }
   }, []);
 
-  
   // Save calendar view preference when it changes
   useEffect(() => {
     localStorage.setItem('tasks-calendar-view', calendarView);
   }, [calendarView]);
 
   // Filter tasks based on current filters
-  const filteredTasks = tasks.filter((task) => {
-    // Filter by completion status
-    if (!filters.showCompleted && task.status === 'Completed') return false;
+  const filteredTasks = scopeManaged
+    ? tasks
+    : tasks.filter((task) => {
+        // Filter by completion status
+        if (!filters.showCompleted && task.status === 'Completed') return false;
 
-    // Filter by selected statuses (if any selected)
-    if (filters.status.length > 0 && !filters.status.includes(task.status)) return false;
+        // Filter by selected statuses (if any selected)
+        if (filters.status.length > 0 && !filters.status.includes(task.status)) return false;
 
-    return true;
-  });
+        return true;
+      });
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -79,7 +81,7 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
         tasks={filteredTasks}
       />
 
-      <CalendarFilters filters={filters} onFiltersChange={setFilters} />
+      {!scopeManaged && <CalendarFilters filters={filters} onFiltersChange={setFilters} />}
 
       <div className="flex-1 overflow-auto">
         {calendarView === 'day' && (
