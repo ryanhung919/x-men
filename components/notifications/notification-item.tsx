@@ -19,11 +19,7 @@ interface NotificationItemProps {
   onClick: (notification: Notification) => void;
 }
 
-export function NotificationItem({
-  notification,
-  onMarkAsRead,
-  onClick,
-}: NotificationItemProps) {
+export function NotificationItem({ notification, onMarkAsRead, onClick }: NotificationItemProps) {
   const handleClick = () => {
     if (!notification.read) {
       onMarkAsRead(notification.id);
@@ -32,32 +28,37 @@ export function NotificationItem({
   };
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'relative flex gap-3 p-4 border-b transition-colors hover:bg-accent cursor-pointer',
-        !notification.read && 'bg-accent/50'
+        'relative flex w-full gap-3 border-b p-5 text-left transition-colors duration-150 hover:bg-accent',
+        !notification.read && 'bg-positive-soft/40'
       )}
       onClick={handleClick}
+      aria-label={`${notification.read ? 'Read' : 'Unread'}: ${notification.title}`}
     >
-      {/* Unread indicator */}
-      {!notification.read && (
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary" />
-      )}
-
-      {/* Content */}
-      <div className="flex-1 min-w-0 pl-4">
-        <div className="flex items-start justify-between gap-2">
-          <h4 className="text-sm font-medium truncate">{notification.title}</h4>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatDistanceToNow(new Date(notification.created_at), {
-              addSuffix: true,
-            })}
-          </span>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+      <span
+        className={cn(
+          'mt-1.5 size-2 shrink-0 rounded-full',
+          notification.read ? 'border border-muted-foreground/40' : 'bg-positive'
+        )}
+        aria-hidden="true"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block break-words text-sm font-medium leading-5">
+          {notification.title}
+        </span>
+        <span className="mt-1 block line-clamp-2 break-words text-sm leading-relaxed text-muted-foreground">
           {notification.message}
-        </p>
-      </div>
-    </div>
+        </span>
+        <time
+          dateTime={notification.created_at}
+          title={new Date(notification.created_at).toLocaleString()}
+          className="mt-2 block text-[11px] text-muted-foreground"
+        >
+          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+        </time>
+      </span>
+    </button>
   );
 }
