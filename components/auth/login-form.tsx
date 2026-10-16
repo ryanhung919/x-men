@@ -1,35 +1,35 @@
-'use client'
+'use client';
 
-import { cn } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
-import { getRolesForUserClient } from '@/lib/db/roles'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/client';
+import { getRolesForUserClient } from '@/lib/db/roles';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const supabase = createClient()
-    setIsLoading(true)
-    setError(null)
+    e.preventDefault();
+    const supabase = createClient();
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
 
-      const { data: userRes } = await supabase.auth.getUser()
-      const userId = userRes.user?.id
+      const { data: userRes } = await supabase.auth.getUser();
+      const userId = userRes.user?.id;
       if (userId) {
         try {
           // Load user settings
@@ -37,40 +37,39 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
             .from('user_info')
             .select('default_view')
             .eq('id', userId)
-            .maybeSingle()
+            .maybeSingle();
           if (!uiErr && ui) {
             // Redirect to preferred default view
-            const path = ui.default_view === 'schedule' ? '/schedule' : '/tasks'
-            router.push(path)
-            return
+            const path = ui.default_view === 'schedule' ? '/schedule' : '/tasks';
+            router.push(path);
+            return;
           }
 
           // Fallback to roles logic if no settings
-          const roles = await getRolesForUserClient(supabase, userId)
+          const roles = await getRolesForUserClient(supabase, userId);
           if (roles.includes('manager')) {
-            router.push('/tasks')
+            router.push('/tasks');
           } else {
-            router.push('/tasks')
+            router.push('/tasks');
           }
         } catch (rolesErr) {
-          console.warn('Failed to load settings/roles, defaulting redirect', rolesErr)
-          router.push('/tasks')
+          console.warn('Failed to load settings/roles, defaulting redirect', rolesErr);
+          router.push('/tasks');
         }
       }
-
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your email below to log in to NODAL</CardDescription>
+          <CardTitle className="text-2xl">Welcome back</CardTitle>
+          <CardDescription>Sign in to your NODAL workspace.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin}>
@@ -80,7 +79,8 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="you@company.com"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -99,19 +99,27 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-problem/20 bg-problem-soft p-3 text-sm text-problem"
+                >
+                  {error}
+                </p>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Logging in...' : 'Login'}
+                {isLoading ? 'Signing in…' : 'Sign in'}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

@@ -80,6 +80,15 @@ describe('lib/supabase/middleware', () => {
       expect(response.status).toBe(200);
     });
 
+    it.each(['/auth/forgot-password', '/auth/update-password', '/auth/error', '/auth/confirm'])(
+      'allows existing auth screen %s without a session',
+      async (path) => {
+        mockSupabase.auth.getClaims.mockResolvedValue({ data: { claims: null } });
+        const response = await updateSession(new NextRequest(`http://localhost:3000${path}`));
+        expect(response.status).toBe(200);
+      }
+    );
+
     describe('seed route protection', () => {
       it('should allow access to /seed in local development without auth header', async () => {
         vi.stubEnv('NODE_ENV', 'development');
