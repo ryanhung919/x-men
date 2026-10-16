@@ -11,6 +11,21 @@ describe('DateRangeFilter', () => {
     vi.clearAllMocks();
   });
 
+  describe('Dropdown surface', () => {
+    it('uses an opaque popover background on the outer container and calendar area', () => {
+      const { container } = render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
+      fireEvent.click(screen.getByRole('button', { name: /All Time/ }));
+
+      const panel = container.querySelector('.absolute.z-50') as HTMLElement;
+      expect(panel).toBeInTheDocument();
+      expect(panel.className).toContain('bg-popover');
+      expect(panel.className).not.toMatch(/bg-popover\/|backdrop-blur|opacity-/);
+      for (const child of Array.from(panel.children) as HTMLElement[]) {
+        expect(child.className).not.toMatch(/bg-\w+\/\d+/);
+      }
+    });
+  });
+
   describe('Component Rendering', () => {
     it('should render date range selector button', () => {
       render(<DateRangeFilter value={{}} onChange={mockOnChange} />);
