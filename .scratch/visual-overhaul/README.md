@@ -1,6 +1,6 @@
 # Visual overhaul ticket index
 
-The 16 tickets below are published as `ready-for-agent`. Work only on tickets whose blockers are complete. Ticket 01 is the current entry point. Publication does not mean implementation has begun.
+The 16 tickets below are published as `ready-for-agent`. Work only on tickets whose blockers are complete. Ticket 01 is currently in progress on the integration branch `integration/visual-overhaul` through an isolated implementation worktree.
 
 The parent spec remains unchanged. The user subsequently approved project-scoped toolchain and library upgrades before visual implementation, Context7 documentation lookup, and using existing CSS animation utilities without adding GSAP or Lenis. Tickets 01–02 capture those additions.
 
@@ -24,4 +24,11 @@ The parent spec remains unchanged. The user subsequently approved project-scoped
 | [16: Produce and integrate the one-minute portfolio showcase](issues/16-portfolio-showcase.md) | 15 |
 
 Each ticket contains its own acceptance criteria and spec-story coverage. Main workflow tickets must validate both themes and relevant accessibility/responsive states before completion; ticket 15 verifies their integration, and ticket 16 creates the portfolio showcase.
+
+## Implementation record
+
+- Baseline: `cefe280` preserves the approved spec, tickets, and adopted Oxlint/Oxfmt setup.
+- Screenshot/video tooling clarification: `23bae0b` records Playwright CLI and FFmpeg.
+- Completion is recorded separately from triage using a ticket's `Resolution:` field and checked acceptance criteria, with validation evidence under Comments. Unverified acceptance criteria remain unchecked.
+- Local browser preparation confirmed a populated loopback Supabase instance. Existing hosted demo data must remain untouched.
 
