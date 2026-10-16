@@ -150,7 +150,7 @@ export default function ReportsPageClient({
   };
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-4 px-2 py-4 sm:px-4 lg:px-4">
+    <div className="space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-4 pb-2">
         <div>
           <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
