@@ -17,14 +17,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22.x, 24.x]
+        node-version: [24.22.0]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
+        uses: pnpm/action-setup@v6.1.0 # version comes from packageManager in package.json
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -34,7 +34,7 @@ jobs:
         run: pnpm test:unit
       - name: Upload unit test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: unit-test-results-node-${{ matrix.node-version }}
           path: |
@@ -46,27 +46,27 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22.x, 24.x]
+        node-version: [24.22.0]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
+        uses: pnpm/action-setup@v6.1.0 # version comes from packageManager in package.json
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Setup Deno
-        uses: denoland/setup-deno@v1
+        uses: denoland/setup-deno@v2.0.5
         with:
-          deno-version: v2.5.4
+          deno-version: v2.9.7
       - name: Run Deno unit tests
         run: pnpm test:unit:deno
       - name: Upload Deno test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: deno-test-results-node-${{ matrix.node-version }}
           path: coverage/deno
@@ -78,14 +78,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [22.x, 24.x]
+        node-version: [24.22.0]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
+        uses: pnpm/action-setup@v6.1.0 # version comes from packageManager in package.json
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -98,7 +98,7 @@ jobs:
           NODE_OPTIONS: '--experimental-vm-modules --max-old-space-size=4096'
       - name: Upload component test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: component-test-results-node-${{ matrix.node-version }}
           path: |
@@ -112,18 +112,18 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.base_ref == 'main' || github.base_ref == 'develop'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
-      - name: Setup Node.js 24.x
-        uses: actions/setup-node@v4
+        uses: pnpm/action-setup@v6.1.0 # version comes from packageManager in package.json
+      - name: Setup Node.js 24.22.0
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 24.x
+          node-version: 24.22.0
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v3
+        uses: supabase/setup-cli@v3.0.1
         with:
           version: 2.121.0
       - name: Check required tools
@@ -273,21 +273,21 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
+        uses: pnpm/action-setup@v6.1.0 # version comes from packageManager in package.json
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 24.x
+          node-version: 24.22.0
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v3
+        uses: supabase/setup-cli@v3.0.1
         with:
           version: 2.121.0
       - name: Check required tools
@@ -361,7 +361,7 @@ jobs:
           fi
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: playwright-report

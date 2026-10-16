@@ -2,7 +2,11 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ExportButtons } from '@/components/report/export-buttons';
-import type { LoggedTimeReport, TeamSummaryReport, TaskCompletionReport } from '@/components/report/export-buttons';
+import type {
+  LoggedTimeReport,
+  TeamSummaryReport,
+  TaskCompletionReport,
+} from '@/components/report/export-buttons';
 
 describe('ExportButtons', () => {
   const mockLoggedTimeReport: LoggedTimeReport = {
@@ -16,7 +20,10 @@ describe('ExportButtons', () => {
     totalDelayHours: 10,
     incompleteTime: 30,
     overdueTime: 15,
-    timeByTask: new Map([[1, 3600], [2, 7200]]),
+    timeByTask: new Map([
+      [1, 3600],
+      [2, 7200],
+    ]),
     kpis: [
       { label: 'Total Time', value: 100, unit: 'h' },
       { label: 'Avg Time', value: 50, unit: 'h' },
@@ -48,14 +55,17 @@ describe('ExportButtons', () => {
       },
     ],
     userTotals: new Map([
-      ['user1', {
-        userName: 'John Doe',
-        todo: 5,
-        inProgress: 3,
-        completed: 2,
-        blocked: 1,
-        total: 11,
-      }],
+      [
+        'user1',
+        {
+          userName: 'John Doe',
+          todo: 5,
+          inProgress: 3,
+          completed: 2,
+          blocked: 1,
+          total: 11,
+        },
+      ],
     ]),
     kpis: [
       { label: 'Total Tasks', value: 50, unit: 'tasks' },
@@ -90,27 +100,28 @@ describe('ExportButtons', () => {
         avgLoggedTimePerTask: 12,
       },
     ],
-    completedByProject: new Map([[1, 5], [2, 5]]),
-    kpis: [
-      { label: 'Total Tasks', value: 20, unit: 'tasks' },
-    ],
+    completedByProject: new Map([
+      [1, 5],
+      [2, 5],
+    ]),
+    kpis: [{ label: 'Total Tasks', value: 20, unit: 'tasks' }],
     charts: [],
   };
 
   describe('Component Rendering', () => {
     it('should render export buttons', () => {
       render(<ExportButtons reportData={mockLoggedTimeReport} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
 
     it('should render buttons with icons', () => {
       render(<ExportButtons reportData={mockLoggedTimeReport} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       const excelButton = screen.getByText('Export Excel').closest('button');
-      
+
       expect(pdfButton).toBeInTheDocument();
       expect(excelButton).toBeInTheDocument();
     });
@@ -119,30 +130,30 @@ describe('ExportButtons', () => {
   describe('Disabled State', () => {
     it('should disable buttons when disabled prop is true', () => {
       render(<ExportButtons reportData={mockLoggedTimeReport} disabled={true} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       const excelButton = screen.getByText('Export Excel').closest('button');
-      
+
       expect(pdfButton).toBeDisabled();
       expect(excelButton).toBeDisabled();
     });
 
     it('should enable buttons when disabled prop is false', () => {
       render(<ExportButtons reportData={mockLoggedTimeReport} disabled={false} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       const excelButton = screen.getByText('Export Excel').closest('button');
-      
+
       expect(pdfButton).not.toBeDisabled();
       expect(excelButton).not.toBeDisabled();
     });
 
     it('should enable buttons by default when disabled prop is not provided', () => {
       render(<ExportButtons reportData={mockLoggedTimeReport} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       const excelButton = screen.getByText('Export Excel').closest('button');
-      
+
       expect(pdfButton).not.toBeDisabled();
       expect(excelButton).not.toBeDisabled();
     });
@@ -152,28 +163,30 @@ describe('ExportButtons', () => {
     it('should call PDF export handler when PDF button is clicked', async () => {
       const { jsPDF } = await import('jspdf');
       const mockSave = vi.fn();
-      
-      (jsPDF as any).mockImplementation(() => ({
-        internal: {
-          pageSize: {
-            getWidth: () => 842,
-            getHeight: () => 595,
+
+      (jsPDF as any).mockImplementation(function () {
+        return {
+          internal: {
+            pageSize: {
+              getWidth: () => 842,
+              getHeight: () => 595,
+            },
           },
-        },
-        setFont: vi.fn().mockReturnThis(),
-        setFontSize: vi.fn().mockReturnThis(),
-        text: vi.fn().mockReturnThis(),
-        addPage: vi.fn().mockReturnThis(),
-        save: mockSave,
-        splitTextToSize: vi.fn(() => ['line1']),
-        rect: vi.fn().mockReturnThis(),
-        triangle: vi.fn().mockReturnThis(),
-        setFillColor: vi.fn().mockReturnThis(),
-        setTextColor: vi.fn().mockReturnThis(),
-      }));
+          setFont: vi.fn().mockReturnThis(),
+          setFontSize: vi.fn().mockReturnThis(),
+          text: vi.fn().mockReturnThis(),
+          addPage: vi.fn().mockReturnThis(),
+          save: mockSave,
+          splitTextToSize: vi.fn(() => ['line1']),
+          rect: vi.fn().mockReturnThis(),
+          triangle: vi.fn().mockReturnThis(),
+          setFillColor: vi.fn().mockReturnThis(),
+          setTextColor: vi.fn().mockReturnThis(),
+        };
+      });
 
       render(<ExportButtons reportData={mockLoggedTimeReport} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       fireEvent.click(pdfButton!);
 
@@ -183,11 +196,11 @@ describe('ExportButtons', () => {
     it('should call Excel export handler when Excel button is clicked', async () => {
       const XLSX = await import('xlsx');
       const mockWriteFile = vi.fn();
-      
+
       (XLSX.writeFile as any) = mockWriteFile;
 
       render(<ExportButtons reportData={mockLoggedTimeReport} />);
-      
+
       const excelButton = screen.getByText('Export Excel').closest('button');
       fireEvent.click(excelButton!);
 
@@ -197,13 +210,15 @@ describe('ExportButtons', () => {
     it('should not call handlers when buttons are disabled', () => {
       const mockSave = vi.fn();
       vi.mocked(import('jspdf')).then(({ jsPDF }) => {
-        (jsPDF as any).mockImplementation(() => ({
-          save: mockSave,
-        }));
+        (jsPDF as any).mockImplementation(function () {
+          return {
+            save: mockSave,
+          };
+        });
       });
 
       render(<ExportButtons reportData={mockLoggedTimeReport} disabled={true} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       fireEvent.click(pdfButton!);
 
@@ -214,26 +229,21 @@ describe('ExportButtons', () => {
 
   describe('Custom Props', () => {
     it('should use custom report title when provided', () => {
-      render(
-        <ExportButtons 
-          reportData={mockLoggedTimeReport} 
-          reportTitle="Custom Report Title"
-        />
-      );
-      
+      render(<ExportButtons reportData={mockLoggedTimeReport} reportTitle="Custom Report Title" />);
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
 
     it('should handle subtitle prop', () => {
       render(
-        <ExportButtons 
-          reportData={mockLoggedTimeReport} 
+        <ExportButtons
+          reportData={mockLoggedTimeReport}
           reportTitle="Main Title"
           subTitle="Subtitle Text"
         />
       );
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -242,21 +252,21 @@ describe('ExportButtons', () => {
   describe('Different Report Types', () => {
     it('should handle LoggedTimeReport', () => {
       render(<ExportButtons reportData={mockLoggedTimeReport} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
 
     it('should handle TeamSummaryReport', () => {
       render(<ExportButtons reportData={mockTeamSummaryReport} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
 
     it('should handle TaskCompletionReport', () => {
       render(<ExportButtons reportData={mockTaskCompletionReport} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -274,7 +284,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={reportWithKPIs} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       expect(pdfButton).toBeInTheDocument();
       expect(pdfButton).not.toBeDisabled();
@@ -304,7 +314,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={reportWithCharts} />);
-      
+
       const pdfButton = screen.getByText('Export PDF').closest('button');
       expect(pdfButton).toBeInTheDocument();
     });
@@ -316,7 +326,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={reportWithoutKPIs} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -328,7 +338,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={reportWithoutCharts} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -348,29 +358,35 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={report} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
 
     it('should handle Maps correctly in TeamSummaryReport', () => {
       const userTotals = new Map([
-        ['user1', {
-          userName: 'John Doe',
-          todo: 5,
-          inProgress: 3,
-          completed: 2,
-          blocked: 1,
-          total: 11,
-        }],
-        ['user2', {
-          userName: 'Jane Smith',
-          todo: 3,
-          inProgress: 2,
-          completed: 4,
-          blocked: 0,
-          total: 9,
-        }],
+        [
+          'user1',
+          {
+            userName: 'John Doe',
+            todo: 5,
+            inProgress: 3,
+            completed: 2,
+            blocked: 1,
+            total: 11,
+          },
+        ],
+        [
+          'user2',
+          {
+            userName: 'Jane Smith',
+            todo: 3,
+            inProgress: 2,
+            completed: 4,
+            blocked: 0,
+            total: 9,
+          },
+        ],
       ]);
 
       const report: TeamSummaryReport = {
@@ -379,7 +395,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={report} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -397,7 +413,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={report} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -422,7 +438,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={emptyReport} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -445,7 +461,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={largeReport} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });
@@ -468,7 +484,7 @@ describe('ExportButtons', () => {
       };
 
       render(<ExportButtons reportData={preciseReport} />);
-      
+
       expect(screen.getByText('Export PDF')).toBeInTheDocument();
       expect(screen.getByText('Export Excel')).toBeInTheDocument();
     });

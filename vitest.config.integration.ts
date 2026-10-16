@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
+      '@': path.resolve(import.meta.dirname, './'),
     },
   },
   test: {
@@ -30,7 +30,7 @@ export default defineConfig({
         '__tests__/',
         '.next/',
         'scripts/',
-        'middleware.ts',
+        'proxy.ts',
 
         // Config files
         '**/*.config.{js,ts,mjs,cjs}',
@@ -53,11 +53,7 @@ export default defineConfig({
     hookTimeout: 120000, // 2 minute timeout for setup/teardown hooks
     // Run tests sequentially to avoid database conflicts and race conditions
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true, // Run all tests in a single process
-      },
-    },
+    fileParallelism: false,
     // Retry flaky tests once (network issues, etc.)
     retry: 1,
     // Don't bail on first failure - run all tests

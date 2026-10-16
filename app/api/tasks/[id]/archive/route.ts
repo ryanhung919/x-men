@@ -18,10 +18,7 @@ import { archiveTaskService } from '@/lib/services/tasks';
  * - affectedCount: number - Total number of tasks affected (parent + subtasks)
  * - message: string
  */
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> | { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient();
 
@@ -38,18 +35,13 @@ export async function PATCH(
     const readOnly = await rejectIfDemoViewer(supabase, user.id);
     if (readOnly) return readOnly;
 
-    // Parse task ID from params - handle both Promise and non-Promise
-    const resolvedParams = context.params instanceof Promise
-      ? await context.params
-      : context.params;
+    // Resolve asynchronous route parameters.
+    const resolvedParams = await context.params;
     const { id } = resolvedParams;
     const taskId = parseInt(id, 10);
 
     if (isNaN(taskId)) {
-      return NextResponse.json(
-        { error: 'Invalid task ID' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid task ID' }, { status: 400 });
     }
 
     // Parse request body
@@ -57,19 +49,13 @@ export async function PATCH(
     try {
       body = await request.json();
     } catch (error) {
-      return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
 
     const { is_archived } = body;
 
     if (typeof is_archived !== 'boolean') {
-      return NextResponse.json(
-        { error: 'is_archived must be a boolean' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'is_archived must be a boolean' }, { status: 400 });
     }
 
     // Archive or unarchive the task via service layer (handles authorization)
@@ -91,10 +77,7 @@ export async function PATCH(
 
     // Handle authorization errors from service layer
     if (error instanceof Error && error.message === 'Only managers can archive tasks') {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
 
     return NextResponse.json(
