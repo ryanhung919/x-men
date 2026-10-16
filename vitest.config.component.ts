@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
+      '@': path.resolve(import.meta.dirname, './'),
     },
   },
   test: {
@@ -22,11 +22,7 @@ export default defineConfig({
       '__tests__/integration/**',
       '__tests__/e2e/**',
     ],
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -36,7 +32,7 @@ export default defineConfig({
         '__tests__/',
         '.next/',
         'scripts/',
-        'middleware.ts',
+        'proxy.ts',
         '**/layout.tsx',
 
         // Config files
@@ -57,7 +53,7 @@ export default defineConfig({
         'components/report/report-skeletons.tsx',
         'components/report/task-completion-report.tsx',
         'components/report/team-summary-report.tsx',
-        'app/auth/'
+        'app/auth/',
       ],
       reportsDirectory: 'coverage/component',
     },
