@@ -37,7 +37,7 @@ export function useNotifications() {
 
     // Realtime subscription
     const channel: RealtimeChannel = supabase
-      .channel('notifications-changes')
+      .channel(`notifications-changes-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
         {

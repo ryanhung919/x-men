@@ -5,29 +5,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function LoggedTimeReportSkeleton() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {[1, 2, 3, 4, 5].map((i) => (
-        <Card key={i}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <Skeleton className="h-4 w-32" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-3 w-48 mb-2" />
-            <Skeleton className="h-8 w-24 mb-3" />
-            <div className="space-y-1 mb-3">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-            </div>
-            {i <= 4 && <Skeleton className="h-[160px] w-full mt-3" />}
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-5" aria-label="Loading logged time report">
+      <div className="grid grid-cols-2 gap-5 rounded-xl border bg-card p-5 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i}>
+            <Skeleton className="mb-4 h-3 w-28" />
+            <Skeleton className="h-10 w-28" />
+            <Skeleton className="mt-3 h-3 w-36" />
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.65fr_1fr]">
+        {[1, 2].map((i) => (
+          <div key={i} className="rounded-2xl border bg-card p-6">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="mt-3 h-3 w-52" />
+            <Skeleton className="mt-6 h-[260px] w-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

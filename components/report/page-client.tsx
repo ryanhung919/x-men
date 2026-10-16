@@ -19,7 +19,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 
-import { XIcon, FilterIcon } from 'lucide-react';
+import { XIcon, FilterIcon, ChartNoAxesCombined } from 'lucide-react';
 
 async function fetchDepartments(projectIds?: number[]): Promise<Department[]> {
   const query = projectIds?.length ? `&projectIds=${projectIds.join(',')}` : '';
@@ -150,8 +150,27 @@ export default function ReportsPageClient({
   };
 
   return (
-    <div className="space-y-6 p-4">
-      <div className="flex flex-wrap gap-4 items-center">
+    <div className="mx-auto max-w-[1440px] space-y-4 px-2 py-4 sm:px-4 lg:px-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 pb-2">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <ChartNoAxesCombined className="size-3.5 text-positive" />
+            Workspace analytics
+          </div>
+          <h1 className="text-3xl font-semibold tracking-[-0.04em]">Reports</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            A clearer view of effort, progress, and delivery.
+          </p>
+        </div>
+        {reportData && (
+          <ExportButtons
+            reportData={reportData}
+            reportTitle={REPORT_OPTIONS.find((o) => o.value === selectedReport)?.label}
+            disabled={isLoading || reportData.kind !== selectedReport}
+          />
+        )}
+      </header>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 [&>div]:max-w-full">
         <DepartmentSelector
           departments={departments}
           selectedDepartments={selectedDepartments}
@@ -180,7 +199,7 @@ export default function ReportsPageClient({
           <SelectContent
             className="bg-popover text-popover-foreground border border-border shadow-md [&>span]:text-foreground [&>span]:font-medium"
             style={{
-              backgroundColor: 'hsl(var(--popover))',
+              backgroundColor: 'var(--popover)',
               backdropFilter: 'none',
               WebkitBackdropFilter: 'none',
             }}
@@ -207,19 +226,11 @@ export default function ReportsPageClient({
             </div>
           </SelectContent>
         </Select>
-
-        {reportData && (
-          <ExportButtons
-            reportData={reportData}
-            reportTitle={REPORT_OPTIONS.find((o) => o.value === selectedReport)?.label}
-            disabled={isLoading || !reportData}
-          />
-        )}
       </div>
 
       {hasActiveFilters && (
-        <div className="flex items-center gap-2 mt-3">
-          <span className="flex items-center gap-2 rounded-full bg-accent/10 text-accent-foreground px-3 py-1.5 text-sm border border-accent/30 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-2 rounded-md bg-positive-soft text-positive px-2.5 py-1 text-xs border border-positive/10">
             {selectedDepartments.length > 0 && (
               <span>
                 {selectedDepartments.length} department{selectedDepartments.length > 1 ? 's' : ''}
@@ -252,13 +263,14 @@ export default function ReportsPageClient({
       )}
 
       {/* Report Display */}
-      <div className="mt-4">
+      <div>
         {!selectedDepartments.length && !selectedProjects.length ? (
           <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-lg bg-muted/30">
             <FilterIcon className="h-12 w-12 text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No Filters Selected</h3>
             <p className="text-sm text-muted-foreground text-center max-w-md">
-              Please select one or more departments and/or projects from the filters above to generate your report.
+              Please select one or more departments and/or projects from the filters above to
+              generate your report.
             </p>
           </div>
         ) : selectedReport === 'loggedTime' ? (
