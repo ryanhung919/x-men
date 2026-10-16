@@ -32,3 +32,11 @@ Prioritize presentable design and the portfolio recording; implement only necess
 - Test externally observable outcomes. Reuse the browser-level seam, existing Playwright suites, and globally installed Playwright CLI. Verify isolated database targeting before running tests that seed or mutate data.
 - Preserve unrelated user changes. No hosted reseed, deployment, broad machine-wide upgrades, or unrelated portfolio changes.
 
+
+## Resolution: implemented
+
+2026-10-17: delivered against owner's revised visual/demo scope. Compact sticky navigation now shares a restrained NODAL glyph, route icons, selected blue surfaces and aria-current (including task detail routes). Reports naming consistent, unsupported Profile/Settings removed, sign-in/sign-out target the actual root login route. Account shows real display name and actual Administrator/Manager/Team member or Read-only demo role; long identities truncate. Existing default-view preference remains in desktop account menu and mobile sheet, with saving state and recoverable failure copy. No permission or preference API changes.
+
+Dashboard owns consistent max width and gutters; removed nested Tasks/Reports padding. Tasks and Schedule use the report title scale, short descriptions, contextual labels and aligned actions; Schedule filters grouped on shared card surface. Report dominant chart still fits1440x900. Removed nav/theme/notification hover scale and bell rotation; focus and motion tokens inherited from foundation. Mobile Radix sheet closes on selection/Escape and restores trigger focus; unsupported destinations absent.
+
+Validation: TypeScript passes; production build/start passes on verified loopback env. Both-theme1440x900 Reports inspected via Playwright CLI (`/tmp/nodal04-report-light.png`, `-dark.png`), plus Tasks/Schedule screenshots, mobile390x844 menu (`/tmp/nodal04-mobile-nav.png`), guest account (`/tmp/nodal04-guest.png`). Computed header/scope x32 alignment verified; mobile overflow false, Escape focus restoration true, Reports aria-current page. Existing guest Reports access/read-only identity verified. Targeted lint for Navbar/ThemeToggle/NotificationPanel/TasksPageHeader passes. No seed, task edits or preference writes. Exhaustive role/error-path tests and signout submission deferred under owner revised scope.

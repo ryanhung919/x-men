@@ -7,6 +7,7 @@ import { StaffSelector } from '@/components/filters/staff-selector';
 import GanttChart, { GanttRow } from '@/components/schedule/GanttChart';
 import { addDays, endOfDay, startOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { CalendarDays, RefreshCw } from 'lucide-react';
 
 type Project = { id: number; name: string };
 type Staff = { id: string; first_name: string; last_name: string };
@@ -25,7 +26,7 @@ export default function ScheduleView() {
 
   const startDate = date.startDate ? startOfDay(date.startDate) : startOfDay(new Date());
   const endDate = date.endDate ? endOfDay(date.endDate) : endOfDay(addDays(new Date(), 6));
-  
+
   // Fetch current user and roles from API
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -40,7 +41,7 @@ export default function ScheduleView() {
         console.error('Error fetching user info:', error);
       }
     };
-    
+
     fetchUserInfo();
   }, []);
 
@@ -68,10 +69,10 @@ export default function ScheduleView() {
         const res = await fetch(`/api/schedule/staff?${params.toString()}`);
         const data = await res.json();
         setAvailableStaff(data || []);
-        
+
         // Clear selected staff that are no longer in the available list
         const availableIds = new Set((data || []).map((s: Staff) => s.id));
-        setSelectedStaffIds(prev => prev.filter(id => availableIds.has(id)));
+        setSelectedStaffIds((prev) => prev.filter((id) => availableIds.has(id)));
       } catch (error) {
         console.error('Error loading staff:', error);
         setAvailableStaff([]);
@@ -89,7 +90,7 @@ export default function ScheduleView() {
       params.set('endDate', endDate.toISOString());
       if (selectedProjects.length) params.set('projectIds', selectedProjects.join(','));
       if (selectedStaffIds.length) params.set('staffIds', selectedStaffIds.join(','));
-      
+
       const res = await fetch(`/api/schedule?${params.toString()}`);
       const data = await res.json();
       const grouped: Record<string, GanttRow> = {};
@@ -99,18 +100,23 @@ export default function ScheduleView() {
           if (selectedStaffIds.length > 0 && !selectedStaffIds.includes(a.id)) {
             return; // Skip this assignee
           }
-          
+
           const key = a.id;
-          if (!grouped[key]) grouped[key] = { assigneeId: key, assigneeName: `${a.first_name} ${a.last_name}`, tasks: [] };
-          grouped[key].tasks.push({ 
-            id: t.id, 
-            title: t.title, 
-            project: t.project_name, 
+          if (!grouped[key])
+            grouped[key] = {
+              assigneeId: key,
+              assigneeName: `${a.first_name} ${a.last_name}`,
+              tasks: [],
+            };
+          grouped[key].tasks.push({
+            id: t.id,
+            title: t.title,
+            project: t.project_name,
             startDate: t.created_at,
             deadline: t.deadline,
             status: t.status,
             updatedAt: t.updated_at,
-            assignee: { id: a.id, name: `${a.first_name} ${a.last_name}` } 
+            assignee: { id: a.id, name: `${a.first_name} ${a.last_name}` },
           });
         });
       });
@@ -125,7 +131,12 @@ export default function ScheduleView() {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date.startDate?.toISOString(), date.endDate?.toISOString(), selectedProjects.join(','), selectedStaffIds.join(',')]);
+  }, [
+    date.startDate?.toISOString(),
+    date.endDate?.toISOString(),
+    selectedProjects.join(','),
+    selectedStaffIds.join(','),
+  ]);
 
   const handleChangeDeadline = async (taskId: number, newDate: Date) => {
     try {
@@ -134,12 +145,12 @@ export default function ScheduleView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, deadline: newDate.toISOString() }),
       });
-      
+
       if (!response.ok) {
         console.error('Failed to update task deadline');
         return;
       }
-      
+
       reload();
     } catch (error) {
       console.error('Failed to update task deadline');
@@ -147,8 +158,24 @@ export default function ScheduleView() {
   };
 
   return (
-    <div className="space-y-4 p-2 sm:p-4">
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 items-stretch sm:items-center">
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <CalendarDays className="size-3.5 text-positive" />
+            Planning
+          </div>
+          <h1 className="text-3xl font-semibold tracking-[-0.04em]">Schedule</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            See who's working on what, and what's coming next.
+          </p>
+        </div>
+        <Button variant="outline" onClick={reload} disabled={loadingData}>
+          <RefreshCw className="mr-2 size-4" />
+          {loadingData ? 'Refreshing…' : 'Refresh'}
+        </Button>
+      </header>
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 items-stretch sm:items-center rounded-xl border bg-card p-3">
         <DateRangeFilter value={date} onChange={setDate} />
         <ProjectSelector
           projects={projects as any}
@@ -162,19 +189,16 @@ export default function ScheduleView() {
           onChange={setSelectedStaffIds}
           loading={loadingFilters}
         />
-        <Button variant="secondary" onClick={reload} disabled={loadingData} className="w-full sm:w-auto">
-          Refresh
-        </Button>
       </div>
 
-      <div className="-mx-2 sm:mx-0">
-        <GanttChart 
-          rows={rows} 
-          startDate={startOfDay(startDate)} 
-          endDate={endOfDay(endDate)} 
+      <div>
+        <GanttChart
+          rows={rows}
+          startDate={startOfDay(startDate)}
+          endDate={endOfDay(endDate)}
           currentUserId={currentUserId}
           userRoles={userRoles}
-          onChangeDeadline={handleChangeDeadline} 
+          onChangeDeadline={handleChangeDeadline}
         />
       </div>
     </div>

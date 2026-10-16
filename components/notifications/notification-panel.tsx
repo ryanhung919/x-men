@@ -3,13 +3,7 @@
 import { useState } from 'react';
 import { Bell, CheckCheck, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { NotificationItem, type Notification } from './notification-item';
 import { NotificationModal } from './notification-modal';
 import { useNotifications } from '@/hooks/use-notifications';
@@ -41,7 +35,8 @@ export function NotificationPanel() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-110 hover:rotate-12"
+          aria-label="Notifications"
+          className="relative transition-colors duration-150 hover:bg-accent"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
