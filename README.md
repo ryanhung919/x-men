@@ -88,6 +88,24 @@ pnpm db:seed
 
 ## Running Tests
 
+### Linting and formatting
+
+Use the project-pinned Oxlint and Oxfmt tools:
+
+```bash
+pnpm lint          # Next.js, React/hooks, TypeScript and accessibility lint rules
+pnpm lint:fix      # Apply supported automatic lint fixes
+pnpm format:check  # Check formatting without changing files
+pnpm format       # Format the repository
+pnpm typecheck    # TypeScript compiler checks (separate from linting)
+```
+
+Oxfmt uses the existing style: semicolons, single quotes, ES5 trailing commas,
+100-column print width, and two-space indentation. Configure it in `.oxfmtrc.json`;
+lint rules live in `.oxlintrc.json`. Generated output and lockfiles are excluded
+from formatting. Tool adoption does not automatically reformat existing source
+or resolve its existing lint findings; run checks before applying broad fixes.
+
 - Unit tests:
 
 ```bash
