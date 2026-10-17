@@ -29,20 +29,18 @@ export function AssigneeMultiSelector({
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchUsers();
+    const controller = new AbortController();
+    fetch('/api/tasks?action=users', { signal: controller.signal })
+      .then((response) => response.json())
+      .then((data) => setUsers(data.users || []))
+      .catch((error) => {
+        if (error.name !== 'AbortError') console.error('Error fetching users:', error);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
-
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch('/api/tasks?action=users');
-      const data = await response.json();
-      setUsers(data.users || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredUsers = users.filter((user) => {
     const fullName = `${user.first_name} ${user.last_name}`.toLowerCase();
@@ -86,6 +84,7 @@ export function AssigneeMultiSelector({
               {getUserFullName(user)}
               <button
                 type="button"
+                aria-label={`Remove ${getUserFullName(user)}`}
                 onClick={() => removeAssignee(user.id)}
                 className="ml-1 rounded-full hover:bg-muted p-0.5"
               >
@@ -100,6 +99,7 @@ export function AssigneeMultiSelector({
       <div className="relative">
         <Select value="" onValueChange={() => {}}>
           <SelectTrigger
+            id="assignees"
             className={cn(
               'w-full border border-input bg-background text-foreground',
               'hover:bg-accent hover:text-accent-foreground',
@@ -120,9 +120,7 @@ export function AssigneeMultiSelector({
               }
             />
           </SelectTrigger>
-          <SelectContent
-            className="bg-popover text-popover-foreground border border-border shadow-md"
-          >
+          <SelectContent className="bg-popover text-popover-foreground border border-border shadow-md">
             {/* Search Input */}
             <div className="p-2 border-b">
               <div className="relative">
@@ -149,10 +147,13 @@ export function AssigneeMultiSelector({
                     const isDisabled = !isSelected && selectedAssigneeIds.length >= maxAssignees;
 
                     return (
-                      <div
+                      <button
+                        type="button"
+                        disabled={isDisabled}
+                        aria-pressed={isSelected}
                         key={user.id}
                         className={cn(
-                          'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors duration-100',
+                          'relative flex w-full text-left cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors duration-100',
                           !isDisabled && 'hover:bg-accent hover:text-accent-foreground',
                           isSelected && 'bg-accent/50',
                           isDisabled && 'opacity-50 cursor-not-allowed'
@@ -168,7 +169,7 @@ export function AssigneeMultiSelector({
                           {isSelected && <CheckIcon className="h-3 w-3 text-primary-foreground" />}
                         </div>
                         <span className="flex-1 truncate">{getUserFullName(user)}</span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>

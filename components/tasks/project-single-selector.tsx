@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Select, SelectTrigger, SelectValue, SelectContent } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { CheckIcon, SearchIcon } from 'lucide-react';
+import { SearchIcon } from 'lucide-react';
 
 interface Project {
   id: number;
@@ -22,20 +22,18 @@ export function ProjectSingleSelector({ selectedProjectId, onChange }: ProjectSi
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchProjects();
+    const controller = new AbortController();
+    fetch('/api/tasks?action=projects', { signal: controller.signal })
+      .then((response) => response.json())
+      .then((data) => setProjects(data.projects || []))
+      .catch((error) => {
+        if (error.name !== 'AbortError') console.error('Error fetching projects:', error);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/tasks?action=projects');
-      const data = await response.json();
-      setProjects(data.projects || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -51,6 +49,7 @@ export function ProjectSingleSelector({ selectedProjectId, onChange }: ProjectSi
     <div className="relative">
       <Select value={selectedProjectId?.toString() || ''} onValueChange={() => {}}>
         <SelectTrigger
+          id="project"
           className={cn(
             'w-full border border-input bg-background text-foreground',
             'hover:bg-accent hover:text-accent-foreground',
@@ -58,15 +57,11 @@ export function ProjectSingleSelector({ selectedProjectId, onChange }: ProjectSi
             '[&>span]:text-foreground [&>span]:font-medium'
           )}
         >
-          <SelectValue
-            placeholder={loading ? 'Loading projects...' : 'Select a project'}
-          >
+          <SelectValue placeholder={loading ? 'Loading projects...' : 'Select a project'}>
             {selectedProject?.name}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent
-          className="bg-popover text-popover-foreground border border-border shadow-md"
-        >
+        <SelectContent className="bg-popover text-popover-foreground border border-border shadow-md">
           {/* Search Input */}
           <div className="p-2 border-b">
             <div className="relative">
@@ -84,15 +79,20 @@ export function ProjectSingleSelector({ selectedProjectId, onChange }: ProjectSi
           <div className="max-h-[300px] overflow-y-auto">
             {filteredProjects.length === 0 ? (
               <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                {loading ? 'Loading...' : searchTerm ? 'No projects found' : 'No projects available'}
+                {loading
+                  ? 'Loading...'
+                  : searchTerm
+                    ? 'No projects found'
+                    : 'No projects available'}
               </div>
             ) : (
               <div className="p-1">
                 {filteredProjects.map((project) => (
-                  <div
+                  <button
+                    type="button"
                     key={project.id}
                     className={cn(
-                      'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors duration-100',
+                      'relative flex w-full text-left cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors duration-100',
                       'hover:bg-accent hover:text-accent-foreground',
                       selectedProjectId === project.id && 'bg-accent/50'
                     )}
@@ -111,7 +111,7 @@ export function ProjectSingleSelector({ selectedProjectId, onChange }: ProjectSi
                       )}
                     </div>
                     <span className="flex-1 truncate">{project.name}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
