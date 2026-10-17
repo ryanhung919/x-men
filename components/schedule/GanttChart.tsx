@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   addDays,
   differenceInCalendarDays,
@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { DeadlineControl } from './deadline-control';
 import { cn } from '@/lib/utils';
 
 export type GanttTask = {
@@ -66,8 +67,7 @@ export function GanttChart({
     [startDate, endDate]
   );
   const width = days.length * DAY_COLUMN_WIDTH;
-  const [drag, setDrag] = useState<{ taskId: number; startX: number } | null>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{ taskId: number; date: Date } | null>(null);
   const today = new Date();
   const todayIndex = differenceInCalendarDays(today, days[0]);
   const todayPosition =
@@ -80,27 +80,6 @@ export function GanttChart({
     else groups.push({ label, count: 1 });
     return groups;
   }, []);
-  const handleMouseDown = (taskId: number, event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setDrag({ taskId, startX: event.clientX });
-  };
-  const handleMouseUp = async (event: React.MouseEvent) => {
-    if (!drag || !gridRef.current) return;
-    const index = Math.min(
-      Math.max(
-        Math.floor(
-          (event.clientX - gridRef.current.getBoundingClientRect().left) / DAY_COLUMN_WIDTH
-        ),
-        0
-      ),
-      days.length - 1
-    );
-    const id = drag.taskId;
-    setDrag(null);
-    await onChangeDeadline?.(id, addDays(startOfDay(startDate), index));
-  };
-
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
@@ -110,19 +89,27 @@ export function GanttChart({
             Task lifetime · creation to deadline, or latest update for completed work
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <CircleDashed className="size-3 text-positive" />
-            Active
-          </span>
-          <span className="flex items-center gap-1">
-            <CircleCheck className="size-3 text-positive" />
-            Completed
-          </span>
-          <span className="flex items-center gap-1">
-            <CircleMinus className="size-3 text-problem" />
-            Blocked / overdue
-          </span>
+        <div className="flex min-h-5 flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+          {drag ? (
+            <span role="status" className="font-medium text-positive">
+              {format(drag.date, 'EEE, MMM d')} · Release to save · Esc to cancel
+            </span>
+          ) : (
+            <>
+              <span className="flex items-center gap-1">
+                <CircleDashed className="size-3 text-positive" />
+                Active
+              </span>
+              <span className="flex items-center gap-1">
+                <CircleCheck className="size-3 text-positive" />
+                Completed
+              </span>
+              <span className="flex items-center gap-1">
+                <CircleMinus className="size-3 text-problem" />
+                Blocked / overdue
+              </span>
+            </>
+          )}
         </div>
       </div>
       {totalDays > MAX_DAYS && (
@@ -132,6 +119,7 @@ export function GanttChart({
       )}
       <div
         className="relative max-h-[calc(100vh-320px)] min-h-[380px] overflow-auto [scrollbar-gutter:stable]"
+        data-timeline-scroll
         role="region"
         aria-label="Staff task timeline"
         tabIndex={0}
@@ -212,6 +200,7 @@ export function GanttChart({
             return (
               <div key={row.assigneeId} className="flex border-b last:border-0">
                 <div
+                  data-person-column
                   className="sticky left-0 z-20 shrink-0 border-r bg-card px-4 py-5"
                   style={{ width: ASSIGNEE_COLUMN_WIDTH }}
                 >
@@ -236,9 +225,7 @@ export function GanttChart({
                 <div
                   className="relative"
                   style={{ width, minHeight: rowHeight }}
-                  ref={gridRef}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
+                  data-timeline-grid
                 >
                   <div className="pointer-events-none absolute inset-0 flex">
                     {days.map((date) => (
@@ -260,7 +247,9 @@ export function GanttChart({
                       aria-label="Current time"
                     />
                   )}
-                  {spans.map(({ task, first, last, completed }, index) => {
+                  {spans.map(({ task, first, last: savedLast, completed }, index) => {
+                    const previewing = drag?.taskId === task.id;
+                    const last = previewing ? endOfDay(drag.date) : savedLast;
                     const start = Math.max(0, differenceInCalendarDays(first, days[0]));
                     const end = Math.min(days.length - 1, differenceInCalendarDays(last, days[0]));
                     const left = start * DAY_COLUMN_WIDTH + 5;
@@ -304,7 +293,9 @@ export function GanttChart({
                         >
                           <Icon className={cn('size-3.5 shrink-0', !problem && 'text-positive')} />
                           {clippedLeft && <ChevronLeft className="size-3 shrink-0 opacity-60" />}
-                          <span className="truncate text-xs font-medium">{task.title}</span>
+                          <span className="truncate text-xs font-medium">
+                            {barWidth >= 160 ? task.title : ''}
+                          </span>
                           {barWidth > 420 && (
                             <span className="ml-auto truncate text-[10px] opacity-65">
                               {task.project}
@@ -314,7 +305,7 @@ export function GanttChart({
                             <ChevronRight className="ml-auto size-3 shrink-0 opacity-60" />
                           )}
                         </button>
-                        {barWidth < 220 && end < days.length - 3 && (
+                        {barWidth < 160 && end < days.length - 3 && (
                           <span
                             className="pointer-events-none absolute left-full top-2 ml-3 max-w-[230px] truncate text-xs text-foreground"
                             aria-hidden="true"
@@ -322,14 +313,19 @@ export function GanttChart({
                             {task.title}
                           </span>
                         )}
-                        {!completed && !clippedRight && canDrag && (
-                          <div
-                            className={cn(
-                              'absolute -right-1 top-2.5 size-3 rotate-45 cursor-ew-resize rounded-[2px] border border-card',
-                              problem ? 'bg-problem' : 'bg-positive'
-                            )}
-                            title={`Deadline ${format(last, 'PPP')}. Drag to adjust.`}
-                            onMouseDown={(event) => handleMouseDown(task.id, event)}
+                        {!completed && !clippedRight && canDrag && onChangeDeadline && (
+                          <DeadlineControl
+                            title={task.title}
+                            deadline={task.deadline!}
+                            firstDate={first}
+                            rangeStart={days[0]}
+                            days={days.length}
+                            dayWidth={DAY_COLUMN_WIDTH}
+                            problem={!!problem}
+                            onPreview={(date) => setDrag(date ? { taskId: task.id, date } : null)}
+                            onCommit={async (date) => {
+                              await onChangeDeadline(task.id, date);
+                            }}
                           />
                         )}
                       </div>
