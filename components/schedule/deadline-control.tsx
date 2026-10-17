@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { addDays, differenceInCalendarDays, format, isSameDay, startOfDay } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,6 +31,7 @@ export function DeadlineControl({
   onPreview,
   onCommit,
 }: Props) {
+  const inputId = useId();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(format(new Date(deadline), 'yyyy-MM-dd'));
   const [saving, setSaving] = useState(false);
@@ -125,7 +126,8 @@ export function DeadlineControl({
             }
           }}
           onKeyDown={(event) => {
-            if((event.key === 'Enter' || event.key === ' ') && !gesture.current) suppressClick.current = false;
+            if ((event.key === 'Enter' || event.key === ' ') && !gesture.current)
+              suppressClick.current = false;
             if (event.key === 'Escape' && gesture.current) {
               event.preventDefault();
               event.stopPropagation();
@@ -204,9 +206,10 @@ export function DeadlineControl({
             {title}
           </p>
         </div>
-        <label className="block space-y-1.5 text-xs text-muted-foreground">
+        <label htmlFor={inputId} className="block space-y-1.5 text-xs text-muted-foreground">
           <span>Deadline date</span>
           <Input
+            id={inputId}
             type="date"
             aria-label="Deadline date"
             value={value}

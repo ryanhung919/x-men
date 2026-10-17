@@ -33,3 +33,11 @@ Prioritize presentable design and the portfolio recording; implement only necess
 - Test externally observable outcomes. Reuse the browser-level seam, existing Playwright suites, and globally installed Playwright CLI. Verify isolated database targeting before running tests that seed or mutate data.
 - Preserve unrelated user changes. No hosted reseed, deployment, broad machine-wide upgrades, or unrelated portfolio changes.
 
+
+## Resolution: implemented against revised demo scope
+
+Added a restrained endpoint diamond within a 44px button. Mouse dragging captures the pointer and previews both the task endpoint and a readable target date; the visible, unpinned staff-row grid determines valid drops and dates clamp to creation/visible boundaries. Escape, canceled/lost pointer capture, and release outside that row revert the preview without saving. Click, Enter, Space, and touch expose an explicitly labeled date field with Save/Cancel. Completed tasks and demo guests have no adjustment handle; existing manager/assignee visibility and API authorization remain intact.
+
+A pending spinner disables repeat saves. The displayed bar remains based on server data until a successful reload; request failures restore the saved endpoint and retain the attempted date with a retryable error. Success confirmation appears after the update/reload path. No Undo is advertised. Local-midnight date serialization matches existing task deadline editing, with no schema changes.
+
+Verified: TypeScript check passes; the existing schedule API unit suite passes all 16 mocked tests without database writes; Oxfmt checks pass for the three changed schedule files; the new deadline control passes Oxlint after adding an explicit input/label association. Review traced pointer cancellation, row/scroll clipping and keyboard click suppression. Existing GanttChart/ScheduleView lint findings (render-time clock and older semantic/hook conventions) remain outside this focused change. Browser geometry, both-theme/reduced-motion screenshots, and live failure/unauthorized mutation scenarios were not run in this ticket; visual matrix validation remains ticket15. No hosted data or deadline values were changed during verification.

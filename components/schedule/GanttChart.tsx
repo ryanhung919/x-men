@@ -89,19 +89,28 @@ export function GanttChart({
             Task lifetime · creation to deadline, or latest update for completed work
           </p>
         </div>
-        <div className="flex min-h-5 flex-wrap items-center gap-3 text-[11px] text-muted-foreground">{drag ? <span role="status" className="font-medium text-positive">{format(drag.date,'EEE, MMM d')} · Release to save · Esc to cancel</span> : <>
-          <span className="flex items-center gap-1">
-            <CircleDashed className="size-3 text-positive" />
-            Active
-          </span>
-          <span className="flex items-center gap-1">
-            <CircleCheck className="size-3 text-positive" />
-            Completed
-          </span>
-          <span className="flex items-center gap-1">
-            <CircleMinus className="size-3 text-problem" />
-            Blocked / overdue
-          </span></>}</div>
+        <div className="flex min-h-5 flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+          {drag ? (
+            <span role="status" className="font-medium text-positive">
+              {format(drag.date, 'EEE, MMM d')} · Release to save · Esc to cancel
+            </span>
+          ) : (
+            <>
+              <span className="flex items-center gap-1">
+                <CircleDashed className="size-3 text-positive" />
+                Active
+              </span>
+              <span className="flex items-center gap-1">
+                <CircleCheck className="size-3 text-positive" />
+                Completed
+              </span>
+              <span className="flex items-center gap-1">
+                <CircleMinus className="size-3 text-problem" />
+                Blocked / overdue
+              </span>
+            </>
+          )}
+        </div>
       </div>
       {totalDays > MAX_DAYS && (
         <p className="border-b bg-muted px-4 py-2 text-xs text-muted-foreground" role="status">
@@ -284,7 +293,9 @@ export function GanttChart({
                         >
                           <Icon className={cn('size-3.5 shrink-0', !problem && 'text-positive')} />
                           {clippedLeft && <ChevronLeft className="size-3 shrink-0 opacity-60" />}
-                          <span className="truncate text-xs font-medium">{barWidth >= 160 ? task.title : ''}</span>
+                          <span className="truncate text-xs font-medium">
+                            {barWidth >= 160 ? task.title : ''}
+                          </span>
                           {barWidth > 420 && (
                             <span className="ml-auto truncate text-[10px] opacity-65">
                               {task.project}
