@@ -148,22 +148,14 @@ export default function ScheduleView() {
   ]);
 
   const handleChangeDeadline = async (taskId: number, newDate: Date) => {
-    try {
-      const response = await fetch('/api/schedule', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, deadline: newDate.toISOString() }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to update task deadline');
-        return;
-      }
-
-      reload();
-    } catch (error) {
-      console.error('Failed to update task deadline');
-    }
+    const response = await fetch('/api/schedule', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, deadline: newDate.toISOString() }),
+    });
+    if (!response.ok)
+      throw new Error('The deadline could not be saved. Your previous date is unchanged.');
+    await reload();
   };
 
   return (
