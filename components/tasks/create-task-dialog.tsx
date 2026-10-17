@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,10 +25,16 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, PlusIcon } from 'lucide-react';
+import {
+  CalendarIcon,
+  PlusIcon,
+  ChevronDown,
+  LockKeyhole,
+  Loader2,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import {
-  CreateTaskFormData,
   TaskPriority,
   TaskStatus,
   RecurrenceFrequency,
@@ -42,13 +48,30 @@ import { TagsInput } from './tags-input';
 import { FileUploadZone } from './file-upload-zone';
 
 interface CreateTaskDialogProps {
-  onTaskCreated?: (taskId: number) => void;
+  onTaskCreated?: (taskId: number) => void | Promise<void>;
+  readOnly?: boolean;
+  disabled?: boolean;
   initialProjectId?: number; // NEW: lock project if provided
   isSubtask?: boolean; // NEW: show different title
   initialProjectName?: string; // NEW: to show project name if locked
 }
 
-export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = false, initialProjectName }: CreateTaskDialogProps) {
+const Required = () => (
+  <span className="text-muted-foreground" aria-hidden="true">
+    *
+  </span>
+);
+
+export function CreateTaskDialog({
+  onTaskCreated,
+  initialProjectId,
+  isSubtask = false,
+  initialProjectName,
+  readOnly = false,
+  disabled = false,
+}: CreateTaskDialogProps) {
+  const submissionRef = useRef(false);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,15 +92,8 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
   const [recurrenceEnabled, setRecurrenceEnabled] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequency>('weekly');
 
-  // Reset form when dialog closes
-  useEffect(() => {
-    if (!open) {
-      resetForm();
-    }
-  }, [open]);
-
   const resetForm = () => {
-    setProjectId(initialProjectId ??null);
+    setProjectId(initialProjectId ?? null);
     setTitle('');
     setDescription('');
     setPriority(1);
@@ -111,13 +127,16 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submissionRef.current || readOnly) return;
 
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
+      requestAnimationFrame(() => errorRef.current?.focus());
       return;
     }
 
+    submissionRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -164,231 +183,311 @@ export function CreateTaskDialog({ onTaskCreated, initialProjectId, isSubtask = 
 
       // Success
       setOpen(false);
+      resetForm();
       if (onTaskCreated && result.taskId) {
-        onTaskCreated(result.taskId);
+        await onTaskCreated(result.taskId);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
+      submissionRef.current = false;
       setLoading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!loading) {
+          setOpen(next);
+          if (!next) resetForm();
+        }
+      }}
+    >
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <PlusIcon className="h-4 w-4" />
+        <Button
+          variant={isSubtask ? 'outline' : 'default'}
+          size={isSubtask ? 'sm' : 'default'}
+          disabled={disabled}
+          className="gap-2"
+        >
+          <PlusIcon className="size-4" />
           {isSubtask ? 'Create Subtask' : 'Create Task'}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:!max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isSubtask ? 'Create New Subtask' : 'Create New Task'}</DialogTitle>
-          <DialogDescription>
-            Fill in the details to create a new task. Fields marked with * are mandatory.
+      <DialogContent
+        className="flex max-h-[calc(100svh-32px)] flex-col gap-0 overflow-hidden p-0 sm:!max-w-[680px]"
+        onEscapeKeyDown={(e) => {
+          if (loading) e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+          if (loading) e.preventDefault();
+        }}
+      >
+        <DialogHeader className="shrink-0 border-b px-6 py-5 text-left">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {isSubtask ? 'Break work into steps' : 'New work'}
+          </div>
+          <DialogTitle className="text-2xl font-semibold tracking-tight">
+            {isSubtask ? 'Create subtask' : 'Create task'}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            {isSubtask
+              ? `Part of ${initialProjectName || 'the parent project'}.`
+              : 'Set the essentials. Add the details when you need them.'}{' '}
+            <span className="whitespace-nowrap">* Required</span>
           </DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Project Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="project">
-              Project <span className="text-red-500">*</span>
-            </Label>
-            {isProjectLocked ? (
-              <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded border text-sm">
-                <p className="font-medium text-gray-700 dark:text-gray-300">
-                  {initialProjectName}
-                </p>
+        {readOnly ? (
+          <div className="space-y-4 px-6 py-8">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-positive-soft text-positive">
+              <LockKeyhole className="size-5" />
+            </span>
+            <h3 className="font-medium">You're exploring a read-only demo</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Browse tasks, timelines and reports. Creating or changing workspace data is available
+              to team accounts.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOpen(false);
+                resetForm();
+              }}
+            >
+              Back to workspace
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+              <div className="space-y-2">
+                <Label htmlFor="title">
+                  Title <Required />
+                </Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="What needs to get done?"
+                  maxLength={255}
+                  className="h-11"
+                />
               </div>
-            ) : (
-              <ProjectSingleSelector selectedProjectId={projectId} onChange={setProjectId} />
-            )}
-          </div>
-
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">
-              Title <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter task title"
-              maxLength={255}
-            />
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">
-              Description <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe the task in detail"
-              rows={3}
-            />
-          </div>
-
-          {/* Priority and Status Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="priority">
-                Priority <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={priority.toString()}
-                onValueChange={(v) => setPriority(parseInt(v) as TaskPriority)}
-              >
-                <SelectTrigger id="priority">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="6">6</SelectItem>
-                  <SelectItem value="7">7</SelectItem>
-                  <SelectItem value="8">8</SelectItem>
-                  <SelectItem value="9">9</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">
-                Status <span className="text-red-500">*</span>
-              </Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
-                <SelectTrigger id="status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  <SelectItem value="To Do">To Do</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                  <SelectItem value="Blocked">Blocked</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Assignees */}
-          <div className="space-y-2">
-            <Label>
-              Assignees (Max 5) <span className="text-red-500">*</span>
-            </Label>
-            <AssigneeMultiSelector
-              selectedAssigneeIds={assigneeIds}
-              onChange={setAssigneeIds}
-              maxAssignees={5}
-            />
-          </div>
-
-          {/* Due Date */}
-          <div className="space-y-2">
-            <Label>
-              Due Date <span className="text-red-500">*</span>
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    'w-full justify-start text-left font-normal',
-                    !deadline && 'text-muted-foreground'
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {deadline ? format(deadline, 'PPP') : 'Pick a date'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={deadline} onSelect={setDeadline} initialFocus />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Recurrence */}
-          <div className="space-y-3 border rounded-md p-4">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="recurrence"
-                checked={recurrenceEnabled}
-                onCheckedChange={(checked) => setRecurrenceEnabled(checked === true)}
-              />
-              <Label htmlFor="recurrence" className="cursor-pointer">
-                Recurring Task
-              </Label>
-            </div>
-
-            {recurrenceEnabled && (
-              <div className="space-y-3 pl-6">
+              <div className="space-y-2">
+                <Label htmlFor="description">
+                  Description <Required />
+                </Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Add the context your team needs…"
+                  rows={3}
+                  className="min-h-20 resize-y"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="frequency">Frequency</Label>
-                  <Select
-                    value={recurrenceFrequency}
-                    onValueChange={(v) => setRecurrenceFrequency(v as RecurrenceFrequency)}
-                  >
-                    <SelectTrigger id="frequency">
+                  <Label htmlFor="project">
+                    Project <Required />
+                  </Label>
+                  {isProjectLocked ? (
+                    <div className="flex h-10 items-center gap-2 rounded-lg border bg-muted/40 px-3 text-sm">
+                      <LockKeyhole className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">
+                        {initialProjectName || `Project ${projectId}`}
+                      </span>
+                    </div>
+                  ) : (
+                    <ProjectSingleSelector selectedProjectId={projectId} onChange={setProjectId} />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deadline">
+                    Deadline <Required />
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        id="deadline"
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !deadline && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 size-4" />
+                        {deadline ? format(deadline, 'MMM d, yyyy') : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={deadline}
+                        onSelect={setDeadline}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignees">
+                  Assignees <Required />
+                  <span className="ml-auto text-xs font-normal text-muted-foreground">
+                    Choose up to 5
+                  </span>
+                </Label>
+                <AssigneeMultiSelector
+                  selectedAssigneeIds={assigneeIds}
+                  onChange={setAssigneeIds}
+                  maxAssignees={5}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="status">
+                    Status <Required />
+                  </Label>
+                  <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
+                    <SelectTrigger id="status" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover">
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectContent>
+                      {(['To Do', 'In Progress', 'Completed', 'Blocked'] as const).map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="text-xs text-muted-foreground space-y-1 mt-2">
-                  <p className="font-medium">How recurring tasks work:</p>
-                  <ul className="list-disc list-inside space-y-0.5 pl-2">
-                    <li><strong>Daily:</strong> Recurs every day</li>
-                    <li><strong>Weekly:</strong> Recurs on the same weekday (e.g., every Tuesday)</li>
-                    <li><strong>Monthly:</strong> Recurs on the same day of month (e.g., every 15th)</li>
-                  </ul>
-                  <p className="mt-1">The deadline you set above determines when this pattern starts.</p>
+                <div className="space-y-2">
+                  <Label htmlFor="priority">
+                    Priority <Required />
+                  </Label>
+                  <Select
+                    value={priority.toString()}
+                    onValueChange={(v) => setPriority(parseInt(v) as TaskPriority)}
+                  >
+                    <SelectTrigger id="priority" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((value) => (
+                        <SelectItem key={value} value={value.toString()}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Tags */}
-          <div className="space-y-2">
-            <Label>Tags (Optional)</Label>
-            <TagsInput tags={tags} onChange={setTags} />
-          </div>
-
-          {/* File Attachments */}
-          <div className="space-y-2">
-            <Label>Attachments (Optional, Max 50MB total)</Label>
-            <FileUploadZone files={files} onChange={setFiles} maxTotalSize={50 * 1024 * 1024} />
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
-              {error}
+              <details className="group rounded-xl border bg-muted/20">
+                <summary className="flex cursor-pointer list-none items-center gap-3 p-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                  <SlidersHorizontal className="size-4 text-muted-foreground" />
+                  <span>
+                    More options
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                      Recurrence, tags & files
+                      {tags.length || files.length || recurrenceEnabled ? ' · Added' : ''}
+                    </span>
+                  </span>
+                  <ChevronDown className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="space-y-5 border-t p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="recurrence"
+                        checked={recurrenceEnabled}
+                        onCheckedChange={(checked) => setRecurrenceEnabled(checked === true)}
+                      />
+                      <Label htmlFor="recurrence">Repeat this task</Label>
+                    </div>
+                    {recurrenceEnabled && (
+                      <div className="space-y-2">
+                        <Select
+                          value={recurrenceFrequency}
+                          onValueChange={(v) => setRecurrenceFrequency(v as RecurrenceFrequency)}
+                        >
+                          <SelectTrigger
+                            id="frequency"
+                            aria-label="Repeat frequency"
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="daily">Every day</SelectItem>
+                            <SelectItem value="weekly">Every 7 days</SelectItem>
+                            <SelectItem value="monthly">Every 30 days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                          A new task is created after completion. The deadline anchors the repeat
+                          interval.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>
+                      Tags{' '}
+                      <span className="text-xs font-normal text-muted-foreground">Optional</span>
+                    </Label>
+                    <TagsInput tags={tags} onChange={setTags} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>
+                      Files{' '}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        Up to 10 files · 50 MB total
+                      </span>
+                    </Label>
+                    <FileUploadZone
+                      files={files}
+                      onChange={setFiles}
+                      maxTotalSize={50 * 1024 * 1024}
+                    />
+                  </div>
+                </div>
+              </details>
             </div>
-          )}
-
-          {/* Footer Actions */}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Task'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <div className="shrink-0 border-t bg-card px-6 py-4">
+              {error && (
+                <div
+                  ref={errorRef}
+                  tabIndex={-1}
+                  role="alert"
+                  className="mb-3 rounded-lg border border-problem/20 bg-problem-soft px-3 py-2 text-sm text-problem"
+                >
+                  {error}
+                </div>
+              )}
+              <DialogFooter className="gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => {
+                    setOpen(false);
+                    resetForm();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  {loading ? 'Creating…' : isSubtask ? 'Create subtask' : 'Create task'}
+                </Button>
+              </DialogFooter>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, ListTodo, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ListTodo, RefreshCw } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,19 +11,24 @@ import type { TaskInspection } from '@/lib/types/tasks';
 
 export function TaskInspectorProvider({ children }: { children: React.ReactNode }) {
   const [taskId, setTaskId] = useState<number | null>(null);
+  const [history, setHistory] = useState<number[]>([]);
   const [task, setTask] = useState<TaskInspection | null>(null);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const opener = useRef<HTMLElement | null>(null);
-  const openTask = useCallback((id: number) => {
-    if (!Number.isSafeInteger(id) || id < 1) return;
-    if (!document.querySelector('[data-slot=sheet-content]'))
-      opener.current = document.activeElement as HTMLElement;
-    setTask(null);
-    setError('');
-    setRevision((value) => value + 1);
-    setTaskId(id);
-  }, []);
+  const openTask = useCallback(
+    (id: number) => {
+      if (!Number.isSafeInteger(id) || id < 1) return;
+      if (!document.querySelector('[data-slot=sheet-content]'))
+        opener.current = document.activeElement as HTMLElement;
+      setHistory((previous) => (taskId !== null && taskId !== id ? [...previous, taskId] : []));
+      setTask(null);
+      setError('');
+      setRevision((value) => value + 1);
+      setTaskId(id);
+    },
+    [taskId]
+  );
   useEffect(() => {
     if (taskId === null) return;
     const abort = new AbortController();
@@ -65,7 +70,24 @@ export function TaskInspectorProvider({ children }: { children: React.ReactNode 
         >
           <header className="flex min-h-16 shrink-0 items-center justify-between border-b px-5 pr-14">
             <div className="flex items-center gap-2">
-              <ListTodo className="size-4 text-positive" />
+              {history.length > 0 ? (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7"
+                  aria-label="Back to previous task"
+                  onClick={() => {
+                    setTask(null);
+                    setError('');
+                    setTaskId(history[history.length - 1]);
+                    setHistory((previous) => previous.slice(0, -1));
+                  }}
+                >
+                  <ArrowLeft className="size-4" />
+                </Button>
+              ) : (
+                <ListTodo className="size-4 text-positive" />
+              )}
               <SheetTitle className="text-sm">Task details</SheetTitle>
             </div>
             {taskId && (

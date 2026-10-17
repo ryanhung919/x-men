@@ -104,12 +104,16 @@ export function EditableTags({ taskId, initialTags, onTagsUpdate }: EditableTags
       <div className="flex items-center gap-2 flex-wrap">
         {tags.length > 0 ? (
           tags.map((tag) => (
-            <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-3 py-1">
+            <Badge
+              key={tag}
+              variant="secondary"
+              className="flex max-w-full items-center gap-1 break-words whitespace-normal px-2 py-1 text-[11px]"
+            >
               {tag}
               <button
                 onClick={() => handleRemoveTag(tag)}
                 disabled={isLoading}
-                className="ml-1 hover:text-red-600 disabled:opacity-50"
+                className="ml-1 hover:text-problem disabled:opacity-50"
                 aria-label={`Remove tag ${tag}`}
               >
                 <X className="w-3 h-3" />
