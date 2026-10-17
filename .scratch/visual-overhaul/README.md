@@ -1,6 +1,6 @@
 # Visual overhaul ticket index
 
-The 16 tickets below are published as `ready-for-agent`. Work only on tickets whose blockers are complete. Ticket 01 is currently in progress on the integration branch `integration/visual-overhaul` through an isolated implementation worktree.
+Implementation is active on `integration/visual-overhaul`, using isolated ticket worktrees. Work only on tickets whose blockers are complete. Triage remains `ready-for-agent`; individual `Resolution:` fields and validation evidence record delivered work against the revised scope.
 
 The parent spec remains unchanged. The user subsequently approved project-scoped toolchain and library upgrades before visual implementation, Context7 documentation lookup, and using existing CSS animation utilities without adding GSAP or Lenis. Tickets 01–02 capture those additions.
 

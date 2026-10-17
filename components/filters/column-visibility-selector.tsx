@@ -71,7 +71,7 @@ export function ColumnVisibilitySelector({
       <Select value="" onValueChange={() => {}}>
         <SelectTrigger
           className={cn(
-            'w-[140px] border border-input bg-background text-foreground',
+            'h-9 w-[140px] border border-input bg-background text-foreground',
             'hover:bg-accent hover:text-accent-foreground',
             'focus:ring-2 focus:ring-ring focus:ring-offset-2',
             '[&>span]:text-foreground [&>span]:font-medium'
@@ -83,7 +83,7 @@ export function ColumnVisibilitySelector({
         <SelectContent
           className="bg-popover text-popover-foreground border border-border shadow-md min-w-[220px]"
           style={{
-            backgroundColor: 'hsl(var(--popover))',
+            backgroundColor: 'var(--popover)',
             backdropFilter: 'none',
             WebkitBackdropFilter: 'none',
           }}
@@ -98,10 +98,14 @@ export function ColumnVisibilitySelector({
               {allColumns.map((column) => {
                 const isDisabled = visibleColumns.length === 1 && visibleColumns.includes(column);
                 return (
-                  <div
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={visibleColumns.includes(column)}
+                    disabled={isDisabled}
                     key={column}
                     className={cn(
-                      'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2.5 text-sm outline-none transition-colors duration-100',
+                      'relative flex w-full cursor-pointer text-left select-none items-center rounded-sm px-2 py-2.5 text-sm outline-none transition-colors duration-100',
                       'hover:bg-accent hover:text-accent-foreground',
                       visibleColumns.includes(column) && 'bg-accent/50',
                       isDisabled && 'opacity-50 cursor-not-allowed'
@@ -122,7 +126,7 @@ export function ColumnVisibilitySelector({
                       )}
                     </div>
                     <span className="flex-1 whitespace-nowrap">{COLUMN_LABELS[column]}</span>
-                  </div>
+                  </button>
                 );
               })}
             </div>

@@ -1,5 +1,7 @@
 'use client';
 
+import { format } from 'date-fns';
+import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -54,12 +56,23 @@ export function NotificationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-[500px] p-7">
+        <DialogHeader className="text-left">
+          <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-positive-soft text-positive">
+            <Bell className="size-5" />
+          </span>
           <DialogTitle>{formatNotificationTitle(notification.type)}</DialogTitle>
-          <DialogDescription>{formatNotificationMessage(notification.message)}</DialogDescription>
+          <p className="text-xs text-muted-foreground">
+            {format(new Date(notification.created_at), 'MMM d, yyyy · h:mm a')}
+          </p>
+          <DialogDescription className="break-words whitespace-pre-wrap pt-3 text-sm leading-relaxed">
+            {formatNotificationMessage(notification.message)}
+          </DialogDescription>
         </DialogHeader>
-        <DialogFooter>
+        <DialogFooter className="mt-4 gap-2 border-t pt-5 sm:justify-between">
+          <Button variant="outline" onClick={onClose}>
+            Done
+          </Button>
           <Button variant="destructive" onClick={handleDelete}>
             Delete
           </Button>
