@@ -13,6 +13,7 @@ import type {
   LoggedTimeReport as LoggedTimeReportType,
   KPI,
 } from '@/components/report/export-buttons';
+import { ReportError } from '@/components/report/report-comparison';
 import { LoggedTimeReportSkeleton } from '@/components/report/report-skeletons';
 
 interface LoggedTimeProps {
@@ -201,6 +202,8 @@ export function LoggedTimeReport({
 }: LoggedTimeProps) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const prevMetricsRef = useRef<Metrics | null>(null);
   const initializedRef = useRef(false);
 
@@ -270,8 +273,10 @@ export function LoggedTimeReport({
       return;
     }
 
+    const controller = new AbortController();
     const fetchMetrics = async () => {
       setLoading(true);
+      setError(false);
       try {
         const params = new URLSearchParams({
           action: 'time',
@@ -281,10 +286,11 @@ export function LoggedTimeReport({
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
 
-        const res = await fetch(`/api/reports?${params}`);
+        const res = await fetch(`/api/reports?${params}`, { signal: controller.signal });
         if (!res.ok) throw new Error('Failed to fetch logged time metrics');
 
         const json = await res.json();
+        if (controller.signal.aborted) return;
         if (json) {
           const newMetrics: Metrics = {
             completedTasks: json.completedTasks,
@@ -327,14 +333,18 @@ export function LoggedTimeReport({
             onDataLoaded(exportData);
           }
         }
-      } catch (err) {
-        console.error(err);
+      } catch {
+        if (controller.signal.aborted) return;
+        setError(true);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
     fetchMetrics();
-  }, [departmentIds, projectIds, startDate, endDate, onDataLoaded]);
+    return () => controller.abort();
+  }, [departmentIds, projectIds, startDate, endDate, onDataLoaded, retry]);
+
+  if (error) return <ReportError retry={() => setRetry((value) => value + 1)} />;
 
   const displayMetrics = loading && prevMetricsRef.current ? prevMetricsRef.current : metrics;
 
