@@ -32,3 +32,11 @@ Prioritize presentable design and the portfolio recording; implement only necess
 - Test externally observable outcomes. Reuse the browser-level seam, existing Playwright suites, and globally installed Playwright CLI. Verify isolated database targeting before running tests that seed or mutate data.
 - Preserve unrelated user changes. No hosted reseed, deployment, broad machine-wide upgrades, or unrelated portfolio changes.
 
+
+## Resolution: implemented (supported task inspection; aggregate drilldown deferred)
+
+2026-10-17 owner's design-first revision narrows this ticket to existing exact task IDs. Logged Time's `timeByTask` payload already supplies task-ID/hour entries and the top-five rows. Their NDL labels now expose explicit keyboard-operable Inspect task actions opening06's shared inspector. Hours and parent/subtask rollups unchanged. The report stays mounted beneath the Sheet, preserving filters/tab/scroll; close restores the activating control. Task details still load through existing authenticated session/RLS GET, including read-only guest presentation and existing stale/not-found handling.
+
+Aggregate status/timing/chart figures and Team Summary creator totals have no complete exact membership payload available to this client. They remain informational. No approximate personal-task substitution, new aggregate API, query/date fields, schema changes or misleading denominator introduced. Exact aggregate task-set drilldown and deterministic mutation fixture matrix deferred under owner's revised scope.
+
+Validation: typecheck passes. Playwright CLI local-only preview (fresh ignored environment generated from loopback Supabase CLI status; no private env-file reads) verified NDL-1 loads Customer portal v2 launch, Escape restores trigger focus, report URL stays /report, and selected scope unchanged after Sheet exit animation. Guest opens same authorized task with Read-only demo identity. Screenshots `/tmp/nodal13-report-task-inspection.png`, `/tmp/nodal13-guest-task.png`. No writes/seeds; final integrated production build belongs15. No additional test suite for this simple UI seam.

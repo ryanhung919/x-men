@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useTaskInspector } from '@/components/tasks/task-inspector-context';
 import {
   CheckCheck,
   Clock3,
   CircleMinus,
   ListFilter,
+  ArrowUpRight,
   Timer,
   ChartNoAxesCombined,
 } from 'lucide-react';
@@ -200,6 +202,7 @@ export function LoggedTimeReport({
   onDataLoaded,
   initialData,
 }: LoggedTimeProps) {
+  const { openTask } = useTaskInspector();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -580,7 +583,9 @@ export function LoggedTimeReport({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold tracking-tight">Where time goes</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Top five tasks by logged hours</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Top five tasks by logged hours · inspect a task for context
+              </p>
             </div>
             <ListFilter className="size-4 text-muted-foreground" aria-hidden="true" />
           </div>
@@ -589,9 +594,17 @@ export function LoggedTimeReport({
               topTasks.map((task) => (
                 <div
                   key={task.id}
-                  className="grid grid-cols-[70px_1fr_58px] items-center gap-3 text-xs"
+                  className="grid grid-cols-[82px_1fr_58px] items-center gap-3 text-xs"
                 >
-                  <span className="font-mono text-muted-foreground">Task {task.id}</span>
+                  <button
+                    type="button"
+                    onClick={() => openTask(Number(task.id))}
+                    aria-label={`Inspect task NDL-${task.id}`}
+                    className="group inline-flex items-center gap-1 rounded-sm py-1 font-mono text-positive transition-colors hover:underline underline-offset-4"
+                  >
+                    NDL-{task.id}
+                    <ArrowUpRight className="size-3 shrink-0" aria-hidden="true" />
+                  </button>
                   <div className="h-3 rounded bg-muted">
                     <div
                       className="h-full rounded"
