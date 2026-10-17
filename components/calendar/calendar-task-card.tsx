@@ -1,9 +1,9 @@
 'use client';
 
 import { Repeat } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { isPast } from 'date-fns';
 import type { Task } from '@/lib/services/tasks';
+import { TaskStatus, OverdueIndicator } from '@/components/tasks/task-status';
 
 interface CalendarTaskCardProps {
   task: Task;
@@ -11,109 +11,70 @@ interface CalendarTaskCardProps {
   onClick: () => void;
 }
 
-// Inline utility functions
-const isTaskOverdue = (task: Task): boolean => {
-  if (!task.deadline || task.status === 'Completed') return false;
-  return isPast(new Date(task.deadline));
-};
-
-/**
- * Task card component for display in calendar views.
- * Shows task status with color coding using shadcn/ui badge variants, recurring indicators, and assignee avatars.
- */
 export default function CalendarTaskCard({
   task,
   compact = false,
   onClick,
 }: CalendarTaskCardProps) {
-  const isOverdue = isTaskOverdue(task);
-
-  // Function to get color classes based on status and overdue state
-  const getStatusClasses = (status: string, isOverdue: boolean) => {
-    // Overdue tasks take priority (except completed)
-    if (isOverdue && status !== 'Completed') {
-      return 'bg-destructive text-white border-destructive hover:bg-destructive/90';
-    }
-
-    switch (status) {
-      case 'Completed':
-        return 'bg-primary text-primary-foreground border-primary hover:bg-primary/90';
-      case 'In Progress':
-        return 'bg-secondary text-secondary-foreground border-secondary hover:bg-secondary/90';
-      case 'Blocked':
-        return 'bg-destructive text-white border-destructive hover:bg-destructive/90';
-      default: // To Do
-        return 'text-foreground border-border bg-background hover:bg-accent hover:text-accent-foreground';
-    }
-  };
-
-  const statusClasses = getStatusClasses(task.status, isOverdue);
-
-  if (compact) {
-    return (
-      <button
-        onClick={onClick}
-        className={`w-full h-full text-left px-1 py-0.5 sm:px-2 sm:py-1 rounded text-xs border ${statusClasses} transition-opacity flex items-center gap-0.5 sm:gap-1`}
-        aria-label={`Task: ${task.title}`}
-      >
-        {task.recurrence_interval > 0 && (
-          <Repeat className="h-2.5 w-2.5 sm:h-3 sm:w-3 flex-shrink-0" />
-        )}
-        <span className="truncate text-[10px] sm:text-xs">{task.title}</span>
-      </button>
-    );
-  }
-
-  // Full card for day view
+  const overdue = !!task.deadline && task.status !== 'Completed' && isPast(new Date(task.deadline));
+  const problem = overdue || task.status === 'Blocked';
+  const active = task.status === 'In Progress' || task.status === 'Completed';
+  const tone = problem
+    ? 'border-l-problem bg-problem-soft/60 hover:bg-problem-soft'
+    : active
+      ? 'border-l-positive bg-positive-soft/65 hover:bg-positive-soft'
+      : 'border-l-muted-foreground/50 bg-muted/40 hover:bg-muted';
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`w-full h-full text-left p-2 sm:p-3 rounded-lg border ${statusClasses} transition-opacity flex flex-col overflow-hidden`}
-      aria-label={`Task: ${task.title}, Status: ${task.status}, Priority: ${task.priority}`}
+      title={task.title}
+      aria-label={`Task: ${task.title}, Status: ${task.status}, Priority: ${task.priority}${overdue ? ', Overdue' : ''}${task.recurrence_interval > 0 ? ', Recurring task' : ''}`}
+      className={`group w-full min-w-0 rounded-md border border-border/50 border-l-[3px] text-left text-foreground transition-colors ${tone} ${compact ? 'px-2 py-1.5' : 'p-4'}`}
     >
-      <div className="flex items-start justify-between gap-1 sm:gap-2 mb-1 sm:mb-2">
-        <h4 className="font-semibold text-xs sm:text-sm line-clamp-2 flex-1 leading-tight">
+      <div className="flex items-start gap-1.5">
+        <span
+          className={`min-w-0 flex-1 break-words font-medium leading-snug ${compact ? 'line-clamp-2 text-[11px]' : 'text-sm'}`}
+        >
           {task.title}
-        </h4>
+        </span>
         {task.recurrence_interval > 0 && (
-          <Repeat className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" aria-label="Recurring task" />
+          <Repeat
+            aria-label="Recurring task"
+            className="mt-0.5 size-3 shrink-0 text-muted-foreground"
+          />
         )}
       </div>
-
-      {task.description && (
-        <p className="text-[10px] sm:text-xs opacity-90 line-clamp-1 sm:line-clamp-2 mb-1 sm:mb-2 leading-tight">
-          {task.description}
-        </p>
+      {!compact && (
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <TaskStatus status={task.status} />
+            {overdue && <OverdueIndicator />}
+          </div>
+          {task.description && (
+            <p className="mt-3 line-clamp-2 break-words text-xs leading-relaxed text-muted-foreground">
+              {task.description}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+            <span className="font-mono text-[10px] text-muted-foreground">NDL-{task.id}</span>
+            <span className="text-[11px] text-muted-foreground">
+              {task.assignees.length
+                ? task.assignees
+                    .map(
+                      (assignee) =>
+                        `${assignee.user_info.first_name} ${assignee.user_info.last_name}`
+                    )
+                    .join(', ')
+                : 'Unassigned'}
+            </span>
+          </div>
+        </>
       )}
-
-      {/* Show assignees only on larger screens */}
-      <div className="mt-auto items-center gap-1 hidden sm:flex">
-        {task.assignees?.slice(0, 2).map((assignee) => {
-          const initials = `${assignee.user_info.first_name.charAt(
-            0
-          )}${assignee.user_info.last_name.charAt(0)}`;
-
-          return (
-            <Avatar
-              key={assignee.assignee_id}
-              className="h-5 w-5"
-              title={`${assignee.user_info.first_name} ${assignee.user_info.last_name}`}
-            >
-              <AvatarFallback className="text-[10px] bg-white/20">{initials}</AvatarFallback>
-            </Avatar>
-          );
-        })}
-        {task.assignees && task.assignees.length > 2 && (
-          <span className="text-xs opacity-90">+{task.assignees.length - 2}</span>
-        )}
-      </div>
-
-      {/* Mobile: show count instead of avatars */}
-      {task.assignees && task.assignees.length > 0 && (
-        <div className="mt-auto flex items-center gap-1 sm:hidden">
-          <span className="text-[10px] opacity-75">
-            {task.assignees.length} assignee{task.assignees.length > 1 ? 's' : ''}
-          </span>
+      {compact && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <TaskStatus status={task.status} className="gap-1 text-[9px] [&>svg]:size-2.5" />
+          {overdue && <span className="text-[9px] text-problem">· Overdue</span>}
         </div>
       )}
     </button>

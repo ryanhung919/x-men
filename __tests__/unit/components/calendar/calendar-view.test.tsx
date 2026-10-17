@@ -1,7 +1,14 @@
 import React from 'react';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as renderComponent, screen, fireEvent, waitFor } from '@testing-library/react';
 import CalendarView from '@/components/calendar/calendar-view';
+import { TaskInspectorContext } from '@/components/tasks/task-inspector-context';
+const render = (element: React.ReactNode) =>
+  renderComponent(
+    <TaskInspectorContext.Provider value={{ openTask: vi.fn() }}>
+      {element}
+    </TaskInspectorContext.Provider>
+  );
 import type { Task } from '@/lib/services/tasks';
 
 describe('CalendarView User Interactions', () => {
@@ -25,7 +32,12 @@ describe('CalendarView User Interactions', () => {
     value: localStorageMock,
   });
 
-  const createTask = (id: number, title: string, status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked', deadline: Date): Task => ({
+  const createTask = (
+    id: number,
+    title: string,
+    status: 'To Do' | 'In Progress' | 'Completed' | 'Blocked',
+    deadline: Date
+  ): Task => ({
     id,
     title,
     description: `Description for ${title}`,
@@ -61,15 +73,15 @@ describe('CalendarView User Interactions', () => {
     render(<CalendarView tasks={mockTasks} />);
 
     // Test month view button
-    const monthButton = screen.getAllByText('M')[0].closest('button');
+    const monthButton = screen.getByRole('button', { name: 'Month view' });
     expect(monthButton).toBeInTheDocument();
 
     // Test week view button
-    const weekButton = screen.getByText('W').closest('button');
+    const weekButton = screen.getByRole('button', { name: 'Week view' });
     expect(weekButton).toBeInTheDocument();
 
     // Test day view button
-    const dayButton = screen.getByText('D').closest('button');
+    const dayButton = screen.getByRole('button', { name: 'Day view' });
     expect(dayButton).toBeInTheDocument();
   });
 

@@ -1,109 +1,93 @@
 'use client';
-
-import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isToday } from 'date-fns';
+import {
+  format,
+  isSameDay,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  startOfWeek,
+  endOfWeek,
+  isToday,
+  isWeekend,
+} from 'date-fns';
 import CalendarTaskCard from './calendar-task-card';
 import type { Task } from '@/lib/services/tasks';
-
 interface MonthViewProps {
   tasks: Task[];
   date: Date;
   onTaskClick: (task: Task) => void;
   onDateSelect: (date: Date) => void;
 }
-
-/**
- * Month view calendar component showing a traditional calendar grid.
- * Displays tasks as colored badges on their deadline dates.
- * Clicking a date switches to day view for that date.
- */
 export default function MonthView({ tasks, date, onTaskClick, onDateSelect }: MonthViewProps) {
-  // Get all days to display (including padding from prev/next month)
-  const monthStart = startOfMonth(date);
-  const monthEnd = endOfMonth(date);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-
-  const calendarDays = eachDayOfInterval({
-    start: calendarStart,
-    end: calendarEnd,
+  const days = eachDayOfInterval({
+    start: startOfWeek(startOfMonth(date), { weekStartsOn: 0 }),
+    end: endOfWeek(endOfMonth(date), { weekStartsOn: 0 }),
   });
-
-  // Group by weeks for rendering
-  const weeks: Date[][] = [];
-  for (let i = 0; i < calendarDays.length; i += 7) {
-    weeks.push(calendarDays.slice(i, i + 7));
-  }
-
-  const getTasksForDay = (day: Date) => {
-    return tasks.filter(task =>
-      task.deadline && isSameDay(new Date(task.deadline), day)
-    );
-  };
-
   return (
-    <div className="h-full flex flex-col bg-background overflow-y-auto">
-      {/* Day headers - sticky */}
-      <div className="grid grid-cols-7 border-b bg-muted sticky top-0 z-10">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="p-1 sm:p-2 text-center text-xs sm:text-sm font-semibold text-muted-foreground border-r last:border-r-0">
-            {day}
+    <section aria-label="Month calendar" className="flex min-h-full min-w-[840px] flex-col bg-card">
+      <div className="sticky top-0 z-10 grid grid-cols-7 border-b bg-card">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((name) => (
+          <div
+            key={name}
+            className="border-r py-3 text-center text-[10px] font-medium uppercase tracking-wider text-muted-foreground last:border-r-0"
+          >
+            {name}
           </div>
         ))}
       </div>
-
-      {/* Calendar grid */}
-      <div className="flex-1 grid grid-rows-6 border-b">
-        {weeks.map((week, weekIdx) => (
-          <div key={weekIdx} className="grid grid-cols-7 border-b last:border-r-0">
-            {week.map(day => {
-              const dayTasks = getTasksForDay(day);
-              const isCurrentMonth = day.getMonth() === date.getMonth();
-              const isTodayDate = isToday(day);
-
-              return (
-                <div
-                  key={day.toString()}
-                  className={`border-r last:border-r-0 p-1 sm:p-2 min-h-[60px] sm:min-h-[80px] md:min-h-[100px] cursor-pointer hover:bg-muted/50 transition-colors ${
-                    !isCurrentMonth ? 'bg-muted/50 text-muted-foreground' : ''
-                  } ${isTodayDate ? 'bg-accent' : ''}`}
+      <div
+        className="grid flex-1 grid-cols-7"
+        style={{ gridTemplateRows: `repeat(${days.length / 7},minmax(130px,1fr))` }}
+      >
+        {days.map((day) => {
+          const dayTasks = tasks.filter(
+            (task) => task.deadline && isSameDay(new Date(task.deadline), day)
+          );
+          const outside = day.getMonth() !== date.getMonth();
+          return (
+            <div
+              key={day.toISOString()}
+              className={`min-w-0 border-b border-r p-2 [&:nth-child(7n)]:border-r-0 ${outside ? 'bg-muted/40' : isWeekend(day) ? 'bg-muted/20' : ''}`}
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <button
+                  type="button"
                   onClick={() => onDateSelect(day)}
-                  role="button"
                   aria-label={`${format(day, 'MMMM d, yyyy')}, ${dayTasks.length} tasks`}
+                  aria-current={isToday(day) ? 'date' : undefined}
+                  className={`flex size-7 items-center justify-center rounded-full text-xs font-medium transition-colors ${isToday(day) ? 'bg-primary text-primary-foreground' : outside ? 'text-muted-foreground hover:bg-muted' : 'text-foreground hover:bg-muted'}`}
                 >
-                  {/* Day number */}
-                  <div className={`text-xs sm:text-sm font-semibold mb-0.5 sm:mb-1 ${isTodayDate ? 'text-accent-foreground' : 'text-foreground'}`}>
-                    {format(day, 'd')}
-                  </div>
-
-                  {/* Tasks */}
-                  <div className="space-y-0.5 sm:space-y-1">
-                    {dayTasks.slice(0, 3).map(task => (
-                      <div
-                        key={task.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onTaskClick(task);
-                        }}
-                      >
-                        <CalendarTaskCard
-                          task={task}
-                          onClick={() => onTaskClick(task)}
-                          compact={true}
-                        />
-                      </div>
-                    ))}
-                    {dayTasks.length > 3 && (
-                      <div className="text-[10px] sm:text-xs text-muted-foreground pl-1 sm:pl-2">
-                        +{dayTasks.length - 3} more
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                  {format(day, 'd')}
+                </button>
+                {dayTasks.length > 0 && (
+                  <span className="text-[9px] tabular-nums text-muted-foreground">
+                    {dayTasks.length} due
+                  </span>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                {dayTasks.slice(0, 3).map((task) => (
+                  <CalendarTaskCard
+                    key={task.id}
+                    task={task}
+                    onClick={() => onTaskClick(task)}
+                    compact
+                  />
+                ))}
+                {dayTasks.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => onDateSelect(day)}
+                    className="w-full rounded px-2 py-1 text-left text-[10px] font-medium text-positive hover:bg-positive-soft"
+                  >
+                    +{dayTasks.length - 3} more tasks
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </div>
+    </section>
   );
 }
