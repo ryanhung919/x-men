@@ -45,9 +45,6 @@ export function TaskDetailContent({
   const updated = () => {
     setFeedback('Changes saved');
     router.refresh();
-  };
-  const structureUpdated = () => {
-    updated();
     onStructureUpdated?.();
   };
   const heading = 'mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground';
@@ -114,7 +111,7 @@ export function TaskDetailContent({
                   parentTaskId={task.id}
                   parentProjectId={task.project?.id || 0}
                   parentProjectName={task.project?.name}
-                  onCreated={structureUpdated}
+                  onCreated={updated}
                 />
               )}
             </div>

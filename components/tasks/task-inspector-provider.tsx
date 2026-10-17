@@ -32,7 +32,6 @@ export function TaskInspectorProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (taskId === null) return;
     const abort = new AbortController();
-    setTask(null);
     setError('');
     fetch(`/api/tasks/${taskId}`, { signal: abort.signal, cache: 'no-store' })
       .then(async (response) => {
