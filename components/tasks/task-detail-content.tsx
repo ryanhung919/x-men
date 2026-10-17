@@ -73,12 +73,11 @@ export function TaskDetailContent({
         ) : (
           <EditableTitle taskId={task.id} initialTitle={task.title} onTitleUpdate={updated} />
         )}
-        <p className="mt-2 min-h-4 text-[11px] text-positive" aria-live="polite">
-          {feedback ||
-            (readonly
-              ? 'Explore this task. Demo work stays read-only.'
-              : 'Everything you need to move this work forward.')}
-        </p>
+        {feedback && (
+          <p className="mt-2 text-[11px] text-positive" aria-live="polite">
+            {feedback}
+          </p>
+        )}
       </div>
       <div className="grid lg:grid-cols-[minmax(0,1fr)_270px]">
         <div className="min-w-0 space-y-6 p-5 sm:p-7">
@@ -88,7 +87,7 @@ export function TaskDetailContent({
               Description
             </h2>
             {readonly ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/85">
                 {task.description || 'No description added.'}
               </p>
             ) : (
@@ -105,7 +104,9 @@ export function TaskDetailContent({
                 <CheckSquare className="size-4 text-muted-foreground" />
                 Subtasks
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  {task.subtasks.length}
+                  {task.subtasks.length
+                    ? `${task.subtasks.filter((sub) => sub.status === 'Completed').length}/${task.subtasks.length}`
+                    : 0}
                 </span>
               </h2>
               {!readonly && (
@@ -125,7 +126,17 @@ export function TaskDetailContent({
                       onClick={() => openTask(sub.id)}
                       className="flex w-full items-center justify-between gap-3 p-3 text-left hover:bg-muted/50"
                     >
-                      <span className="min-w-0 text-sm leading-relaxed">{sub.title}</span>
+                      <span className="min-w-0">
+                        <span className="block break-words text-sm leading-relaxed">
+                          {sub.title}
+                        </span>
+                        <span className="mt-1 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                          <span className="font-mono">NDL-{sub.id}</span>
+                          {sub.deadline && (
+                            <span>Due {format(new Date(sub.deadline), 'MMM d')}</span>
+                          )}
+                        </span>
+                      </span>
                       <TaskStatus status={sub.status} />
                     </button>
                   </li>
@@ -166,7 +177,7 @@ export function TaskDetailContent({
             </summary>
             <div className="mt-3">
               {readonly ? (
-                <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
                   {task.notes || 'No notes added.'}
                 </p>
               ) : (
@@ -261,8 +272,14 @@ export function TaskDetailContent({
             {readonly ? (
               <p className="text-xs">
                 {task.recurrence_interval
-                  ? `Every ${task.recurrence_interval} days`
+                  ? { 1: 'Daily', 7: 'Weekly', 30: 'Monthly' }[task.recurrence_interval] ||
+                    `Every ${task.recurrence_interval} days`
                   : 'Does not repeat'}
+                {task.recurrence_interval > 0 && task.recurrence_date && (
+                  <span className="mt-1 block text-muted-foreground">
+                    Since {format(new Date(task.recurrence_date), 'MMM d, yyyy')}
+                  </span>
+                )}
               </p>
             ) : (
               <EditableRecurrence
@@ -276,7 +293,20 @@ export function TaskDetailContent({
           <div className={property}>
             <h3 className="text-xs text-muted-foreground">Tags</h3>
             {readonly ? (
-              <p className="text-xs text-muted-foreground">{task.tags.join(', ') || 'No tags'}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {task.tags.length ? (
+                  task.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="max-w-full break-words rounded-md border px-2 py-1 text-[11px] text-muted-foreground"
+                    >
+                      {tag}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-muted-foreground">No tags</span>
+                )}
+              </div>
             ) : (
               <EditableTags taskId={task.id} initialTags={task.tags} onTagsUpdate={updated} />
             )}

@@ -49,7 +49,9 @@ export function EditableRecurrence({
   );
 
   const getRecurrenceLabel = (interval: number): string => {
-    return RECURRENCE_OPTIONS.find((opt) => opt.value === interval)?.label || 'Unknown';
+    return (
+      RECURRENCE_OPTIONS.find((opt) => opt.value === interval)?.label || `Every ${interval} days`
+    );
   };
 
   const handleCancel = () => {
@@ -102,19 +104,19 @@ export function EditableRecurrence({
 
   if (!isEditing) {
     return (
-      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-transparent hover:border-muted-foreground/25 transition-colors">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-2 rounded-lg border border-transparent py-1 transition-colors hover:border-border">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {displayInterval > 0 ? (
             <>
               <Badge variant="secondary">{getRecurrenceLabel(displayInterval)}</Badge>
               {displayDate && (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   Since {format(new Date(displayDate), 'MMM d, yyyy')}
                 </span>
               )}
             </>
           ) : (
-            <span className="text-sm text-muted-foreground">No recurrence set</span>
+            <span className="text-xs text-muted-foreground">No recurrence set</span>
           )}
         </div>
         <Button

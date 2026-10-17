@@ -157,10 +157,7 @@ export function FileUploadZone({
           {/* Progress Bar */}
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div
-              className={cn(
-                'h-full transition-all',
-                sizePercentage > 90 ? 'bg-red-500' : sizePercentage > 70 ? 'bg-yellow-500' : 'bg-primary'
-              )}
+              className="h-full bg-primary transition-[width]"
               style={{ width: `${Math.min(sizePercentage, 100)}%` }}
             />
           </div>
@@ -202,7 +199,10 @@ export function FileUploadZone({
 
       {/* Error Message */}
       {error && (
-        <div className="text-xs text-red-500 bg-red-50 border border-red-200 px-3 py-2 rounded">
+        <div
+          role="alert"
+          className="rounded-lg border border-problem/20 bg-problem-soft px-3 py-2 text-xs text-problem"
+        >
           {error}
         </div>
       )}
