@@ -119,7 +119,7 @@ export function EditableAssignees({
   return (
     <div className="space-y-3">
       {error && (
-        <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-3 rounded-md border border-red-200 dark:border-red-800">
+        <div className="text-sm text-problem bg-problem-soft p-3 rounded-md border border-problem/25">
           {error}
         </div>
       )}
@@ -140,7 +140,7 @@ export function EditableAssignees({
                 <button
                   onClick={() => handleRemoveAssignee(assignee.id)}
                   disabled={isLoading}
-                  className="ml-1 hover:text-red-600 disabled:opacity-50 transition-colors"
+                  className="ml-1 hover:text-problem disabled:opacity-50 transition-colors"
                   aria-label={`Remove ${assignee.first_name} ${assignee.last_name}`}
                 >
                   <X className="w-3 h-3" />

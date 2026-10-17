@@ -63,7 +63,7 @@ export function DepartmentSelector({
         <SelectContent
           className="bg-popover text-popover-foreground border border-border shadow-md"
           style={{
-            backgroundColor: 'hsl(var(--popover))',
+            backgroundColor: 'var(--popover)',
             backdropFilter: 'none',
             WebkitBackdropFilter: 'none',
           }}

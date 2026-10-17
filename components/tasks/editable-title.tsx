@@ -83,13 +83,13 @@ export function EditableTitle({ taskId, initialTitle, onTitleUpdate }: EditableT
           onKeyDown={handleKeyDown}
           placeholder="Enter task title..."
           disabled={isLoading}
-          className="!text-2xl !font-bold h-auto py-2 px-3 selection:bg-blue-200 selection:text-inherit"
+          className="!text-2xl !font-bold h-auto py-2 px-3 selection:bg-positive-soft selection:text-inherit"
           style={{
             fontSize: '1.5rem',
             fontWeight: 'bold',
           }}
         />
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-problem">{error}</p>}
         <div className="flex gap-2">
           <Button
             size="sm"

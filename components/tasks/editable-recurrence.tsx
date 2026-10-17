@@ -135,7 +135,7 @@ export function EditableRecurrence({
   return (
     <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
       {error && (
-        <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-3 rounded-md border border-red-200 dark:border-red-800">
+        <div className="text-sm text-problem bg-problem-soft p-3 rounded-md border border-problem/25">
           {error}
         </div>
       )}

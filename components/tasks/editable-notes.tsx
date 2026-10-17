@@ -83,7 +83,7 @@ export function EditableNotes({ taskId, initialNotes, onNotesUpdate }: EditableN
           disabled={isLoading}
         />
         {error && (
-          <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-3 rounded-md border border-red-200 dark:border-red-800 mb-3">
+          <div className="text-sm text-problem bg-problem-soft p-3 rounded-md border border-problem/25 mb-3">
             {error}
           </div>
         )}

@@ -80,7 +80,7 @@ export function EditableDescription({
             className="min-h-[120px] resize-none text-base"
             disabled={isLoading}
           />
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-problem">{error}</p>}
           <div className="flex gap-2">
             <Button
               size="sm"

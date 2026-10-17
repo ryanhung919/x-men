@@ -84,7 +84,7 @@ export function EditableDeadline({
   return (
     <div className="space-y-2">
       {error && (
-        <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-2 rounded-md border border-red-200 dark:border-red-800">
+        <div className="text-sm text-problem bg-problem-soft p-2 rounded-md border border-problem/25">
           {error}
         </div>
       )}
