@@ -1,4 +1,5 @@
 'use client';
+import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,7 @@ export function EditablePriority({
       setIsEditing(false);
     } catch (err) {
       console.error('Failed to update priority:', err);
-      alert(err instanceof Error ? err.message : 'Failed to update priority');
+      toast.error(err instanceof Error ? err.message : 'Failed to update priority');
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +75,7 @@ export function EditablePriority({
         <Button
           size="sm"
           variant="ghost"
+          aria-label="Edit priority"
           onClick={() => setIsEditing(true)}
           className="h-8 w-8 p-0"
           disabled={isLoading}

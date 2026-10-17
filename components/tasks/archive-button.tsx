@@ -20,9 +20,10 @@ import { toast } from 'sonner';
 interface ArchiveButtonProps {
   taskId: number;
   subtaskCount: number;
+  onArchived?: () => void;
 }
 
-export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
+export function ArchiveButton({ taskId, subtaskCount, onArchived }: ArchiveButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -48,7 +49,8 @@ export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
       });
 
       // Redirect to tasks page after successful archive
-      router.push('/tasks');
+      if (onArchived) onArchived();
+      else router.push('/tasks');
       router.refresh();
     } catch (error) {
       toast.error('Error', {
