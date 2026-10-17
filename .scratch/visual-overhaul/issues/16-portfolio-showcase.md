@@ -36,3 +36,8 @@ Prioritize presentable design and the portfolio recording; implement only necess
 - Test externally observable outcomes. Reuse the browser-level seam, existing Playwright suites, and globally installed Playwright CLI. Verify isolated database targeting before running tests that seed or mutate data.
 - Preserve unrelated user changes. No hosted reseed, deployment, broad machine-wide upgrades, or unrelated portfolio changes.
 
+## Resolution: implemented
+
+Delivered the browsing-only ~60s silent tour with a real Reports light→dark switch and all main feature groups represented. Installed MP4/WebM/poster into the existing Base portfolio, updating only its poster timestamp/comment. Preserved the player's looping muted behavior and translucent layer.
+
+FFprobe confirms 1440×900, 59.933s, one video stream and no audio/captions. Playwright CLI verified the actual embed's autoplay, both codec paths, loop, reduced-motion poster and desktop/mobile crop. Portfolio build passed. Full timed coverage, artifact paths, sizes and verification limits: `docs/design/portfolio-showcase.md`.

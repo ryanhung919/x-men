@@ -34,3 +34,9 @@ Prioritize presentable design and the portfolio recording; implement only necess
 - Test externally observable outcomes. Reuse the browser-level seam, existing Playwright suites, and globally installed Playwright CLI. Verify isolated database targeting before running tests that seed or mutate data.
 - Preserve unrelated user changes. No hosted reseed, deployment, broad machine-wide upgrades, or unrelated portfolio changes.
 
+
+## Resolution: implemented
+
+Completed targeted visual integration checks against the revised design/demo scope. Fixed shared popover surfaces, progress/error/link token consistency and report spacing. Reviewed both themes and mobile containment, real calendar views, task inspection/creation and scoped deadline controls. Corrected the review finding about stale inspector values after save, backed by a database-free regression.
+
+TypeScript, production build, 593 unit tests and 189 component tests pass. Full evidence, screenshot paths, two-axis review and honest deferred coverage: `docs/design/visual-review.md`. Existing broad lint debt was not suppressed or expanded into unrelated cleanup.

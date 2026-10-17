@@ -36,3 +36,7 @@ The owner revised scope on 2026-10-17: prioritize the visual overhaul and record
 - Completion is recorded separately from triage using a ticket's `Resolution:` field and checked acceptance criteria, with validation evidence under Comments. Unverified acceptance criteria remain unchecked.
 - Local browser preparation confirmed a populated loopback Supabase instance. Existing hosted demo data must remain untouched.
 
+
+## Delivery complete
+
+All 16 tickets have an implemented resolution against the owner's revised design/demo scope. Final review and validation: `docs/design/visual-review.md`. Final video, portfolio integration and coverage: `docs/design/portfolio-showcase.md`. Original unchecked exhaustive criteria remain visible where not exercised.

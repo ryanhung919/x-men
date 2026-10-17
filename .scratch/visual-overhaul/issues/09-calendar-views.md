@@ -33,3 +33,9 @@ Prioritize presentable design and the portfolio recording; implement only necess
 - Test externally observable outcomes. Reuse the browser-level seam, existing Playwright suites, and globally installed Playwright CLI. Verify isolated database targeting before running tests that seed or mutate data.
 - Preserve unrelated user changes. No hosted reseed, deployment, broad machine-wide upgrades, or unrelated portfolio changes.
 
+
+## Resolution: implemented
+
+Completed against the owner's revised design/demo scope. Day/week use truthful deadline agendas rather than invented working-hour blocks; month has compact accessible task cards, real weekends/today, recurrence indicators and overflow-to-day access. All views use shared task inspection and inherited scope. Calendar preferences are validated before restoration.
+
+Verification: TypeScript passed; all 16 existing calendar component tests passed. Playwright CLI verified month/week/day switching and both-theme rendering, with 390px containment checks. Evidence and remaining nonessential coverage limits: `docs/design/visual-review.md`.

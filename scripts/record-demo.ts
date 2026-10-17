@@ -212,7 +212,7 @@ async function main() {
     scene('inspector');
     await click(page, page.getByRole('link', { name: TASK, exact: true }).first());
     const inspector = page.getByRole('dialog', { name: 'Task details', exact: true });
-    await inspector.getByRole('heading', { name: TASK, exact: true }).waitFor();
+    await inspector.getByText(TASK, { exact: true }).first().waitFor();
     await sleep(800);
     await moveTo(page, inspector.getByText('Discussion', { exact: true }));
     await scroll(page, 430, 750);
