@@ -1,19 +1,23 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { CreateTaskDialog } from './create-task-dialog';
 
 interface CreateSubtaskButtonProps {
   parentTaskId: number;
   parentProjectId: number;
   parentProjectName?: string;
+  onCreated?: () => void;
 }
 
 export function CreateSubtaskButton({
   parentTaskId,
   parentProjectId,
   parentProjectName,
+  onCreated,
 }: CreateSubtaskButtonProps) {
+  const router = useRouter();
   const [isLinking, setIsLinking] = useState(false);
 
   const handleSubtaskCreated = async (subtaskId: number) => {
@@ -41,7 +45,8 @@ export function CreateSubtaskButton({
 
       // Success - refresh page to see new subtask
       console.log('Subtask successfully linked to parent');
-      window.location.reload();
+      router.refresh();
+      onCreated?.();
     } catch (err) {
       console.error('Failed to link subtask to parent:', err);
       alert('Subtask created but failed to link to parent');

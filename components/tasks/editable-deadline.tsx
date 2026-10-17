@@ -66,12 +66,11 @@ export function EditableDeadline({
   if (!isEditing) {
     return (
       <div className="flex items-center gap-2">
-        <div className="text-base">
-          {deadline ? format(deadline, 'PPP') : 'No deadline set'}
-        </div>
+        <div className="text-base">{deadline ? format(deadline, 'PPP') : 'No deadline set'}</div>
         <Button
           size="sm"
           variant="ghost"
+          aria-label="Edit deadline"
           onClick={() => setIsEditing(true)}
           className="h-8 w-8 p-0"
           disabled={isLoading}
@@ -89,7 +88,7 @@ export function EditableDeadline({
           {error}
         </div>
       )}
-      
+
       <Popover open={isEditing} onOpenChange={setIsEditing}>
         <PopoverTrigger asChild>
           <Button

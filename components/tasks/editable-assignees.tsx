@@ -1,17 +1,23 @@
-"use client"
+'use client';
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, X, Users } from "lucide-react"
-import { useState } from "react"
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus, X, Users } from 'lucide-react';
+import { useState } from 'react';
 
 interface EditableAssigneesProps {
-  taskId: number
-  initialAssignees: { id: string; first_name: string; last_name: string }[]
-  allUsers: { id: string; first_name: string; last_name: string }[]
-  isManager: boolean
-  onAssigneesUpdate?: (newAssignees: string[]) => void
+  taskId: number;
+  initialAssignees: { id: string; first_name: string; last_name: string }[];
+  allUsers: { id: string; first_name: string; last_name: string }[];
+  isManager: boolean;
+  onAssigneesUpdate?: (newAssignees: string[]) => void;
 }
 
 export function EditableAssignees({
@@ -21,92 +27,94 @@ export function EditableAssignees({
   isManager,
   onAssigneesUpdate,
 }: EditableAssigneesProps) {
-  const [assignees, setAssignees] = useState(initialAssignees)
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedUserId, setSelectedUserId] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [showAddDropdown, setShowAddDropdown] = useState(false)
+  const [assignees, setAssignees] = useState(initialAssignees);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
 
   // Filter out already assigned users
-  const availableUsers = allUsers.filter((user) => !assignees.some((assignee) => assignee.id === user.id))
+  const availableUsers = allUsers.filter(
+    (user) => !assignees.some((assignee) => assignee.id === user.id)
+  );
 
   const handleAddAssignee = async () => {
-    if (!selectedUserId) return
+    if (!selectedUserId) return;
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "addAssignee",
+          action: 'addAssignee',
           assignee_id: selectedUserId,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to add assignee")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to add assignee');
       }
 
-      const newUser = allUsers.find((u) => u.id === selectedUserId)
+      const newUser = allUsers.find((u) => u.id === selectedUserId);
       if (newUser) {
-        const updatedAssignees = [...assignees, newUser]
-        setAssignees(updatedAssignees)
-        setSelectedUserId("")
-        setShowAddDropdown(false)
-        onAssigneesUpdate?.(updatedAssignees.map((a) => a.id))
+        const updatedAssignees = [...assignees, newUser];
+        setAssignees(updatedAssignees);
+        setSelectedUserId('');
+        setShowAddDropdown(false);
+        onAssigneesUpdate?.(updatedAssignees.map((a) => a.id));
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to add assignee"
-      setError(errorMessage)
-      console.error("Failed to add assignee:", err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add assignee';
+      setError(errorMessage);
+      console.error('Failed to add assignee:', err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleRemoveAssignee = async (userId: string) => {
     if (!isManager) {
-      setError("Only managers can remove assignees")
-      return
+      setError('Only managers can remove assignees');
+      return;
     }
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "removeAssignee",
+          action: 'removeAssignee',
           assignee_id: userId,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to remove assignee")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to remove assignee');
       }
 
-      const updatedAssignees = assignees.filter((a) => a.id !== userId)
-      setAssignees(updatedAssignees)
-      onAssigneesUpdate?.(updatedAssignees.map((a) => a.id))
+      const updatedAssignees = assignees.filter((a) => a.id !== userId);
+      setAssignees(updatedAssignees);
+      onAssigneesUpdate?.(updatedAssignees.map((a) => a.id));
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to remove assignee"
-      setError(errorMessage)
-      console.error("Failed to remove assignee:", err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove assignee';
+      setError(errorMessage);
+      console.error('Failed to remove assignee:', err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-3">
@@ -119,7 +127,11 @@ export function EditableAssignees({
       <div className="flex items-center gap-2 flex-wrap">
         {assignees.length > 0 ? (
           assignees.map((assignee) => (
-            <Badge key={assignee.id} variant="secondary" className="flex items-center gap-2 px-3 py-1.5">
+            <Badge
+              key={assignee.id}
+              variant="secondary"
+              className="flex items-center gap-2 px-3 py-1.5"
+            >
               <Users className="w-3 h-3" />
               <span>
                 {assignee.first_name} {assignee.last_name}
@@ -166,7 +178,12 @@ export function EditableAssignees({
               ))}
             </SelectContent>
           </Select>
-          <Button size="sm" onClick={handleAddAssignee} disabled={!selectedUserId || isLoading} variant="outline">
+          <Button
+            size="sm"
+            onClick={handleAddAssignee}
+            disabled={!selectedUserId || isLoading}
+            variant="outline"
+          >
             Add
           </Button>
           <Button size="sm" onClick={() => setShowAddDropdown(false)} variant="ghost">
@@ -175,5 +192,5 @@ export function EditableAssignees({
         </div>
       )}
     </div>
-  )
+  );
 }

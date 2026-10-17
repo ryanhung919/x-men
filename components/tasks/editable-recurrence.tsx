@@ -1,93 +1,104 @@
-"use client"
+'use client';
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
-import { CalendarIcon, Pencil, Check, X } from "lucide-react"
-import { useState } from "react"
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { CalendarIcon, Pencil, Check, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface EditableRecurrenceProps {
-  taskId: number
-  recurrenceInterval: number
-  recurrenceDate: string | null
+  taskId: number;
+  recurrenceInterval: number;
+  onRecurrenceUpdate?: () => void;
+  recurrenceDate: string | null;
 }
 
 const RECURRENCE_OPTIONS = [
-  { value: 0, label: "No Recurrence" },
-  { value: 1, label: "Daily" },
-  { value: 7, label: "Weekly" },
-  { value: 30, label: "Monthly" },
-]
+  { value: 0, label: 'No Recurrence' },
+  { value: 1, label: 'Daily' },
+  { value: 7, label: 'Weekly' },
+  { value: 30, label: 'Monthly' },
+];
 
 export function EditableRecurrence({
   taskId,
   recurrenceInterval: initialInterval,
   recurrenceDate: initialDate,
+  onRecurrenceUpdate,
 }: EditableRecurrenceProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [displayInterval, setDisplayInterval] = useState<number>(initialInterval)
-  const [displayDate, setDisplayDate] = useState<string | null>(initialDate)
+  const [displayInterval, setDisplayInterval] = useState<number>(initialInterval);
+  const [displayDate, setDisplayDate] = useState<string | null>(initialDate);
 
-  const [selectedInterval, setSelectedInterval] = useState<number>(initialInterval)
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(initialDate ? new Date(initialDate) : undefined)
+  const [selectedInterval, setSelectedInterval] = useState<number>(initialInterval);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    initialDate ? new Date(initialDate) : undefined
+  );
 
   const getRecurrenceLabel = (interval: number): string => {
-    return RECURRENCE_OPTIONS.find((opt) => opt.value === interval)?.label || "Unknown"
-  }
+    return RECURRENCE_OPTIONS.find((opt) => opt.value === interval)?.label || 'Unknown';
+  };
 
   const handleCancel = () => {
-    setIsEditing(false)
-    setSelectedInterval(displayInterval)
-    setSelectedDate(displayDate ? new Date(displayDate) : undefined)
-    setError(null)
-  }
+    setIsEditing(false);
+    setSelectedInterval(displayInterval);
+    setSelectedDate(displayDate ? new Date(displayDate) : undefined);
+    setError(null);
+  };
 
   const handleSave = async () => {
-    setError(null)
-    setIsLoading(true)
+    setError(null);
+    setIsLoading(true);
 
     try {
       if (selectedInterval > 0 && !selectedDate) {
-        setError("Please select a recurrence start date")
-        setIsLoading(false)
-        return
+        setError('Please select a recurrence start date');
+        setIsLoading(false);
+        return;
       }
 
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "updateRecurrence",
+          action: 'updateRecurrence',
           recurrenceInterval: selectedInterval,
           recurrenceDate: selectedDate ? selectedDate.toISOString() : null,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to update recurrence")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update recurrence');
       }
 
-      setDisplayInterval(selectedInterval)
-      setDisplayDate(selectedDate ? selectedDate.toISOString() : null)
-      setIsEditing(false)
+      onRecurrenceUpdate?.();
+      setDisplayInterval(selectedInterval);
+      setDisplayDate(selectedDate ? selectedDate.toISOString() : null);
+      setIsEditing(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to update recurrence"
-      setError(errorMessage)
-      console.error("Failed to update recurrence:", err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update recurrence';
+      setError(errorMessage);
+      console.error('Failed to update recurrence:', err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   if (!isEditing) {
     return (
@@ -98,7 +109,7 @@ export function EditableRecurrence({
               <Badge variant="secondary">{getRecurrenceLabel(displayInterval)}</Badge>
               {displayDate && (
                 <span className="text-sm text-muted-foreground">
-                  Since {format(new Date(displayDate), "MMM d, yyyy")}
+                  Since {format(new Date(displayDate), 'MMM d, yyyy')}
                 </span>
               )}
             </>
@@ -106,11 +117,17 @@ export function EditableRecurrence({
             <span className="text-sm text-muted-foreground">No recurrence set</span>
           )}
         </div>
-        <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)} className="h-8 w-8 p-0">
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label="Edit recurrence"
+          onClick={() => setIsEditing(true)}
+          className="h-8 w-8 p-0"
+        >
           <Pencil className="w-4 h-4" />
         </Button>
       </div>
-    )
+    );
   }
 
   return (
@@ -126,10 +143,10 @@ export function EditableRecurrence({
         <Select
           value={selectedInterval.toString()}
           onValueChange={(v) => {
-            const interval = Number.parseInt(v)
-            setSelectedInterval(interval)
+            const interval = Number.parseInt(v);
+            setSelectedInterval(interval);
             if (interval === 0) {
-              setSelectedDate(undefined)
+              setSelectedDate(undefined);
             }
           }}
         >
@@ -153,10 +170,13 @@ export function EditableRecurrence({
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
+                className={cn(
+                  'w-full justify-start text-left font-normal',
+                  !selectedDate && 'text-muted-foreground'
+                )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Pick a date"}
+                {selectedDate ? format(selectedDate, 'MMM d, yyyy') : 'Pick a date'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
@@ -173,9 +193,14 @@ export function EditableRecurrence({
       )}
 
       <div className="flex gap-2">
-        <Button size="sm" onClick={handleSave} disabled={isLoading} className="flex-1 bg-green-600 hover:bg-green-700">
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={isLoading}
+          className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
           <Check className="w-4 h-4 mr-1" />
-          {isLoading ? "Saving..." : "Save"}
+          {isLoading ? 'Saving...' : 'Save'}
         </Button>
         <Button
           size="sm"
@@ -189,5 +214,5 @@ export function EditableRecurrence({
         </Button>
       </div>
     </div>
-  )
+  );
 }

@@ -160,3 +160,6 @@ export function calculateNextDueDate(task: Task): Task {
   }
   return task;
 }
+
+export type TaskViewer = { id: string; isManager: boolean; isAdmin: boolean; isReadOnly: boolean };
+export type TaskInspection = DetailedTask & { viewer: TaskViewer; allUsers: RawAssignee[] };

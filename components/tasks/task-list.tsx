@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { type Task } from '@/lib/types/tasks';
 import { Paperclip, CheckSquare, ArrowUpDown, Repeat } from 'lucide-react';
 import { type ColumnId } from '@/components/filters/column-visibility-selector';
-import { useRouter } from 'next/navigation';
+import { useTaskInspector } from './task-inspector-context';
 import Link from 'next/link';
 import { TaskStatus, OverdueIndicator } from './task-status';
 
@@ -38,7 +38,7 @@ export default function TasksList({
   emptyMessage = 'No tasks match your scope.',
   onClear,
 }: TasksListProps) {
-  const router = useRouter();
+  const { openTask } = useTaskInspector();
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const filteredTasks = tasks;
 
@@ -93,7 +93,18 @@ export default function TasksList({
       <div className="divide-y overflow-hidden rounded-xl border bg-card md:hidden">
         {tasksWithNextDue.length ? (
           tasksWithNextDue.map((task) => (
-            <Link key={task.id} href={`/tasks/${task.id}`} className="block p-4 hover:bg-muted/50">
+            <Link
+              key={task.id}
+              href={`/tasks/${task.id}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                  event.preventDefault();
+                  openTask(task.id);
+                }
+              }}
+              className="block p-4 hover:bg-muted/50"
+            >
               <div className="font-medium leading-relaxed">{task.title}</div>
               <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                 <span className="font-mono">NDL-{task.id}</span>
@@ -242,13 +253,20 @@ export default function TasksList({
               tasksWithNextDue.map((task) => (
                 <TableRow
                   key={task.id}
-                  onClick={() => router.push(`/tasks/${task.id}`)}
+                  onClick={() => openTask(task.id)}
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
                 >
                   <TableCell className="min-w-[240px] max-w-[420px] whitespace-normal">
                     <Link
                       href={`/tasks/${task.id}`}
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                          event.preventDefault();
+                          openTask(task.id);
+                        }
+                      }}
+
                       className="block font-medium leading-snug hover:text-positive"
                       title={task.title}
                     >

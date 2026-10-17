@@ -1,118 +1,125 @@
-"use client"
+'use client';
 
-import type React from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { format } from "date-fns"
-import { Check, Edit2, Plus, Trash2, X } from "lucide-react"
-import { useState } from "react"
+import type React from 'react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { format } from 'date-fns';
+import { Check, Edit2, Plus, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface Comment {
-  id: number
-  content: string
-  created_at: string
-  updated_at?: string
-  user_id: string
+  id: number;
+  content: string;
+  created_at: string;
+  updated_at?: string;
+  user_id: string;
   user_info?: {
-    first_name: string
-    last_name: string
-  }
+    first_name: string;
+    last_name: string;
+  };
 }
 
 interface TaskCommentsProps {
-  taskId: number
-  comments: Comment[]
-  currentUserId: string
-  isAdmin: boolean
+  taskId: number;
+  comments: Comment[];
+  currentUserId: string;
+  isAdmin: boolean;
+  readOnly?: boolean;
 }
 
-export function TaskComments({ taskId, comments: initialComments, currentUserId, isAdmin }: TaskCommentsProps) {
-  const [comments, setComments] = useState<Comment[]>(initialComments)
-  const [newComment, setNewComment] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [editContent, setEditContent] = useState("")
-  const [isSavingEdit, setIsSavingEdit] = useState(false)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [showCommentInput, setShowCommentInput] = useState(false)
+export function TaskComments({
+  taskId,
+  comments: initialComments,
+  currentUserId,
+  isAdmin,
+  readOnly = false,
+}: TaskCommentsProps) {
+  const [comments, setComments] = useState<Comment[]>(initialComments);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showCommentInput, setShowCommentInput] = useState(false);
 
   const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsSubmitting(true)
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "addComment",
+          action: 'addComment',
           content: newComment,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to add comment")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to add comment');
       }
 
-      const data = await res.json()
+      const data = await res.json();
       const updatedComments = [
         ...comments,
         {
           ...data.comment,
           user_info: {
-            first_name: "You",
-            last_name: "",
+            first_name: 'You',
+            last_name: '',
           },
         },
-      ]
-      setComments(updatedComments)
-      setNewComment("")
-      setShowCommentInput(false)
+      ];
+      setComments(updatedComments);
+      setNewComment('');
+      setShowCommentInput(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add comment")
+      setError(err instanceof Error ? err.message : 'Failed to add comment');
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleEditStart = (comment: Comment) => {
-    setEditingId(comment.id)
-    setEditContent(comment.content)
-  }
+    setEditingId(comment.id);
+    setEditContent(comment.content);
+  };
 
   const handleEditCancel = () => {
-    setEditingId(null)
-    setEditContent("")
-  }
+    setEditingId(null);
+    setEditContent('');
+  };
 
   const handleSaveEdit = async (commentId: number) => {
-    setError(null)
-    setIsSavingEdit(true)
+    setError(null);
+    setIsSavingEdit(true);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "updateComment",
+          action: 'updateComment',
           commentId,
           content: editContent,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to update comment")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update comment');
       }
 
-      const data = await res.json()
+      const data = await res.json();
       const updatedComments = comments.map((c) =>
         c.id === commentId
           ? {
@@ -120,60 +127,72 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
               content: data.comment.content,
               updated_at: data.comment.updated_at,
             }
-          : c,
-      )
-      setComments(updatedComments)
-      setEditingId(null)
+          : c
+      );
+      setComments(updatedComments);
+      setEditingId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update comment")
+      setError(err instanceof Error ? err.message : 'Failed to update comment');
     } finally {
-      setIsSavingEdit(false)
+      setIsSavingEdit(false);
     }
-  }
+  };
 
   const handleDeleteComment = async (commentId: number) => {
-    setError(null)
-    setDeletingId(commentId)
+    setError(null);
+    setDeletingId(commentId);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "deleteComment",
+          action: 'deleteComment',
           commentId,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to delete comment")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to delete comment');
       }
 
-      const updatedComments = comments.filter((c) => c.id !== commentId)
-      setComments(updatedComments)
+      const updatedComments = comments.filter((c) => c.id !== commentId);
+      setComments(updatedComments);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete comment")
+      setError(err instanceof Error ? err.message : 'Failed to delete comment');
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
-  }
+  };
 
   return (
     <div className="space-y-4">
-      {error && <div className="p-3 bg-red-100 text-red-800 rounded-md text-sm border border-red-200">{error}</div>}
+      {error && (
+        <div className="p-3 bg-red-100 text-red-800 rounded-md text-sm border border-red-200">
+          {error}
+        </div>
+      )}
 
-      {!showCommentInput && (
-        <Button size="sm" variant="outline" onClick={() => setShowCommentInput(true)} className="w-fit">
+      {!readOnly && !showCommentInput && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowCommentInput(true)}
+          className="w-fit"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Comment
         </Button>
       )}
 
-      {showCommentInput && (
-        <form onSubmit={handleAddComment} className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+      {!readOnly && showCommentInput && (
+        <form
+          onSubmit={handleAddComment}
+          className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg"
+        >
           <Textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
@@ -186,16 +205,20 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500">{newComment.length}/5000</span>
             <div className="flex gap-2">
-              <Button type="submit" disabled={isSubmitting || newComment.trim().length === 0} size="sm">
-                {isSubmitting ? "Posting..." : "Post Comment"}
+              <Button
+                type="submit"
+                disabled={isSubmitting || newComment.trim().length === 0}
+                size="sm"
+              >
+                {isSubmitting ? 'Posting...' : 'Post Comment'}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setShowCommentInput(false)
-                  setNewComment("")
+                  setShowCommentInput(false);
+                  setNewComment('');
                 }}
                 disabled={isSubmitting}
               >
@@ -212,19 +235,22 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
           <p className="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
         ) : (
           comments.map((comment) => (
-            <div key={comment.id} className="border rounded-lg p-4 bg-white dark:bg-gray-800 space-y-2">
+            <div
+              key={comment.id}
+              className="border rounded-lg p-4 bg-white dark:bg-gray-800 space-y-2"
+            >
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">
                     {comment.user_id === currentUserId
-                      ? "You"
+                      ? 'You'
                       : `${comment.user_info?.first_name} ${comment.user_info?.last_name}`}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500">
-                    {format(new Date(comment.created_at), "MMM d, yyyy HH:mm")}
+                    {format(new Date(comment.created_at), 'MMM d, yyyy HH:mm')}
                   </span>
                   {comment.updated_at && <span className="text-xs text-gray-400">(edited)</span>}
                 </div>
@@ -250,7 +276,12 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
                       <Check className="w-4 h-4 mr-1" />
                       Save
                     </Button>
-                    <Button size="sm" variant="outline" onClick={handleEditCancel} disabled={isSavingEdit}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleEditCancel}
+                      disabled={isSavingEdit}
+                    >
                       <X className="w-4 h-4 mr-1" />
                       Cancel
                     </Button>
@@ -261,7 +292,7 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
               )}
 
               {/* Actions */}
-              {editingId !== comment.id && (
+              {!readOnly && editingId !== comment.id && (
                 <div className="flex gap-2 pt-2">
                   {comment.user_id === currentUserId && (
                     <Button
@@ -300,5 +331,5 @@ export function TaskComments({ taskId, comments: initialComments, currentUserId,
         )}
       </div>
     </div>
-  )
+  );
 }
