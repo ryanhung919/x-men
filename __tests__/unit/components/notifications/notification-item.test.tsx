@@ -81,8 +81,9 @@ describe('NotificationItem', () => {
       );
 
       // Check for the blue dot indicator
-      const indicator = container.querySelector('.bg-primary');
-      expect(indicator).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Unread: New Task Assignment' })
+      ).toBeInTheDocument();
     });
 
     it('should not show unread indicator for read notifications', () => {
@@ -95,50 +96,23 @@ describe('NotificationItem', () => {
       );
 
       // Check that there's no blue dot indicator
-      const indicator = container.querySelector('.bg-primary');
-      expect(indicator).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Read: Task Completed' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Unread:/ })).not.toBeInTheDocument();
     });
   });
 
-  describe('Styling', () => {
-    it('should apply accent background for unread notifications', () => {
-      const { container } = render(
-        <NotificationItem
-          notification={mockNotificationUnread}
-          onMarkAsRead={mockOnMarkAsRead}
-          onClick={mockOnClick}
-        />
-      );
-
-      const item = container.firstChild as HTMLElement;
-      expect(item.className).toContain('bg-accent/50');
-    });
-
-    it('should not apply accent background for read notifications', () => {
-      const { container } = render(
-        <NotificationItem
-          notification={mockNotificationRead}
-          onMarkAsRead={mockOnMarkAsRead}
-          onClick={mockOnClick}
-        />
-      );
-
-      const item = container.firstChild as HTMLElement;
-      expect(item.className).not.toContain('bg-accent/50');
-    });
-
-    it('should have cursor-pointer class', () => {
-      const { container } = render(
-        <NotificationItem
-          notification={mockNotificationUnread}
-          onMarkAsRead={mockOnMarkAsRead}
-          onClick={mockOnClick}
-        />
-      );
-
-      const item = container.firstChild as HTMLElement;
-      expect(item.className).toContain('cursor-pointer');
-    });
+  it('uses a native keyboard-accessible button', () => {
+    render(
+      <NotificationItem
+        notification={mockNotificationUnread}
+        onMarkAsRead={mockOnMarkAsRead}
+        onClick={mockOnClick}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Unread: New Task Assignment' })).toHaveAttribute(
+      'type',
+      'button'
+    );
   });
 
   describe('User Interactions', () => {

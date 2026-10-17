@@ -3,6 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ScheduleView from '@/components/schedule/ScheduleView';
 
+vi.mock('@/components/tasks/task-inspector-context', () => ({
+  useTaskInspector: () => ({ openTask: vi.fn() }),
+}));
+
+const deadlineError = vi.hoisted(() => vi.fn());
+
 // Mock the child components
 vi.mock('@/components/schedule/GanttChart', () => ({
   default: ({ rows, onChangeDeadline }: any) => (
@@ -13,7 +19,14 @@ vi.mock('@/components/schedule/GanttChart', () => ({
           {row.assigneeName}: {row.tasks.length} tasks
         </div>
       ))}
-      <button onClick={() => onChangeDeadline && onChangeDeadline(1, new Date('2025-10-25T00:00:00Z'))}>
+      <button
+        onClick={() =>
+          onChangeDeadline &&
+          Promise.resolve(onChangeDeadline(1, new Date('2025-10-25T00:00:00Z'))).catch(
+            deadlineError
+          )
+        }
+      >
         Test Deadline Change
       </button>
     </div>
@@ -23,7 +36,11 @@ vi.mock('@/components/schedule/GanttChart', () => ({
 vi.mock('@/components/filters/date-range-selector', () => ({
   DateRangeFilter: ({ value, onChange }: any) => (
     <div data-testid="date-range-selector">
-      <button onClick={() => onChange({ startDate: new Date('2025-10-01'), endDate: new Date('2025-10-31') })}>
+      <button
+        onClick={() =>
+          onChange({ startDate: new Date('2025-10-01'), endDate: new Date('2025-10-31') })
+        }
+      >
         Change Date Range
       </button>
     </div>
@@ -49,9 +66,7 @@ vi.mock('@/components/filters/date-range-selector', () => ({
 vi.mock('@/components/filters/project-selector', () => ({
   ProjectSelector: ({ value, onChange }: any) => (
     <div data-testid="project-selector">
-      <button onClick={() => onChange([1, 2])}>
-        Select Projects
-      </button>
+      <button onClick={() => onChange([1, 2])}>Select Projects</button>
     </div>
   ),
 }));
@@ -59,9 +74,7 @@ vi.mock('@/components/filters/project-selector', () => ({
 vi.mock('@/components/filters/staff-selector', () => ({
   StaffSelector: ({ value, onChange }: any) => (
     <div data-testid="staff-selector">
-      <button onClick={() => onChange(['user1', 'user2'])}>
-        Select Staff
-      </button>
+      <button onClick={() => onChange(['user1', 'user2'])}>Select Staff</button>
     </div>
   ),
 }));
@@ -86,9 +99,7 @@ describe('ScheduleView', () => {
         deadline: '2025-10-22T00:00:00Z',
         status: 'In Progress',
         updated_at: null,
-        assignees: [
-          { id: 'user1', first_name: 'John', last_name: 'Doe' },
-        ],
+        assignees: [{ id: 'user1', first_name: 'John', last_name: 'Doe' }],
       },
       {
         id: 2,
@@ -111,9 +122,7 @@ describe('ScheduleView', () => {
         deadline: '2025-10-21T00:00:00Z',
         status: 'Completed',
         updated_at: '2025-10-19T00:00:00Z',
-        assignees: [
-          { id: 'user2', first_name: 'Jane', last_name: 'Smith' },
-        ],
+        assignees: [{ id: 'user2', first_name: 'Jane', last_name: 'Smith' }],
       },
     ],
   };
@@ -183,7 +192,7 @@ describe('ScheduleView', () => {
 
     it('should show loading state initially', () => {
       fetchSpy.mockImplementation(() => new Promise(() => {})); // Never resolves
-      
+
       render(<ScheduleView />);
 
       const refreshButton = screen.getByTestId('refresh-button');
@@ -204,8 +213,11 @@ describe('ScheduleView', () => {
       render(<ScheduleView />);
 
       await waitFor(() => {
-        const scheduleCalls = fetchSpy.mock.calls.filter((call: any) => 
-          call[0].includes('/api/schedule') && !call[0].includes('/api/schedule/projects') && !call[0].includes('/api/schedule/staff')
+        const scheduleCalls = fetchSpy.mock.calls.filter(
+          (call: any) =>
+            call[0].includes('/api/schedule') &&
+            !call[0].includes('/api/schedule/projects') &&
+            !call[0].includes('/api/schedule/staff')
         );
         expect(scheduleCalls.length).toBeGreaterThan(0);
         const fetchCall = scheduleCalls[0][0];
@@ -241,7 +253,7 @@ describe('ScheduleView', () => {
 
       const staffButton = screen.getByText('Select Staff');
       fireEvent.click(staffButton);
-      
+
       await waitFor(() => {
         const lastFetchCall = fetchSpy.mock.calls[fetchSpy.mock.calls.length - 1][0];
         expect(lastFetchCall).toContain('staffIds');
@@ -293,7 +305,7 @@ describe('ScheduleView', () => {
         // Task 2 has both John and Jane as assignees
         const johnRow = screen.getByTestId('row-John Doe');
         const janeRow = screen.getByTestId('row-Jane Smith');
-        
+
         expect(johnRow).toBeInTheDocument();
         expect(janeRow).toBeInTheDocument();
       });
@@ -372,9 +384,7 @@ describe('ScheduleView', () => {
                 deadline: '2025-10-22T00:00:00Z',
                 status: 'In Progress',
                 updated_at: null,
-                assignees: [
-                  { id: 'user1', first_name: 'John', last_name: 'Doe' },
-                ],
+                assignees: [{ id: 'user1', first_name: 'John', last_name: 'Doe' }],
               },
             ],
           } as any);
@@ -469,7 +479,7 @@ describe('ScheduleView', () => {
 
     it('should handle failed deadline update', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       fetchSpy.mockImplementation((url: string | URL | Request, options?: any) => {
         if (options?.method === 'PATCH') {
           return Promise.resolve({ ok: false } as any);
@@ -497,8 +507,10 @@ describe('ScheduleView', () => {
       fireEvent.click(deadlineButton);
 
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Failed to update task deadline'
+        expect(deadlineError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: 'The deadline could not be saved. Your previous date is unchanged.',
+          })
         );
       });
 
@@ -526,9 +538,12 @@ describe('ScheduleView', () => {
 
     it('should disable refresh button while loading', async () => {
       let resolvePromise: any;
-      fetchSpy.mockImplementation(() => new Promise((resolve) => {
-        resolvePromise = resolve;
-      }));
+      fetchSpy.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolvePromise = resolve;
+          })
+      );
 
       render(<ScheduleView />);
 
@@ -546,7 +561,7 @@ describe('ScheduleView', () => {
   describe('Error Handling', () => {
     it('should handle fetch errors gracefully', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       fetchSpy.mockImplementation((url: string | URL | Request) => {
         const urlString = url.toString();
         if (urlString.includes('/api/schedule/projects')) {
@@ -565,17 +580,21 @@ describe('ScheduleView', () => {
       render(<ScheduleView />);
 
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalled();
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'Could not load this schedule. Try again.'
+        );
       });
 
       consoleErrorSpy.mockRestore();
     });
 
     it('should handle empty response', async () => {
-      fetchSpy.mockImplementation(() => Promise.resolve({
-        ok: true,
-        json: async () => [],
-      } as any));
+      fetchSpy.mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: async () => [],
+        } as any)
+      );
 
       render(<ScheduleView />);
 
@@ -586,21 +605,23 @@ describe('ScheduleView', () => {
     });
 
     it('should handle tasks without assignees', async () => {
-      fetchSpy.mockImplementation(() => Promise.resolve({
-        ok: true,
-        json: async () => [
-          {
-            id: 1,
-            title: 'Unassigned Task',
-            project: { id: '1', name: 'Project A' },
-            created_at: '2025-10-16T00:00:00Z',
-            deadline: '2025-10-22T00:00:00Z',
-            status: 'To Do',
-            updated_at: null,
-            assignees: [],
-          },
-        ],
-      } as any));
+      fetchSpy.mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              title: 'Unassigned Task',
+              project: { id: '1', name: 'Project A' },
+              created_at: '2025-10-16T00:00:00Z',
+              deadline: '2025-10-22T00:00:00Z',
+              status: 'To Do',
+              updated_at: null,
+              assignees: [],
+            },
+          ],
+        } as any)
+      );
 
       render(<ScheduleView />);
 
@@ -615,7 +636,7 @@ describe('ScheduleView', () => {
       const { container } = render(<ScheduleView />);
 
       // Check for responsive padding classes
-      const mainContainer = container.querySelector('.p-2');
+      const mainContainer = screen.getByRole('heading', { name: 'Schedule' });
       expect(mainContainer).toBeInTheDocument();
     });
 
@@ -623,7 +644,7 @@ describe('ScheduleView', () => {
       const { container } = render(<ScheduleView />);
 
       // The gantt chart component handles scrolling, not the schedule view
-      expect(container.querySelector('.space-y-4')).toBeInTheDocument();
+      expect(screen.getByTestId('date-range-selector')).toBeInTheDocument();
     });
   });
 
@@ -632,8 +653,11 @@ describe('ScheduleView', () => {
       render(<ScheduleView />);
 
       await waitFor(() => {
-        const scheduleCalls = fetchSpy.mock.calls.filter((call: any) => 
-          call[0].includes('/api/schedule') && !call[0].includes('/api/schedule/projects') && !call[0].includes('/api/schedule/staff')
+        const scheduleCalls = fetchSpy.mock.calls.filter(
+          (call: any) =>
+            call[0].includes('/api/schedule') &&
+            !call[0].includes('/api/schedule/projects') &&
+            !call[0].includes('/api/schedule/staff')
         );
         expect(scheduleCalls.length).toBeGreaterThan(0);
         const fetchCall = scheduleCalls[0][0];
@@ -646,23 +670,23 @@ describe('ScheduleView', () => {
 
   describe('Edge Cases', () => {
     it('should handle tasks with null project', async () => {
-      fetchSpy.mockImplementation(() => Promise.resolve({
-        ok: true,
-        json: async () => [
-          {
-            id: 1,
-            title: 'Task Without Project',
-            project: null,
-            created_at: '2025-10-16T00:00:00Z',
-            deadline: '2025-10-22T00:00:00Z',
-            status: 'To Do',
-            updated_at: null,
-            assignees: [
-              { id: 'user1', name: 'John Doe' },
-            ],
-          },
-        ],
-      } as any));
+      fetchSpy.mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              title: 'Task Without Project',
+              project: null,
+              created_at: '2025-10-16T00:00:00Z',
+              deadline: '2025-10-22T00:00:00Z',
+              status: 'To Do',
+              updated_at: null,
+              assignees: [{ id: 'user1', name: 'John Doe' }],
+            },
+          ],
+        } as any)
+      );
 
       render(<ScheduleView />);
 
@@ -679,7 +703,7 @@ describe('ScheduleView', () => {
       });
 
       const projectButton = screen.getByText('Select Projects');
-      
+
       // Click multiple times rapidly
       fireEvent.click(projectButton);
       fireEvent.click(projectButton);
@@ -691,23 +715,23 @@ describe('ScheduleView', () => {
     });
 
     it('should handle tasks with future dates', async () => {
-      fetchSpy.mockImplementation(() => Promise.resolve({
-        ok: true,
-        json: async () => [
-          {
-            id: 1,
-            title: 'Future Task',
-            project: { id: '1', name: 'Project A' },
-            created_at: '2026-01-01T00:00:00Z',
-            deadline: '2026-12-31T00:00:00Z',
-            status: 'To Do',
-            updated_at: null,
-            assignees: [
-              { id: 'user1', name: 'John Doe' },
-            ],
-          },
-        ],
-      } as any));
+      fetchSpy.mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              title: 'Future Task',
+              project: { id: '1', name: 'Project A' },
+              created_at: '2026-01-01T00:00:00Z',
+              deadline: '2026-12-31T00:00:00Z',
+              status: 'To Do',
+              updated_at: null,
+              assignees: [{ id: 'user1', name: 'John Doe' }],
+            },
+          ],
+        } as any)
+      );
 
       render(<ScheduleView />);
 
