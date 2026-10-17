@@ -1,16 +1,12 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { useEffect, useState } from 'react';
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
-import { Bar, BarChart, XAxis, YAxis, Legend } from 'recharts';
-import { Users, TrendingUp, Calendar } from 'lucide-react';
+  ReportMetrics,
+  ReportError,
+  StatusComparison,
+  StatusLegend,
+} from '@/components/report/report-comparison';
 import type {
   TeamSummaryReport as TeamSummaryReportType,
   KPI,
@@ -58,14 +54,6 @@ const round = (value: number, decimals: number = 1): number => {
   return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
 };
 
-// Chart configs matching your existing style
-const statusConfig = {
-  todo: { label: 'To Do', color: 'var(--chart-5)' },
-  inProgress: { label: 'In Progress', color: 'var(--chart-4)' },
-  completed: { label: 'Completed', color: 'var(--chart-1)' },
-  blocked: { label: 'Blocked', color: 'var(--destructive)' },
-} satisfies ChartConfig;
-
 // Format week label as date range (e.g., "Jan 8 - 14")
 const formatWeekLabel = (weekStart: string): string => {
   // Parse as Singapore time (UTC+8)
@@ -110,18 +98,18 @@ export function TeamSummaryChart({
   onDataLoaded,
 }: Props) {
   const [data, setData] = useState<ReportData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const prevDataRef = useRef<ReportData | null>(null);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    if (!departmentIds.length) {
+    if (!departmentIds.length && !projectIds.length) {
       setData(null);
-      prevDataRef.current = null;
       return;
     }
 
+    const controller = new AbortController();
     const fetchData = async () => {
-      setLoading(true);
+      setError(false);
       try {
         const params = new URLSearchParams({
           action: 'team',
@@ -132,10 +120,11 @@ export function TeamSummaryChart({
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
 
-        const res = await fetch(`/api/reports?${params}`);
+        const res = await fetch(`/api/reports?${params}`, { signal: controller.signal });
         if (!res.ok) throw new Error('Failed to fetch team summary');
 
         const json = await res.json();
+        if (controller.signal.aborted) return;
         if (json && json.kind === 'teamSummary') {
           // Transform weekly data
           const weeklyTotals: WeeklyData[] = [];
@@ -203,7 +192,6 @@ export function TeamSummaryChart({
             userTotals,
           };
 
-          prevDataRef.current = newData;
           setData(newData);
 
           // Generate export data
@@ -272,240 +260,198 @@ export function TeamSummaryChart({
             onDataLoaded(exportData);
           }
         }
-      } catch (err) {
-        console.error(err);
+      } catch {
+        if (controller.signal.aborted) return;
+        setError(true);
         setData(null);
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchData();
-  }, [departmentIds, projectIds, startDate, endDate]);
+    return () => controller.abort();
+  }, [departmentIds, projectIds, startDate, endDate, retry, onDataLoaded]);
 
-  const displayData = loading && prevDataRef.current ? prevDataRef.current : data;
+  if (error) return <ReportError retry={() => setRetry((value) => value + 1)} />;
+
+  const displayData = data;
 
   if (!displayData) {
     return <TeamSummaryReportSkeleton />;
   }
 
+  const maximum = Math.max(...displayData.userTotals.map((user) => user.total), 1);
+  const weeklyMaximum = Math.max(...displayData.weeklyTotals.map((week) => week.total), 1);
   return (
-    <div className="space-y-6">
-      {/* Overall Summary */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{displayData.totalTasks}</div>
-            <p className="text-xs text-muted-foreground mt-1">Across all selected projects</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{displayData.totalUsers}</div>
-            <p className="text-xs text-muted-foreground mt-1">Users with assigned tasks</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Time Period</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{displayData.weeklyTotals.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Weeks of data</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Weekly Trend Chart */}
-      {displayData.weeklyTotals.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Task Status Trend</CardTitle>
-            <CardDescription>
-              Task distribution across weeks, showing status breakdown
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={statusConfig} className="h-[300px] w-full">
-              <BarChart
-                data={displayData.weeklyTotals.map((w) => ({
-                  week: formatWeekLabel(w.weekStart),
-                  'To Do': w.todo,
-                  'In Progress': w.inProgress,
-                  Completed: w.completed,
-                  Blocked: w.blocked,
-                }))}
-                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+    <section className="space-y-5" aria-label="Team summary report">
+      <ReportMetrics
+        items={[
+          {
+            label: 'Tasks in scope',
+            value: displayData.totalTasks,
+            note: 'Across selected projects',
+          },
+          {
+            label: 'Contributors',
+            value: displayData.totalUsers,
+            note: 'People who created tasks',
+          },
+          {
+            label: 'Weeks tracked',
+            value: displayData.weeklyTotals.length,
+            note: 'Grouped by creation date',
+          },
+          {
+            label: 'Tasks / contributor',
+            value: displayData.totalUsers
+              ? round(displayData.totalTasks / displayData.totalUsers, 1)
+              : 0,
+          },
+        ]}
+      />
+      <div className="rounded-2xl border bg-card p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">Weekly work distribution</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Tasks created each week, grouped by current status
+            </p>
+          </div>
+          <StatusLegend />
+        </div>
+        {displayData.weeklyTotals.length ? (
+          <div className="mt-6 flex gap-3">
+            <div
+              aria-hidden="true"
+              className="mt-[30px] flex h-[180px] shrink-0 flex-col justify-between pb-0 text-[10px] tabular-nums text-muted-foreground"
+            >
+              <span>{weeklyMaximum}</span>
+              <span>{round(weeklyMaximum / 2, 1)}</span>
+              <span>0</span>
+            </div>
+            <div className="min-w-0 flex-1 overflow-x-auto">
+              <div
+                className="flex h-[242px] min-w-full items-end gap-3 border-b border-border/50"
+                style={{ minWidth: `${Math.max(displayData.weeklyTotals.length * 70, 250)}px` }}
               >
-                <XAxis
-                  dataKey="week"
-                  tickLine={false}
-                  axisLine={false}
-                  className="text-xs"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis tickLine={false} axisLine={false} className="text-xs" />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Legend />
-                <Bar
-                  dataKey="To Do"
-                  stackId="status"
-                  fill={statusConfig.todo.color}
-                  radius={[0, 0, 0, 0]}
-                />
-                <Bar
-                  dataKey="In Progress"
-                  stackId="status"
-                  fill={statusConfig.inProgress.color}
-                  radius={[0, 0, 0, 0]}
-                />
-                <Bar
-                  dataKey="Completed"
-                  stackId="status"
-                  fill={statusConfig.completed.color}
-                  radius={[0, 0, 0, 0]}
-                />
-                <Bar
-                  dataKey="Blocked"
-                  stackId="status"
-                  fill={statusConfig.blocked.color}
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* User Performance Cards */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Team Member Performance</h3>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {displayData.weeklyTotals.map((week) => (
+                  <div
+                    key={week.week}
+                    className="flex h-full flex-1 flex-col items-center justify-end gap-3"
+                  >
+                    <figure
+                      aria-label={`${formatWeekLabel(week.weekStart)}: ${week.completed} completed, ${week.inProgress} in progress, ${week.todo} to do, ${week.blocked} blocked; ${week.total} total`}
+                      className="relative flex w-full max-w-16 flex-col justify-end"
+                      style={{ height: 210 }}
+                    >
+                      <span
+                        className="absolute left-1/2 -translate-x-1/2 text-[10px] font-medium tabular-nums"
+                        style={{ bottom: `${(week.total / weeklyMaximum) * 180 + 8}px` }}
+                      >
+                        {week.total}
+                      </span>
+                      <div
+                        className="flex w-full flex-col-reverse overflow-hidden rounded-t-md"
+                        style={{ height: `${(week.total / weeklyMaximum) * 180}px` }}
+                      >
+                        {[
+                          { value: week.completed, color: 'var(--chart-1)', name: 'Completed' },
+                          { value: week.inProgress, color: 'var(--chart-2)', name: 'In progress' },
+                          { value: week.todo, color: 'var(--muted-foreground)', name: 'To do' },
+                          { value: week.blocked, color: 'var(--chart-problem)', name: 'Blocked' },
+                        ].map(({ value, color, name }) => (
+                          <span
+                            key={name}
+                            title={`${name}: ${value}`}
+                            style={{
+                              height: `${(value / Math.max(week.total, 1)) * 100}%`,
+                              background: color,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </figure>
+                    <span className="h-5 whitespace-nowrap text-[10px] text-muted-foreground">
+                      {formatWeekLabel(week.weekStart)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="py-14 text-center text-sm text-muted-foreground">
+            No weekly activity matches this scope.
+          </p>
+        )}
+      </div>
+      <div className="overflow-hidden rounded-2xl border bg-card">
+        <div className="p-5 sm:p-6">
+          <h2 className="text-base font-semibold tracking-tight">Work distribution by creator</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Shared scale · task counts across selected weeks
+          </p>
+        </div>
+        <div className="hidden grid-cols-[200px_1fr_90px_100px] gap-6 border-y bg-muted/30 px-6 py-3 text-[10px] uppercase tracking-wider text-muted-foreground md:grid">
+          <span>Creator</span>
+          <span>Task distribution</span>
+          <span className="text-right">Total</span>
+          <span className="text-right">Completion</span>
+        </div>
+        <div className="divide-y">
           {displayData.userTotals.map((user) => (
-            <Card key={user.userId}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <CardTitle className="text-base">{user.userName}</CardTitle>
+            <div
+              key={user.userId}
+              className="grid items-center gap-4 p-5 sm:px-6 md:grid-cols-[200px_1fr_90px_100px] md:gap-6"
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-positive-soft text-xs font-medium text-positive"
+                >
+                  {user.userName
+                    .split(' ')
+                    .map((part) => part[0])
+                    .slice(0, 2)
+                    .join('')}
+                </span>
+                <span className="truncate text-sm font-medium">{user.userName}</span>
+              </div>
+              <div>
+                <StatusComparison
+                  maximum={maximum}
+                  counts={{
+                    completed: user.completed,
+                    inProgress: user.inProgress,
+                    todo: user.todo,
+                    blocked: user.blocked,
+                  }}
+                />
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                  <span>{user.completed} done</span>
+                  <span>{user.inProgress} active</span>
+                  <span>{user.todo} to do</span>
+                  <span className={user.blocked ? 'text-problem' : ''}>{user.blocked} blocked</span>
                 </div>
-                <CardDescription className="text-xs">
-                  {user.total} task{user.total !== 1 ? 's' : ''} total
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Task Status Breakdown */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Completed</span>
-                    <span className="font-medium" style={{ color: 'var(--chart-1)' }}>
-                      {user.completed}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">In Progress</span>
-                    <span className="font-medium" style={{ color: 'var(--chart-4)' }}>
-                      {user.inProgress}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">To Do</span>
-                    <span className="font-medium" style={{ color: 'var(--chart-5)' }}>
-                      {user.todo}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Blocked</span>
-                    <span className="font-medium" style={{ color: 'var(--destructive)' }}>
-                      {user.blocked}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Completion Rate */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="text-muted-foreground">Completion Rate</span>
-                    <span className="font-medium">{round(user.completionRate, 1)}%</span>
-                  </div>
-                  <Progress value={user.completionRate} />
-                </div>
-
-                {/* Stacked Progress Bar */}
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">Task Distribution</div>
-                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-primary/20">
-                    <div className="h-full flex transition-all">
-                      {user.completed > 0 && (
-                        <div
-                          className="h-full transition-all"
-                          style={{
-                            width: `${(user.completed / user.total) * 100}%`,
-                            backgroundColor: 'var(--chart-1)',
-                          }}
-                          title={`Completed: ${user.completed}`}
-                        />
-                      )}
-                      {user.inProgress > 0 && (
-                        <div
-                          className="h-full transition-all"
-                          style={{
-                            width: `${(user.inProgress / user.total) * 100}%`,
-                            backgroundColor: 'var(--chart-4)',
-                          }}
-                          title={`In Progress: ${user.inProgress}`}
-                        />
-                      )}
-                      {user.todo > 0 && (
-                        <div
-                          className="h-full transition-all"
-                          style={{
-                            width: `${(user.todo / user.total) * 100}%`,
-                            backgroundColor: 'var(--chart-5)',
-                          }}
-                          title={`To Do: ${user.todo}`}
-                        />
-                      )}
-                      {user.blocked > 0 && (
-                        <div
-                          className="h-full transition-all"
-                          style={{
-                            width: `${(user.blocked / user.total) * 100}%`,
-                            backgroundColor: 'var(--destructive)',
-                          }}
-                          title={`Blocked: ${user.blocked}`}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {loading && (
-                  <div className="absolute inset-0 animate-pulse bg-black/5 rounded-lg pointer-events-none" />
-                )}
-              </CardContent>
-            </Card>
+              </div>
+              <div className="flex justify-between text-sm md:block md:text-right">
+                <span className="text-xs text-muted-foreground md:hidden">Total tasks</span>
+                <span className="tabular-nums">{user.total}</span>
+              </div>
+              <div className="flex justify-between text-sm md:block md:text-right">
+                <span className="text-xs text-muted-foreground md:hidden">Completion</span>
+                <span className="font-medium tabular-nums text-positive">
+                  {round(user.completionRate, 1)}%
+                </span>
+              </div>
+            </div>
           ))}
+          {!displayData.userTotals.length && (
+            <p className="p-10 text-center text-sm text-muted-foreground">
+              No contributors match this scope.
+            </p>
+          )}
         </div>
       </div>
-
-      {displayData.userTotals.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No user statistics available for the selected filters
-        </div>
-      )}
-    </div>
+    </section>
   );
 }
