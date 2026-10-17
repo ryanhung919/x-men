@@ -1,25 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DateRangeFilter, DateRangeType, presets } from '@/components/filters/date-range-selector';
 import { ProjectSelector } from '@/components/filters/project-selector';
 import { StaffSelector } from '@/components/filters/staff-selector';
 import GanttChart, { GanttRow } from '@/components/schedule/GanttChart';
-import { addDays, endOfDay, startOfDay } from 'date-fns';
+import { addDays, endOfDay, startOfDay, format } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, RefreshCw } from 'lucide-react';
+import { CalendarDays, RefreshCw, X } from 'lucide-react';
+
+import { useTaskInspector } from '@/components/tasks/task-inspector-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Project = { id: number; name: string };
 type Staff = { id: string; first_name: string; last_name: string };
 
 export default function ScheduleView() {
-  const [date, setDate] = useState<DateRangeType>(() => presets[1].range); // Next 7 days default
+  const { openTask } = useTaskInspector();
+  const [error, setError] = useState('');
+  const requestVersion = useRef(0);
+  const [date, setDate] = useState<DateRangeType>(() => presets[1].range); // Two weeks centered on today
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
   const [availableStaff, setAvailableStaff] = useState<Staff[]>([]);
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
   const [loadingFilters, setLoadingFilters] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [rows, setRows] = useState<GanttRow[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
   const [userRoles, setUserRoles] = useState<string[]>([]);
@@ -83,7 +89,9 @@ export default function ScheduleView() {
 
   // Load schedule data
   const reload = async () => {
+    const version = ++requestVersion.current;
     setLoadingData(true);
+    setError('');
     try {
       const params = new URLSearchParams();
       params.set('startDate', startDate.toISOString());
@@ -92,6 +100,7 @@ export default function ScheduleView() {
       if (selectedStaffIds.length) params.set('staffIds', selectedStaffIds.join(','));
 
       const res = await fetch(`/api/schedule?${params.toString()}`);
+      if (!res.ok) throw Error('Could not load this schedule. Try again.');
       const data = await res.json();
       const grouped: Record<string, GanttRow> = {};
       (data || []).forEach((t: any) => {
@@ -120,11 +129,11 @@ export default function ScheduleView() {
           });
         });
       });
-      setRows(Object.values(grouped));
+      if (version === requestVersion.current) setRows(Object.values(grouped));
     } catch (error) {
-      console.error('Failed to load schedule data:', error);
+      if (version === requestVersion.current) setError('Could not load this schedule. Try again.');
     } finally {
-      setLoadingData(false);
+      if (version === requestVersion.current) setLoadingData(false);
     }
   };
 
@@ -167,7 +176,7 @@ export default function ScheduleView() {
           </div>
           <h1 className="text-3xl font-semibold tracking-[-0.04em]">Schedule</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            See who's working on what, and what's coming next.
+            Follow task lifetimes across your team, with the context one click away.
           </p>
         </div>
         <Button variant="outline" onClick={reload} disabled={loadingData}>
@@ -191,16 +200,73 @@ export default function ScheduleView() {
         />
       </div>
 
-      <div>
-        <GanttChart
-          rows={rows}
-          startDate={startOfDay(startDate)}
-          endDate={endOfDay(endDate)}
-          currentUserId={currentUserId}
-          userRoles={userRoles}
-          onChangeDeadline={handleChangeDeadline}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-muted-foreground">
+        <p>
+          <span className="font-medium text-foreground">
+            {format(startDate, 'MMM d')} – {format(endDate, 'MMM d, yyyy')}
+          </span>
+          <span className="mx-3 text-border">/</span>
+          {new Set(rows.flatMap((row) => row.tasks.map((task) => task.id))).size} tasks ·{' '}
+          {rows.length} people
+        </p>
+        <div className="flex items-center gap-3">
+          {loadingData && <span role="status">Updating schedule…</span>}
+          {(selectedProjects.length > 0 || selectedStaffIds.length > 0) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => {
+                setSelectedProjects([]);
+                setSelectedStaffIds([]);
+              }}
+            >
+              <X className="size-3" />
+              Clear filters
+            </Button>
+          )}
+        </div>
       </div>
+      {error && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-lg border border-problem/20 bg-problem-soft p-4 text-xs text-problem"
+          role="alert"
+        >
+          <span>
+            {error}
+            {rows.length > 0 ? ' Showing the previous result.' : ''}
+          </span>
+          <Button variant="outline" size="sm" onClick={reload}>
+            Retry
+          </Button>
+        </div>
+      )}
+      {loadingData && !rows.length ? (
+        <div
+          className="space-y-5 rounded-xl border bg-card p-5"
+          aria-label="Loading staff timeline"
+        >
+          <Skeleton className="h-12 w-full" />
+          {[1, 2, 3, 4].map((row) => (
+            <div key={row} className="flex gap-6">
+              <Skeleton className="h-8 w-36" />
+              <Skeleton className="h-8 flex-1" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        (!error || rows.length > 0) && (
+          <GanttChart
+            rows={rows}
+            startDate={startOfDay(startDate)}
+            endDate={endOfDay(endDate)}
+            currentUserId={currentUserId}
+            userRoles={userRoles}
+            onChangeDeadline={handleChangeDeadline}
+            onInspectTask={openTask}
+          />
+        )
+      )}
     </div>
   );
 }
