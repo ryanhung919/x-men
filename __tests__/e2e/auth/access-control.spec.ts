@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login } from '../helpers/auth';
+import { login, logout } from '../helpers/auth';
 import { PreferenceHelpers } from '../helpers/preferences';
 
 /**
@@ -18,20 +18,7 @@ test.describe('Access Control', () => {
     await page.goto('/report');
     await preferences.verifyOnUnauthorizedPage();
 
-    const goToLoginButton = page.getByRole('button', {
-      name: /go to login|back to login|login/i
-    }).first();
-
-    if (await goToLoginButton.isVisible()) {
-      await goToLoginButton.click();
-    } else {
-      console.log('Go to Login button not found, navigating manually...');
-      await page.goto('/');
-    }
-
-    await expect(page).toHaveURL('/');
-    await page.getByLabel(/email/i).fill('');
-    await page.getByLabel(/password/i).fill('');
+    await logout(page);
     await login(page, 'admin');
 
     console.log('Admin user navigating to /report...');

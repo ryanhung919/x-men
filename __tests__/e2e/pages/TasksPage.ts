@@ -30,7 +30,7 @@ export class TasksPage {
   async openCreateTaskDialog() {
     await this.createTaskButton.click();
     // Wait for dialog to appear
-    await expect(this.page.getByRole('heading', { name: /Create New Task/i })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /^Create task$/i })).toBeVisible();
   }
 
   /**
@@ -76,7 +76,7 @@ export class TasksPage {
     await this.page.keyboard.press('Escape');
 
     // Select deadline - click to open calendar popover
-    await this.page.getByRole('button', { name: /Pick a date/i }).click();
+    await this.page.getByLabel(/^Deadline/).click();
     // Wait for calendar grid to be visible
     await this.page.locator('[role="grid"]').waitFor({ state: 'visible' });
     // Click the day by its visible text - use exact match to avoid clicking wrong date
@@ -119,13 +119,13 @@ export class TasksPage {
    */
   async setRecurring(frequency: 'daily' | 'weekly' | 'monthly') {
     // Check recurring checkbox
-    await this.page.getByRole('checkbox', { name: /Recurring Task/i }).check();
+    await this.page.getByRole('checkbox', { name: /Repeat this task/i }).check();
     await this.page.waitForTimeout(500);
 
     // Select frequency
     await this.page.getByRole('combobox', { name: /Frequency/i }).click();
     await this.page.waitForTimeout(300);
-    await this.page.getByRole('option', { name: new RegExp(frequency, 'i') }).click();
+    await this.page.getByRole('option', { name: { daily: 'Every day', weekly: 'Every 7 days', monthly: 'Every 30 days' }[frequency] }).click();
     await this.page.waitForTimeout(300);
   }
 
@@ -133,9 +133,9 @@ export class TasksPage {
    * Submit the create task form
    */
   async submitTaskForm() {
-    await this.page.getByRole('button', { name: /^Create Task$/i }).click();
+    await this.page.getByRole('dialog', { name: 'Create task', exact: true }).getByRole('button', { name: /^Create task$/i }).click();
     // Wait for dialog to close (task creation can take a while with attachments/API)
-    await expect(this.page.getByRole('heading', { name: /Create New Task/i })).not.toBeVisible({ timeout: 30000 });
+    await expect(this.page.getByRole('heading', { name: /^Create task$/i })).not.toBeVisible({ timeout: 30000 });
   }
 
   
@@ -165,9 +165,9 @@ export class TasksPage {
    * Click on a task in the list to view details
    */
   async clickTaskByTitle(title: string) {
-    const taskRow = this.page.getByRole('row').filter({ hasText: title });
-    await taskRow.click();
-    // Wait for navigation to task details page
+    await this.page.getByRole('link', { name: title, exact: true }).click();
+    await this.page.getByRole('dialog', { name: 'Task details', exact: true }).waitFor();
+    await this.page.getByRole('link', { name: 'Open full page', exact: true }).click();
     await this.page.waitForURL(/\/tasks\/\d+/);
   }
 
@@ -175,7 +175,7 @@ export class TasksPage {
    * Toggle show completed tasks
    */
   async toggleShowCompleted() {
-    const showCompletedButton = this.page.getByRole('button', { name: /Show Completed|Hide Completed/i });
+    const showCompletedButton = this.page.getByRole('button', { name: /^Completed$/i });
     await showCompletedButton.click();
     await this.page.waitForTimeout(500);
   }
@@ -213,7 +213,7 @@ export class TasksPage {
 
     // Wait for confirmation dialog with better error handling
     try {
-      await expect(this.page.getByRole('heading', { name: /Are you sure/i })).toBeVisible({ timeout: 3000 });
+      await expect(this.page.getByRole('heading', { name: 'Archive this task?', exact: true })).toBeVisible({ timeout: 3000 });
       console.log('Confirmation dialog appeared');
     } catch {
       console.log('No confirmation dialog found, checking if already archived...');
@@ -268,9 +268,9 @@ export class TasksPage {
    * Submit form without filling required fields (for validation testing)
    */
   async submitEmptyForm() {
-    await this.page.getByRole('button', { name: /^Create Task$/i }).click();
+    await this.page.getByRole('dialog', { name: 'Create task', exact: true }).getByRole('button', { name: /^Create task$/i }).click();
     // Dialog should remain open
-    await expect(this.page.getByRole('heading', { name: /Create New Task/i })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: /^Create task$/i })).toBeVisible();
   }
 
   /**
@@ -419,7 +419,7 @@ export class TasksPage {
     }
 
     // Select deadline
-    await this.page.getByRole('button', { name: /Pick a date/i }).click();
+    await this.page.getByLabel(/^Deadline/).click();
     await this.page.locator('[role="grid"]').waitFor({ state: 'visible' });
     const dayNumber = taskData.deadline.getDate().toString();
     await this.page.locator('[role="grid"] button').getByText(dayNumber, { exact: true }).first().click();
@@ -455,6 +455,10 @@ export class TasksPage {
     }
     await this.page.keyboard.press('Escape');
     await this.page.waitForTimeout(300);
+
+    if (taskData.tags?.length || taskData.attachments?.length || taskData.recurrence) {
+      await this.page.locator('summary').filter({ hasText: 'More options' }).click();
+    }
 
     // Add tags
     if (taskData.tags && taskData.tags.length > 0) {
@@ -530,7 +534,7 @@ export class TasksPage {
    * Wait for task to appear in calendar view with retry
    */
   async waitForTaskInCalendar(title: string, timeout = 10000) {
-    await expect(this.page.getByText(title)).toBeVisible({ timeout });
+    await expect(this.page.getByRole('button', { name: `Task: ${title}` })).toBeVisible({ timeout });
   }
 
   /**
@@ -681,16 +685,11 @@ export class TasksPage {
     // Wait for modal/popup to appear
     await this.page.waitForTimeout(1000);
 
-    // Verify popup appears with task details (look for dialog title specifically)
-    await expect(this.page.getByRole('heading', { name: title })).toBeVisible();
+    const inspector = this.page.getByRole('dialog', { name: 'Task details', exact: true });
+    await expect(inspector.getByText(title, { exact: true }).first()).toBeVisible();
 
     if (viewFullDetails) {
-      // Click "View Full Details" button
-      const viewDetailsButton = this.page.getByRole('button', { name: /View Full Details/i })
-        .or(this.page.getByText(/View Full Details/i))
-        .or(this.page.locator('button').filter({ hasText: /View Full Details/i }));
-
-      await viewDetailsButton.first().click({ timeout: 5000 });
+      await inspector.getByRole('link', { name: 'Open full page', exact: true }).click();
       await this.page.waitForURL(/\/tasks\/\d+/, { timeout: 5000 });
     } else {
       // Close the popup (look for close button, escape, or click outside)

@@ -166,20 +166,7 @@ export class ReportPage {
       teamSummary: 'Team Summary',
     };
 
-    // Click the report type selector
-    const selector = this.page.getByRole('combobox').filter({
-      has: this.page.locator('span', { hasText: /logged time|task completion|team summary/i })
-    }).first();
-
-    await selector.click();
-    await this.page.waitForTimeout(500);
-
-    // Click the desired option
-    const option = this.page.getByRole('option', {
-      name: new RegExp(reportTypeMap[reportType], 'i')
-    });
-    await option.click();
-    await this.page.waitForTimeout(1000);
+    await this.page.getByRole('tab', { name: reportTypeMap[reportType], exact: true }).click();
 
     // Wait for report to load
     await this.waitForReportLoad();

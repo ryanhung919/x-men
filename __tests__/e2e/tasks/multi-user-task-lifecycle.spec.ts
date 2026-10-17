@@ -201,7 +201,10 @@ test.describe('Multi-User Task Lifecycle', () => {
     // === DAY VIEW TESTING ===
     console.log('Testing Day view...');
     await tasksPage.switchCalendarToDayView();
-    await tasksPage.navigateToCalendarDate(tomorrow);
+    // Recurring work is displayed at its next occurrence, one interval after the anchor.
+    const nextOccurrence = new Date(tomorrow);
+    nextOccurrence.setDate(nextOccurrence.getDate() + 7);
+    await tasksPage.navigateToCalendarDate(nextOccurrence);
     await tasksPage.waitForTaskInCalendar(taskTitle);
 
     // Test popup in Day view (close popup, don't view full details)
@@ -232,7 +235,7 @@ test.describe('Multi-User Task Lifecycle', () => {
 
     // Verify task details are correct
     console.log('Verifying task details content...');
-    await expect(page.getByText(taskTitle)).toBeVisible();
+    await expect(page.getByRole('main').getByText(taskTitle, { exact: true })).toBeVisible();
     await expect(
       page.getByText('Complete multi-assignee workflow test with notifications and calendar views')
     ).toBeVisible();
@@ -250,7 +253,7 @@ test.describe('Multi-User Task Lifecycle', () => {
     console.log('Schedule page URL verified');
 
     // Wait for schedule content to load
-    await page.waitForSelector('.border.rounded-md.overflow-hidden', { timeout: 10000 });
+    await page.getByRole('region', { name: 'Staff task timeline' }).waitFor({ timeout: 10000 });
     console.log('Schedule content loaded');
 
     // Find the created task in schedule
@@ -308,60 +311,20 @@ test.describe('Multi-User Task Lifecycle', () => {
       console.log('Date filter button not found, skipping date filter tests');
     }
 
-    // === SCHEDULE DRAG & COLOR CODING TESTING ===
-    console.log('Testing schedule drag functionality and color changes...');
-
-    // Find the created task's container
-    const taskContainer = page.locator(`text=${taskTitle}`).locator('..').locator('..').first();
-    await expect(taskContainer).toBeVisible();
-    console.log('Found task container for:', taskTitle);
-
-    // Look for deadline diamond specifically within our task's container
-    const taskDeadlineDiamond = taskContainer.locator('.rotate-45.w-3.h-3.cursor-move').first();
-    if (await taskDeadlineDiamond.isVisible()) {
-      console.log('Found deadline diamond specifically for our test task');
-
-      // Get current position for comparison
-      const originalBox = await taskDeadlineDiamond.boundingBox();
-      if (originalBox) {
-        console.log('Original diamond position for our task:', originalBox);
-
-        // Calculate position for today's date (move left to make it overdue)
-        const todayPosition = originalBox.x - 240; // Move ~3 days left to make it overdue
-        console.log('Calculating drag to today position:', todayPosition);
-
-        // Drag the diamond to today's date to make it overdue (red color)
-        await taskDeadlineDiamond.hover();
-        await page.mouse.down();
-        await page.mouse.move(todayPosition, originalBox.y);
-        await page.mouse.up();
-        await page.waitForTimeout(1000); // Wait for color change animation
-
-        console.log('Dragged task deadline diamond to today (should turn red/overdue)');
-
-        // Verify the task now has red color (overdue status)
-        const overdueTaskBar = taskContainer.locator('.bg-red-500\\/20.border-red-600').first();
-        if ((await overdueTaskBar.count()) > 0) {
-          console.log('SUCCESS: Task now has red color (overdue status)');
-        } else {
-          console.log('WARNING: Task should be red but red color not found');
-          // Fallback: check if task is still visible
-          await expect(taskElement).toBeVisible();
-        }
-
-        // Verify the task is still visible after drag
-        await expect(taskElement).toBeVisible();
-        console.log('Task remains visible after overdue drag');
-
-        console.log(
-          'SUCCESS: Schedule testing completed with created task - filters, drag deadline, and color coding working!'
-        );
-      } else {
-        console.log('Could not get deadline diamond bounding box');
-      }
-    } else {
-      console.log('No deadline diamond found for our test task');
-    }
+    // The accessible deadline control replaces the old CSS-only drag handle.
+    const deadlineControl = page.getByRole('button', {
+      name: `Adjust deadline for ${taskTitle}`, exact: true,
+    }).first();
+    await deadlineControl.click();
+    const today = new Date();
+    const dateValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    await page.getByLabel('Deadline date', { exact: true }).fill(dateValue);
+    const deadlineSaved = page.waitForResponse(response =>
+      response.url().endsWith('/api/schedule') && response.request().method() === 'PATCH'
+    );
+    await page.getByRole('button', { name: 'Save deadline', exact: true }).click();
+    expect((await deadlineSaved).ok()).toBeTruthy();
+    await expect(page.getByRole('button', { name: `Inspect ${taskTitle}, To Do, overdue`, exact: true }).first()).toBeVisible();
 
     // Navigate back to task details page first, then to tasks list
     console.log('Navigating back to task details page...');
