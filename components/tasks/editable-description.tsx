@@ -113,12 +113,12 @@ export function EditableDescription({
         }
       }}
       onClick={() => setIsEditing(true)}
-      className={`${containerClasses} border border-transparent rounded-md hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-text transition-all`}
+      className={`${containerClasses} border border-transparent rounded-md hover:border-border hover:bg-muted/40 cursor-text transition-all`}
     >
       {description ? (
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{description}</p>
+        <p className="break-words text-sm leading-relaxed whitespace-pre-wrap">{description}</p>
       ) : (
-        <p className="text-base text-gray-400 italic">Add a description...</p>
+        <p className="text-xs text-muted-foreground">Add a description...</p>
       )}
     </div>
   );

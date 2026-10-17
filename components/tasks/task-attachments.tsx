@@ -1,12 +1,9 @@
 'use client';
 
-import type React from 'react';
-
 import { Button } from '@/components/ui/button';
-import { FileText, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { FileText, X, Plus, ArrowUpRight } from 'lucide-react';
+import { useState } from 'react';
 import { FileUploadZone } from './file-upload-zone';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface TaskAttachmentsProps {
   taskId: number;
@@ -22,6 +19,7 @@ export function TaskAttachments({
   readOnly = false,
 }: TaskAttachmentsProps) {
   const [attachments, setAttachments] = useState(initialAttachments);
+  const [showUpload, setShowUpload] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +74,7 @@ export function TaskAttachments({
       }
 
       setUploadingFiles([]);
+      setShowUpload(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload attachments';
       setError(errorMessage);
@@ -123,93 +122,128 @@ export function TaskAttachments({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Error Message */}
+    <div className="space-y-3">
       {error && (
-        <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-3 rounded-md border border-red-200 dark:border-red-800">
+        <div
+          role="alert"
+          className="rounded-lg border border-problem/20 bg-problem-soft p-3 text-sm text-problem"
+        >
           {error}
         </div>
       )}
-
-      {/* Existing Attachments Section */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] text-muted-foreground">
+          {attachments.length
+            ? `${attachments.length} uploaded file${attachments.length === 1 ? '' : 's'}`
+            : 'No files attached.'}
+        </p>
+        {!readOnly && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isUploading}
+            aria-expanded={showUpload}
+            aria-controls={`task-upload-${taskId}`}
+            onClick={() => setShowUpload((open) => !open)}
+          >
+            <Plus className="size-3.5" />
+            Add files
+          </Button>
+        )}
+      </div>
       {attachments.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold">Uploaded Files ({attachments.length})</h4>
-          </div>
-          <div className="space-y-2">
-            {attachments.map((att) => (
-              <div
+        <ul className="divide-y rounded-lg border">
+          {attachments.map((att) => {
+            const name = getFileName(att.storage_path);
+            const extension = name.includes('.') ? name.split('.').pop()?.toUpperCase() : 'FILE';
+            return (
+              <li
                 key={att.id}
-                className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted rounded-lg transition-colors"
+                className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/40"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-positive-soft text-positive"
+                >
+                  <FileText className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
                   {att.public_url ? (
                     <a
                       href={att.public_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline truncate font-medium"
+                      className="block break-all text-xs font-medium text-foreground hover:text-positive hover:underline"
                     >
-                      {getFileName(att.storage_path)}
+                      {name}
                     </a>
                   ) : (
-                    <span className="text-sm text-muted-foreground truncate">
-                      {getFileName(att.storage_path)}
-                    </span>
+                    <span className="block break-all text-xs font-medium">{name}</span>
                   )}
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    {extension}
+                    {!att.public_url && ' · Link unavailable'}
+                  </p>
                 </div>
+                {att.public_url && (
+                  <a
+                    href={att.public_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open ${name}`}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-positive"
+                  >
+                    <ArrowUpRight className="size-3.5" />
+                  </a>
+                )}
                 {!readOnly && (
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="ghost"
                     onClick={() => handleAttachmentDelete(att.id)}
                     disabled={deletingId === att.id}
-                    className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950 ml-2 flex-shrink-0"
+                    aria-label={`Remove ${name}`}
+                    className="size-8 shrink-0 text-muted-foreground hover:bg-problem-soft hover:text-problem"
                   >
                     {deletingId === att.id ? (
-                      <span className="text-xs">Deleting...</span>
+                      <span className="text-[10px]">…</span>
                     ) : (
-                      <X className="w-4 h-4" />
+                      <X className="size-3.5" />
                     )}
                   </Button>
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
-
-      {/* Upload Zone Section */}
-      {!readOnly && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold">Add New Files</h4>
+      {!readOnly && showUpload && (
+        <div id={`task-upload-${taskId}`} className="space-y-3 rounded-lg border bg-muted/20 p-3">
           <FileUploadZone
             files={uploadingFiles}
             onChange={handleFileSelect}
             maxTotalSize={50 * 1024 * 1024}
             maxFiles={10}
           />
+          {uploadingFiles.length > 0 && (
+            <div className="flex gap-2">
+              <Button onClick={handleUpload} disabled={isUploading} size="sm">
+                {isUploading ? 'Uploading...' : `Upload ${uploadingFiles.length} File(s)`}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setUploadingFiles([]);
+                  setShowUpload(false);
+                }}
+                disabled={isUploading}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
         </div>
-      )}
-      {/* Upload Button */}
-      {!readOnly && uploadingFiles.length > 0 && (
-        <div className="flex gap-2">
-          <Button onClick={handleUpload} disabled={isUploading} className="flex-1">
-            {isUploading ? 'Uploading...' : `Upload ${uploadingFiles.length} File(s)`}
-          </Button>
-          <Button variant="outline" onClick={() => setUploadingFiles([])} disabled={isUploading}>
-            Cancel
-          </Button>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {attachments.length === 0 && uploadingFiles.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-8">
-          {readOnly ? 'No attachments yet.' : 'No attachments yet. Upload files to get started.'}
-        </p>
       )}
     </div>
   );

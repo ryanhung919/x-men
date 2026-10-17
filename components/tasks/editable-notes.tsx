@@ -119,12 +119,12 @@ export function EditableNotes({ taskId, initialNotes, onNotesUpdate }: EditableN
         }
       }}
       onClick={() => setIsEditing(true)}
-      className="cursor-pointer p-3 border border-transparent rounded-md hover:border-muted-foreground/25 hover:bg-muted/50 transition-all min-h-[60px]"
+      className="cursor-pointer p-3 border border-transparent rounded-md hover:border-muted-foreground/25 hover:bg-muted/50 transition-colors"
     >
       {notes ? (
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{notes}</p>
+        <p className="break-words text-sm leading-relaxed whitespace-pre-wrap">{notes}</p>
       ) : (
-        <p className="text-base text-muted-foreground italic">Click to add notes...</p>
+        <p className="text-xs text-muted-foreground">Click to add notes...</p>
       )}
     </div>
   );
