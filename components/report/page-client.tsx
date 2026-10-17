@@ -5,32 +5,18 @@ import { DepartmentSelector, Department } from '@/components/filters/department-
 import { ProjectSelector, Project } from '@/components/filters/project-selector';
 import { DateRangeFilter, DateRangeType } from '@/components/filters/date-range-selector';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 import { LoggedTimeReport } from '@/components/report/logged-time-report';
 import { TaskCompletionsChart } from '@/components/report/task-completion-report';
 import { TeamSummaryChart } from '@/components/report/team-summary-report';
 import { ExportButtons, type AnyReport } from '@/components/report/export-buttons';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 import { XIcon, FilterIcon, ChartNoAxesCombined } from 'lucide-react';
 
-async function fetchDepartments(projectIds?: number[]): Promise<Department[]> {
-  const query = projectIds?.length ? `&projectIds=${projectIds.join(',')}` : '';
-  const res = await fetch(`/api/reports?action=departments${query}`);
-  if (!res.ok) throw new Error('Failed to fetch departments');
-  return res.json();
-}
-
-async function fetchProjects(departmentIds?: number[]): Promise<Project[]> {
+async function fetchProjects(departmentIds?: number[], signal?: AbortSignal): Promise<Project[]> {
   const query = departmentIds?.length ? `&departmentIds=${departmentIds.join(',')}` : '';
-  const res = await fetch(`/api/reports?action=projects${query}`);
+  const res = await fetch(`/api/reports?action=projects${query}`, { signal });
   if (!res.ok) throw new Error('Failed to fetch projects');
   return res.json();
 }
@@ -51,14 +37,13 @@ interface ReportsPageClientProps {
 }
 
 export default function ReportsPageClient({
-  initialDepartmentId,
   initialDepartments,
   initialProjects,
   initialReportData,
   preselectedDepartments,
   preselectedProjects,
 }: ReportsPageClientProps) {
-  const [departments, setDepartments] = useState<Department[]>(initialDepartments);
+  const [departments] = useState<Department[]>(initialDepartments);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
 
   const [selectedDepartments, setSelectedDepartments] = useState<number[]>(preselectedDepartments);
@@ -68,9 +53,10 @@ export default function ReportsPageClient({
     'loggedTime' | 'taskCompletions' | 'teamSummary'
   >('loggedTime');
 
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [scopeError, setScopeError] = useState(false);
+  const [scopeRetry, setScopeRetry] = useState(0);
 
   const [dateRange, setDateRange] = useState<DateRangeType>({
     startDate: undefined,
@@ -86,71 +72,84 @@ export default function ReportsPageClient({
 
   const clearAllFilters = () => {
     setIsLoading(true);
+    setReportData(null);
     setSelectedDepartments([]);
     setSelectedProjects([]);
     setDateRange({ startDate: undefined, endDate: undefined });
   };
 
-  // When departments change, fetch projects and filter selections
+  // Cancel obsolete dependent-filter requests before rendering the next scope.
   useEffect(() => {
-    if (selectedDepartments.length === 0) {
-      // No departments selected - fetch all projects
-      setLoadingProjects(true);
-      fetchProjects()
-        .then((newProjects) => {
-          setProjects(newProjects);
-          setSelectedProjects([]);
-        })
-        .finally(() => setLoadingProjects(false));
-      return;
-    }
-
+    const controller = new AbortController();
     setLoadingProjects(true);
-    fetchProjects(selectedDepartments)
-      .then((newProjects) => {
-        setProjects(newProjects);
-
-        // Remove selected projects no longer in scope
-        setSelectedProjects((prevSelected) =>
-          prevSelected.filter((pId) => newProjects.some((p) => p.id === pId))
+    setScopeError(false);
+    fetchProjects(selectedDepartments, controller.signal)
+      .then((nextProjects) => {
+        if (controller.signal.aborted) return;
+        setProjects(nextProjects);
+        setSelectedProjects((previous) =>
+          previous.filter((id) => nextProjects.some((project) => project.id === id))
         );
       })
-      .finally(() => setLoadingProjects(false));
-  }, [selectedDepartments]);
+      .catch(() => {
+        if (!controller.signal.aborted) setScopeError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingProjects(false);
+      });
+    return () => controller.abort();
+  }, [selectedDepartments, scopeRetry]);
 
   // Determine which project IDs to send to report
   const reportProjectIds = useMemo(() => {
     return selectedProjects.length ? selectedProjects : projects.map((p) => p.id);
   }, [selectedProjects, projects]);
 
-  // Callback to lift report data from child components
-  const handleReportDataLoaded = useCallback((data: AnyReport) => {
-    setReportData(data);
-    setIsLoading(false);
-  }, []);
+  const scopeKey = JSON.stringify([
+    selectedReport,
+    selectedDepartments,
+    reportProjectIds,
+    dateRange.startDate?.toISOString(),
+    dateRange.endDate?.toISOString(),
+  ]);
+  const [loadedScope, setLoadedScope] = useState('');
+  const handleReportDataLoaded = useCallback(
+    (data: AnyReport) => {
+      setLoadedScope(scopeKey);
+      setReportData(data);
+      setIsLoading(false);
+    },
+    [scopeKey]
+  );
 
   const handleDepartmentChange = (newDepts: number[]) => {
     setIsLoading(true);
+    setReportData(null);
     setSelectedDepartments(newDepts);
   };
 
   const handleProjectChange = (newProjs: number[]) => {
     setIsLoading(true);
+    setReportData(null);
     setSelectedProjects(newProjs);
   };
 
   const handleDateRangeChange = (range: DateRangeType) => {
     setIsLoading(true);
+    setReportData(null);
     setDateRange(range);
   };
 
-  const handleReportTypeChange = (type: typeof selectedReport) => {
+  const handleReportTypeChange = (value: string) => {
+    const type = value as typeof selectedReport;
+    if (type === selectedReport) return;
     setIsLoading(true);
+    setReportData(null);
     setSelectedReport(type);
   };
 
   return (
-    <div className="space-y-4">
+    <Tabs value={selectedReport} onValueChange={handleReportTypeChange} className="space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-4 pb-2">
         <div>
           <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -162,20 +161,36 @@ export default function ReportsPageClient({
             A clearer view of effort, progress, and delivery.
           </p>
         </div>
-        {reportData && (
+        {reportData && loadedScope === scopeKey && (
           <ExportButtons
             reportData={reportData}
             reportTitle={REPORT_OPTIONS.find((o) => o.value === selectedReport)?.label}
-            disabled={isLoading || reportData.kind !== selectedReport}
+            disabled={
+              isLoading || loadingProjects || scopeError || reportData.kind !== selectedReport
+            }
           />
         )}
       </header>
+      <TabsList
+        aria-label="Report type"
+        className="h-11 w-full justify-start gap-1 rounded-none border-b bg-transparent p-0 sm:w-fit"
+      >
+        {REPORT_OPTIONS.map(({ value, label }) => (
+          <TabsTrigger
+            key={value}
+            value={value}
+            className="h-full flex-none rounded-none border-0 border-b-2 border-transparent px-3 text-xs text-muted-foreground shadow-none data-[state=active]:border-positive data-[state=active]:bg-transparent data-[state=active]:text-positive data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent dark:data-[state=active]:border-positive dark:data-[state=active]:text-positive sm:px-4 sm:text-sm"
+          >
+            {label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
       <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-3 [&>div]:max-w-full">
         <DepartmentSelector
           departments={departments}
           selectedDepartments={selectedDepartments}
           onChange={handleDepartmentChange}
-          loading={loadingDepartments}
+          loading={false}
         />
         <ProjectSelector
           projects={projects}
@@ -184,48 +199,6 @@ export default function ReportsPageClient({
           loading={loadingProjects}
         />
         <DateRangeFilter value={dateRange} onChange={handleDateRangeChange} />
-
-        <Select value={selectedReport} onValueChange={handleReportTypeChange}>
-          <SelectTrigger
-            className={cn(
-              'w-52 border border-input bg-background text-foreground',
-              'hover:bg-accent hover:text-accent-foreground',
-              'focus:ring-2 focus:ring-ring focus:ring-offset-2'
-            )}
-          >
-            <SelectValue placeholder="Select report" />
-          </SelectTrigger>
-
-          <SelectContent
-            className="bg-popover text-popover-foreground border border-border shadow-md [&>span]:text-foreground [&>span]:font-medium"
-            style={{
-              backgroundColor: 'var(--popover)',
-              backdropFilter: 'none',
-              WebkitBackdropFilter: 'none',
-            }}
-          >
-            <div className="max-h-[300px] overflow-y-auto">
-              <SelectItem
-                value="loggedTime"
-                className="cursor-pointer rounded-sm px-2 py-2 text-sm transition-colors duration-100 hover:bg-accent/50 focus:bg-accent"
-              >
-                Logged Time
-              </SelectItem>
-              <SelectItem
-                value="taskCompletions"
-                className="cursor-pointer rounded-sm px-2 py-2 text-sm transition-colors duration-100 hover:bg-accent/50 focus:bg-accent"
-              >
-                Task Completions
-              </SelectItem>
-              <SelectItem
-                value="teamSummary"
-                className="cursor-pointer rounded-sm px-2 py-2 text-sm transition-colors duration-100 hover:bg-accent/50 focus:bg-accent"
-              >
-                Team Summary
-              </SelectItem>
-            </div>
-          </SelectContent>
-        </Select>
       </div>
 
       {hasActiveFilters && (
@@ -263,8 +236,25 @@ export default function ReportsPageClient({
       )}
 
       {/* Report Display */}
-      <div>
-        {!selectedDepartments.length && !selectedProjects.length ? (
+      <TabsContent value={selectedReport} key={scopeKey}>
+        {scopeError ? (
+          <div role="alert" className="rounded-xl border bg-card p-8 text-center">
+            <p className="text-sm">We couldn’t load the available projects.</p>
+            <button
+              className="mt-3 rounded-lg border px-4 py-2 text-sm"
+              onClick={() => setScopeRetry((value) => value + 1)}
+            >
+              Try again
+            </button>
+          </div>
+        ) : loadingProjects ? (
+          <p
+            role="status"
+            className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground"
+          >
+            Updating report scope…
+          </p>
+        ) : !selectedDepartments.length && !selectedProjects.length ? (
           <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-lg bg-muted/30">
             <FilterIcon className="h-12 w-12 text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No Filters Selected</h3>
@@ -280,7 +270,6 @@ export default function ReportsPageClient({
             startDate={dateRange.startDate?.toISOString()}
             endDate={dateRange.endDate?.toISOString()}
             onDataLoaded={handleReportDataLoaded}
-            initialData={initialReportData?.kind === 'loggedTime' ? initialReportData : undefined}
           />
         ) : selectedReport === 'taskCompletions' ? (
           <TaskCompletionsChart
@@ -299,7 +288,7 @@ export default function ReportsPageClient({
             onDataLoaded={handleReportDataLoaded}
           />
         )}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }
