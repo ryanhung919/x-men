@@ -42,6 +42,16 @@ GUEST_PASSWORD=...                  # password for guest@nodal.demo
 # POSTGRES_SSL=disable              # optional; defaults to off for localhost, require elsewhere
 ```
 
+### Password recovery in production
+
+In Supabase → Authentication → URL Configuration, set **Site URL** to
+`https://x-men-rosy.vercel.app` and add
+`https://x-men-rosy.vercel.app/auth/update-password` to **Redirect URLs**.
+If the deployment domain changes, update both settings. The recovery form uses
+the requesting site's origin; Supabase falls back to Site URL when that redirect
+is not allowed. Local `supabase/config.toml` changes do not update hosted settings.
+Request a fresh reset email after changing these settings; old emails retain their original URL.
+
 ### Running against a local Supabase
 
 With Docker running and the Supabase CLI installed:
