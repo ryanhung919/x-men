@@ -100,9 +100,9 @@ describe('GanttChart', () => {
         />
       );
 
-      expect(screen.getByText('Assignee')).toBeInTheDocument();
+      expect(screen.getByText('Team members')).toBeInTheDocument();
       // Date headers should be present
-      expect(screen.getByText('Oct 15')).toBeInTheDocument();
+      expect(screen.getAllByText('15')[0]).toBeInTheDocument();
     });
 
     it('should render assignee names', () => {
@@ -155,7 +155,7 @@ describe('GanttChart', () => {
         />
       );
 
-      expect(container.querySelector('.overflow-x-auto')).toBeInTheDocument();
+      expect(screen.getByText('No work in this range')).toBeInTheDocument();
     });
   });
 
@@ -171,8 +171,8 @@ describe('GanttChart', () => {
       );
 
       // Check for date headers (responsive format)
-      expect(screen.getByText('Oct 15')).toBeInTheDocument();
-      expect(screen.getByText('Oct 25')).toBeInTheDocument();
+      expect(screen.getAllByText('15')[0]).toBeInTheDocument();
+      expect(screen.getAllByText('25')[0]).toBeInTheDocument();
     });
 
     it('should handle single day range', () => {
@@ -186,7 +186,7 @@ describe('GanttChart', () => {
         />
       );
 
-      expect(screen.getByText('Oct 20')).toBeInTheDocument();
+      expect(screen.getAllByText('20')[0]).toBeInTheDocument();
     });
 
     it('should handle multi-week range', () => {
@@ -201,8 +201,8 @@ describe('GanttChart', () => {
         />
       );
 
-      expect(screen.getByText('Oct 1')).toBeInTheDocument();
-      expect(screen.getByText('Oct 31')).toBeInTheDocument();
+      expect(screen.getAllByText('1')[0]).toBeInTheDocument();
+      expect(screen.getAllByText('31')[0]).toBeInTheDocument();
     });
   });
 
@@ -218,11 +218,11 @@ describe('GanttChart', () => {
       );
 
       // Task bars should have the primary background color class with opacity
-      const taskBars = container.querySelectorAll('.bg-primary\\/20');
+      const taskBars = container.querySelectorAll('.bg-positive-soft');
       expect(taskBars.length).toBeGreaterThan(0);
     });
 
-    it('should render green bars for completed tasks', () => {
+    it('should render blue bars for completed tasks', () => {
       const { container } = render(
         <GanttChart
           rows={mockRowsWithCompleted}
@@ -232,7 +232,7 @@ describe('GanttChart', () => {
         />
       );
 
-      const completedBars = container.querySelectorAll('.bg-green-500\\/20');
+      const completedBars = container.querySelectorAll('.bg-positive-soft');
       expect(completedBars.length).toBeGreaterThan(0);
     });
 
@@ -246,7 +246,7 @@ describe('GanttChart', () => {
         />
       );
 
-      const overdueBars = container.querySelectorAll('.bg-red-500\\/20');
+      const overdueBars = container.querySelectorAll('.bg-problem-soft');
       expect(overdueBars.length).toBeGreaterThan(0);
     });
 
@@ -305,7 +305,7 @@ describe('GanttChart', () => {
         />
       );
 
-      expect(container.querySelector('.bg-green-500\\/20')).toBeInTheDocument();
+      expect(container.querySelector('.bg-positive-soft')).toBeInTheDocument();
     });
 
     it('should apply correct color for in progress status', () => {
@@ -329,7 +329,7 @@ describe('GanttChart', () => {
         />
       );
 
-      expect(container.querySelector('.bg-primary\\/20')).toBeInTheDocument();
+      expect(container.querySelector('.bg-positive-soft')).toBeInTheDocument();
     });
 
     it('should apply correct color for overdue in-progress task', () => {
@@ -353,7 +353,7 @@ describe('GanttChart', () => {
         />
       );
 
-      expect(container.querySelector('.bg-red-500\\/20')).toBeInTheDocument();
+      expect(container.querySelector('.bg-problem-soft')).toBeInTheDocument();
     });
   });
 
@@ -380,7 +380,7 @@ describe('GanttChart', () => {
       );
 
       // Task should be visible and use updated_at as end date (check for project name and green color)
-      expect(screen.getByText('Test')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Inspect / })).toBeInTheDocument();
       expect(screen.getByText('Early Finisher')).toBeInTheDocument();
     });
 
@@ -406,7 +406,7 @@ describe('GanttChart', () => {
       );
 
       // Check for project name and worker name (title is truncated)
-      expect(screen.getByText('Test')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Inspect / })).toBeInTheDocument();
       expect(screen.getByText('Worker')).toBeInTheDocument();
     });
   });
@@ -423,55 +423,16 @@ describe('GanttChart', () => {
       );
 
       // Today's column should have the translucent blue background
-      const todayColumns = container.querySelectorAll('.bg-blue-500\\/10');
+      const todayColumns = container.querySelectorAll('[aria-label="Current time"]');
       expect(todayColumns.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Drag Functionality', () => {
-    it('should handle mouse down on deadline indicator', () => {
-      // Create a non-completed task within date range to ensure diamond is visible
-      const draggableTask: GanttTask = {
-        id: 100,
-        title: 'Draggable Task',
-        project: 'Test Project',
-        startDate: '2025-10-16T00:00:00Z',
-        deadline: '2025-10-22T00:00:00Z',
-        status: 'In Progress',
-        updatedAt: '',
-        assignee: { id: 'user1', name: 'Test User' },
-      };
-
-      const { container } = render(
+  describe('Deadline adjustment', () => {
+    it('provides an explicit date control for authorized staff', async () => {
+      render(
         <GanttChart
-          rows={[{ assigneeId: 'user1', assigneeName: 'Test User', tasks: [draggableTask] }]}
-          startDate={startDate}
-          endDate={endDate}
-          currentUserId="user1"
-          userRoles={['staff']}
-        />
-      );
-
-      const deadlineIndicator = container.querySelector('.rotate-45');
-      expect(deadlineIndicator).toBeInTheDocument();
-    });
-
-    it('should call onChangeDeadline when dragging deadline', async () => {
-      // Create a non-completed task within date range
-      const draggableTask: GanttTask = {
-        id: 101,
-        title: 'Draggable Task 2',
-        project: 'Test Project',
-        startDate: '2025-10-16T00:00:00Z',
-        deadline: '2025-10-22T00:00:00Z',
-        status: 'In Progress',
-        updatedAt: '',
-        assignee: { id: 'user1', name: 'Test User' },
-      };
-
-      const { container } = render(
-        <GanttChart
-          rows={[{ assigneeId: 'user1', assigneeName: 'Test User', tasks: [draggableTask] }]}
+          rows={mockRows}
           startDate={startDate}
           endDate={endDate}
           currentUserId="user1"
@@ -479,66 +440,18 @@ describe('GanttChart', () => {
           onChangeDeadline={mockOnChangeDeadline}
         />
       );
-
-      // Wait for component to render
-      await waitFor(() => {
-        expect(container.querySelector('.rotate-45')).toBeInTheDocument();
-      });
-
-      const diamond = container.querySelector('.rotate-45') as HTMLElement;
-      expect(diamond).toBeInTheDocument();
-
-      // Find the grid element - it's the parent with position relative that contains the task bars
-      const grid = container.querySelector('.relative[style*="width"]') as HTMLElement;
-
-      if (diamond && grid) {
-        // Get grid bounds for realistic clientX calculation
-        const gridRect = grid.getBoundingClientRect();
-        
-        // Start drag on diamond
-        fireEvent.mouseDown(diamond, { 
-          clientX: gridRect.left + 100, 
-          clientY: gridRect.top + 10,
-          bubbles: true 
-        });
-
-        // Move mouse on the grid element to a new position
-        fireEvent.mouseMove(grid, { 
-          clientX: gridRect.left + 250, 
-          clientY: gridRect.top + 10,
-          bubbles: true 
-        });
-
-        // Release on the grid element
-        fireEvent.mouseUp(grid, { 
-          clientX: gridRect.left + 250, 
-          clientY: gridRect.top + 10,
-          bubbles: true 
-        });
-
-        // Wait for the callback to be called
-        await waitFor(() => {
-          expect(mockOnChangeDeadline).toHaveBeenCalled();
-        });
-      }
+      fireEvent.click(screen.getByRole('button', { name: 'Adjust deadline for Active Task' }));
+      const input = await screen.findByLabelText('Deadline date');
+      fireEvent.change(input, { target: { value: '2025-10-23' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save deadline' }));
+      await waitFor(() =>
+        expect(mockOnChangeDeadline).toHaveBeenCalledWith(1, new Date('2025-10-23T00:00:00'))
+      );
     });
-
-    it('should stop dragging on mouse up', () => {
-      // Create a non-completed task within date range
-      const draggableTask: GanttTask = {
-        id: 102,
-        title: 'Draggable Task 3',
-        project: 'Test Project',
-        startDate: '2025-10-16T00:00:00Z',
-        deadline: '2025-10-22T00:00:00Z',
-        status: 'In Progress',
-        updatedAt: '',
-        assignee: { id: 'user1', name: 'Test User' },
-      };
-
-      const { container } = render(
+    it('cancels the date draft without committing', async () => {
+      render(
         <GanttChart
-          rows={[{ assigneeId: 'user1', assigneeName: 'Test User', tasks: [draggableTask] }]}
+          rows={mockRows}
           startDate={startDate}
           endDate={endDate}
           currentUserId="user1"
@@ -546,265 +459,239 @@ describe('GanttChart', () => {
           onChangeDeadline={mockOnChangeDeadline}
         />
       );
-
-      const diamond = container.querySelector('.rotate-45');
-      
-      if (diamond) {
-        fireEvent.mouseDown(diamond, { clientX: 100, clientY: 100 });
-        fireEvent.mouseUp(container);
-        
-        // After mouse up, dragging should stop
-        mockOnChangeDeadline.mockClear();
-        fireEvent.mouseMove(container, { clientX: 200, clientY: 100 });
-        
-        expect(mockOnChangeDeadline).not.toHaveBeenCalled();
-      }
+      fireEvent.click(screen.getByRole('button', { name: 'Adjust deadline for Active Task' }));
+      fireEvent.change(await screen.findByLabelText('Deadline date'), {
+        target: { value: '2025-10-23' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(mockOnChangeDeadline).not.toHaveBeenCalled();
     });
-
-    it('should stop dragging on mouse leave', () => {
-      // Create a non-completed task within date range
-      const draggableTask: GanttTask = {
-        id: 103,
-        title: 'Draggable Task 4',
-        project: 'Test Project',
-        startDate: '2025-10-16T00:00:00Z',
-        deadline: '2025-10-22T00:00:00Z',
-        status: 'In Progress',
-        updatedAt: '',
-        assignee: { id: 'user1', name: 'Test User' },
-      };
-
-      const { container } = render(
+    it('does not offer deadline editing to demo guests', () => {
+      render(
         <GanttChart
-          rows={[{ assigneeId: 'user1', assigneeName: 'Test User', tasks: [draggableTask] }]}
+          rows={mockRows}
           startDate={startDate}
           endDate={endDate}
           currentUserId="user1"
-          userRoles={['staff']}
+          userRoles={['demo_viewer']}
           onChangeDeadline={mockOnChangeDeadline}
         />
       );
-
-        const diamond = container.querySelector('.rotate-45');
-
-        if (diamond) {
-          fireEvent.mouseDown(diamond, { clientX: 100, clientY: 100 });
-          fireEvent.mouseLeave(container);
-
-          // After mouse leave, moving should not trigger changes
-          mockOnChangeDeadline.mockClear();
-          fireEvent.mouseMove(container, { clientX: 200, clientY: 100 });
-
-          expect(mockOnChangeDeadline).not.toHaveBeenCalled();
-        }
-      });
-    });
-
-    describe('Responsive Design', () => {
-      it('should apply responsive width classes', () => {
-        const { container } = render(
-          <GanttChart
-            rows={mockRows}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Component uses inline styles for fixed widths, check for shrink-0 class instead
-        const shrinkElements = container.querySelectorAll('.shrink-0');
-        expect(shrinkElements.length).toBeGreaterThan(0);
-      });
-
-      it('should render with mobile-friendly date format', () => {
-        render(
-          <GanttChart
-            rows={mockRows}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Both formats should be present (hidden/shown by responsive classes)
-        expect(screen.getByText('Oct 15')).toBeInTheDocument();
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('should handle tasks with same start and end date', () => {
-        const singleDayTask: GanttTask = {
-          id: 10,
-          title: 'Single Day Task',
-          project: 'Test',
-          startDate: '2025-10-20T00:00:00Z',
-          deadline: '2025-10-20T00:00:00Z',
-          status: 'To Do',
-          updatedAt: '',
-          assignee: { id: 'worker', name: 'Worker' },
-        };
-
-        render(
-          <GanttChart
-            rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [singleDayTask] }]}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Check for project name and assignee (title is truncated)
-        expect(screen.getByText('Test')).toBeInTheDocument();
-        expect(screen.getByText('Worker')).toBeInTheDocument();
-      });
-
-      it('should handle tasks starting before range', () => {
-        const earlyTask: GanttTask = {
-          id: 11,
-          title: 'Early Start',
-          project: 'Test',
-          startDate: '2025-10-01T00:00:00Z',
-          deadline: '2025-10-20T00:00:00Z',
-          status: 'In Progress',
-          updatedAt: '',
-          assignee: { id: 'worker', name: 'Worker' },
-        };
-
-        render(
-          <GanttChart
-            rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [earlyTask] }]}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Check for project name and left arrow indicator (task extends before range)
-        expect(screen.getByText('Test')).toBeInTheDocument();
-        expect(screen.getByText('◀')).toBeInTheDocument();
-      });
-
-      it('should handle tasks ending after range', () => {
-        const lateTask: GanttTask = {
-          id: 12,
-          title: 'Late End',
-          project: 'Test',
-          startDate: '2025-10-20T00:00:00Z',
-          deadline: '2025-11-01T00:00:00Z',
-          status: 'In Progress',
-          updatedAt: '',
-          assignee: { id: 'worker', name: 'Worker' },
-        };
-
-        render(
-          <GanttChart
-            rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [lateTask] }]}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Check for project name and right arrow indicator (task extends after range)
-        expect(screen.getByText('Test')).toBeInTheDocument();
-        expect(screen.getByText('▶')).toBeInTheDocument();
-      });
-
-      it('should handle multiple tasks for same assignee', () => {
-        const multiTaskRow: GanttRow = {
-          assigneeId: 'busy',
-          assigneeName: 'Busy Worker',
-          tasks: [
-            {
-              id: 13,
-              title: 'Task 1',
-              project: 'Project A',
-              startDate: '2025-10-16T00:00:00Z',
-              deadline: '2025-10-18T00:00:00Z',
-              status: 'Completed',
-              updatedAt: '2025-10-17T00:00:00Z',
-              assignee: { id: 'busy', name: 'Busy Worker' },
-            },
-            {
-              id: 14,
-              title: 'Task 2',
-              project: 'Project B',
-              startDate: '2025-10-19T00:00:00Z',
-              deadline: '2025-10-22T00:00:00Z',
-              status: 'In Progress',
-              updatedAt: '',
-              assignee: { id: 'busy', name: 'Busy Worker' },
-            },
-            {
-              id: 15,
-              title: 'Task 3',
-              project: 'Project C',
-              startDate: '2025-10-23T00:00:00Z',
-              deadline: '2025-10-25T00:00:00Z',
-              status: 'To Do',
-              updatedAt: '',
-              assignee: { id: 'busy', name: 'Busy Worker' },
-            },
-          ],
-        };
-
-        render(
-          <GanttChart
-            rows={[multiTaskRow]}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Check for project names and assignee (titles are truncated)
-        expect(screen.getByText('Project A')).toBeInTheDocument();
-        expect(screen.getByText('Project B')).toBeInTheDocument();
-        expect(screen.getByText('Project C')).toBeInTheDocument();
-        expect(screen.getByText('Busy Worker')).toBeInTheDocument();
-      });
-
-      it('should handle null updated_at for completed tasks', () => {
-        const completedNoUpdate: GanttTask = {
-          id: 16,
-          title: 'Completed No Update',
-          project: 'Test',
-          startDate: '2025-10-16T00:00:00Z',
-          deadline: '2025-10-22T00:00:00Z',
-          status: 'Completed',
-          updatedAt: '',
-          assignee: { id: 'worker', name: 'Worker' },
-        };
-
-        const { container } = render(
-          <GanttChart
-            rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [completedNoUpdate] }]}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Check that the task is rendered (title appears in truncated text)
-        expect(screen.getByText('Test')).toBeInTheDocument();
-        expect(container.querySelector('.bg-green-500\\/20')).toBeInTheDocument();
-      });
-    });
-
-    describe('Weekly Highlighting', () => {
-      it('should highlight weekly columns', () => {
-        const { container } = render(
-          <GanttChart
-            rows={mockRows}
-            startDate={startDate}
-            endDate={endDate}
-            onChangeDeadline={mockOnChangeDeadline}
-          />
-        );
-
-        // Weekly columns should have bg-muted/30 class
-        const weeklyColumns = container.querySelectorAll('.bg-muted\\/30');
-        expect(weeklyColumns.length).toBeGreaterThan(0);
-      });
+      expect(screen.queryByRole('button', { name: /Adjust deadline/ })).not.toBeInTheDocument();
     });
   });
+
+  describe('Responsive Design', () => {
+    it('should apply responsive width classes', () => {
+      const { container } = render(
+        <GanttChart
+          rows={mockRows}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Component uses inline styles for fixed widths, check for shrink-0 class instead
+      const shrinkElements = container.querySelectorAll('.shrink-0');
+      expect(shrinkElements.length).toBeGreaterThan(0);
+    });
+
+    it('should render with mobile-friendly date format', () => {
+      render(
+        <GanttChart
+          rows={mockRows}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Both formats should be present (hidden/shown by responsive classes)
+      expect(screen.getAllByText('15')[0]).toBeInTheDocument();
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle tasks with same start and end date', () => {
+      const singleDayTask: GanttTask = {
+        id: 10,
+        title: 'Single Day Task',
+        project: 'Test',
+        startDate: '2025-10-20T00:00:00Z',
+        deadline: '2025-10-20T00:00:00Z',
+        status: 'To Do',
+        updatedAt: '',
+        assignee: { id: 'worker', name: 'Worker' },
+      };
+
+      render(
+        <GanttChart
+          rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [singleDayTask] }]}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Check for project name and assignee (title is truncated)
+      expect(screen.getByRole('button', { name: /^Inspect / })).toBeInTheDocument();
+      expect(screen.getByText('Worker')).toBeInTheDocument();
+    });
+
+    it('should handle tasks starting before range', () => {
+      const earlyTask: GanttTask = {
+        id: 11,
+        title: 'Early Start',
+        project: 'Test',
+        startDate: '2025-10-01T00:00:00Z',
+        deadline: '2025-10-20T00:00:00Z',
+        status: 'In Progress',
+        updatedAt: '',
+        assignee: { id: 'worker', name: 'Worker' },
+      };
+
+      render(
+        <GanttChart
+          rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [earlyTask] }]}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Check for project name and left arrow indicator (task extends before range)
+      expect(screen.getByRole('button', { name: /^Inspect / })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Inspect / })).toHaveAttribute(
+        'title',
+        expect.stringContaining('Span continues beyond visible range')
+      );
+    });
+
+    it('should handle tasks ending after range', () => {
+      const lateTask: GanttTask = {
+        id: 12,
+        title: 'Late End',
+        project: 'Test',
+        startDate: '2025-10-20T00:00:00Z',
+        deadline: '2025-11-01T00:00:00Z',
+        status: 'In Progress',
+        updatedAt: '',
+        assignee: { id: 'worker', name: 'Worker' },
+      };
+
+      render(
+        <GanttChart
+          rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [lateTask] }]}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Check for project name and right arrow indicator (task extends after range)
+      expect(screen.getByRole('button', { name: /^Inspect / })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Inspect / })).toHaveAttribute(
+        'title',
+        expect.stringContaining('Span continues beyond visible range')
+      );
+    });
+
+    it('should handle multiple tasks for same assignee', () => {
+      const multiTaskRow: GanttRow = {
+        assigneeId: 'busy',
+        assigneeName: 'Busy Worker',
+        tasks: [
+          {
+            id: 13,
+            title: 'Task 1',
+            project: 'Project A',
+            startDate: '2025-10-16T00:00:00Z',
+            deadline: '2025-10-18T00:00:00Z',
+            status: 'Completed',
+            updatedAt: '2025-10-17T00:00:00Z',
+            assignee: { id: 'busy', name: 'Busy Worker' },
+          },
+          {
+            id: 14,
+            title: 'Task 2',
+            project: 'Project B',
+            startDate: '2025-10-19T00:00:00Z',
+            deadline: '2025-10-22T00:00:00Z',
+            status: 'In Progress',
+            updatedAt: '',
+            assignee: { id: 'busy', name: 'Busy Worker' },
+          },
+          {
+            id: 15,
+            title: 'Task 3',
+            project: 'Project C',
+            startDate: '2025-10-23T00:00:00Z',
+            deadline: '2025-10-25T00:00:00Z',
+            status: 'To Do',
+            updatedAt: '',
+            assignee: { id: 'busy', name: 'Busy Worker' },
+          },
+        ],
+      };
+
+      render(
+        <GanttChart
+          rows={[multiTaskRow]}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Check for project names and assignee (titles are truncated)
+      expect(screen.getByRole('button', { name: /Inspect Task 1,/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Inspect Task 2,/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Inspect Task 3,/ })).toBeInTheDocument();
+      expect(screen.getByText('Busy Worker')).toBeInTheDocument();
+    });
+
+    it('should handle null updated_at for completed tasks', () => {
+      const completedNoUpdate: GanttTask = {
+        id: 16,
+        title: 'Completed No Update',
+        project: 'Test',
+        startDate: '2025-10-16T00:00:00Z',
+        deadline: '2025-10-22T00:00:00Z',
+        status: 'Completed',
+        updatedAt: '',
+        assignee: { id: 'worker', name: 'Worker' },
+      };
+
+      const { container } = render(
+        <GanttChart
+          rows={[{ assigneeId: 'worker', assigneeName: 'Worker', tasks: [completedNoUpdate] }]}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Check that the task is rendered (title appears in truncated text)
+      expect(screen.getByRole('button', { name: /^Inspect / })).toBeInTheDocument();
+      expect(container.querySelector('.bg-positive-soft')).toBeInTheDocument();
+    });
+  });
+
+  describe('Weekly Highlighting', () => {
+    it('should highlight weekly columns', () => {
+      const { container } = render(
+        <GanttChart
+          rows={mockRows}
+          startDate={startDate}
+          endDate={endDate}
+          onChangeDeadline={mockOnChangeDeadline}
+        />
+      );
+
+      // Weekly columns should have bg-muted/30 class
+      const weeklyColumns = container.querySelectorAll('.bg-muted\\/30');
+      expect(weeklyColumns.length).toBeGreaterThan(0);
+    });
+  });
+});

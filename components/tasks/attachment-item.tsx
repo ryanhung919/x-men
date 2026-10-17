@@ -20,7 +20,7 @@ export function AttachmentItem({ id, storage_path, public_url }: AttachmentItemP
   if (!public_url) {
     return (
       <li key={id}>
-        <span className="text-gray-500">
+        <span className="text-muted-foreground">
           {fileName} <span className="text-xs">(File not found)</span>
         </span>
       </li>
@@ -35,7 +35,7 @@ export function AttachmentItem({ id, storage_path, public_url }: AttachmentItemP
             href={public_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
+            className="text-positive hover:underline"
           >
             {fileName}
           </a>
@@ -58,7 +58,7 @@ export function AttachmentItem({ id, storage_path, public_url }: AttachmentItemP
         href={public_url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-600 hover:underline"
+        className="text-positive hover:underline"
       >
         {fileName}
       </a>

@@ -1,16 +1,12 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { useEffect, useState } from 'react';
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
-import { Pie, PieChart } from 'recharts';
-import { User } from 'lucide-react';
+  ReportMetrics,
+  ReportError,
+  StatusComparison,
+  StatusLegend,
+} from '@/components/report/report-comparison';
 import type {
   TaskCompletionReport as TaskCompletionReportType,
   KPI,
@@ -57,14 +53,6 @@ const round = (value: number, decimals: number = 2): number => {
   return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
 };
 
-// Chart configs
-const statusConfig = {
-  completed: { label: 'Completed', color: 'var(--chart-1)' },
-  inProgress: { label: 'In Progress', color: 'var(--chart-4)' },
-  todo: { label: 'To Do', color: 'var(--chart-5)' },
-  blocked: { label: 'Blocked', color: 'var(--destructive)' },
-} satisfies ChartConfig;
-
 export function TaskCompletionsChart({
   departmentIds = [],
   projectIds = [],
@@ -73,18 +61,18 @@ export function TaskCompletionsChart({
   onDataLoaded,
 }: Props) {
   const [data, setData] = useState<ReportData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const prevDataRef = useRef<ReportData | null>(null);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    if (!departmentIds.length) {
+    if (!departmentIds.length && !projectIds.length) {
       setData(null);
-      prevDataRef.current = null;
       return;
     }
 
+    const controller = new AbortController();
     const fetchData = async () => {
-      setLoading(true);
+      setError(false);
       try {
         const params = new URLSearchParams({
           action: 'task',
@@ -95,10 +83,11 @@ export function TaskCompletionsChart({
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
 
-        const res = await fetch(`/api/reports?${params}`);
+        const res = await fetch(`/api/reports?${params}`, { signal: controller.signal });
         if (!res.ok) throw new Error('Failed to fetch task completions');
 
         const json = await res.json();
+        if (controller.signal.aborted) return;
         if (json && json.kind === 'taskCompletions') {
           const newData: ReportData = {
             totalTasks: json.totalTasks || 0,
@@ -110,7 +99,6 @@ export function TaskCompletionsChart({
             userStats: json.userStats || [],
           };
 
-          prevDataRef.current = newData;
           setData(newData);
 
           // Generate export data
@@ -177,206 +165,146 @@ export function TaskCompletionsChart({
             onDataLoaded(exportData);
           }
         }
-      } catch (err) {
-        console.error(err);
+      } catch {
+        if (controller.signal.aborted) return;
+        setError(true);
         setData(null);
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchData();
-  }, [departmentIds, projectIds, startDate, endDate]);
+    return () => controller.abort();
+  }, [departmentIds, projectIds, startDate, endDate, retry, onDataLoaded]);
 
-  const displayData = loading && prevDataRef.current ? prevDataRef.current : data;
+  if (error) return <ReportError retry={() => setRetry((value) => value + 1)} />;
+
+  const displayData = data;
 
   if (!displayData) {
     return <TaskCompletionReportSkeleton />;
   }
 
+  const maximum = Math.max(...displayData.userStats.map((user) => user.totalTasks), 1);
   return (
-    <div className="space-y-6">
-      {/* Overall Summary Card */}
-      <Card className="border-2">
-        <CardHeader>
-          <CardTitle className="text-lg">Team Overview</CardTitle>
-          <CardDescription>Aggregate task completion statistics</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            <div>
-              <div className="text-sm text-muted-foreground">Total Tasks</div>
-              <div className="text-2xl font-bold">{displayData.totalTasks}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Completed</div>
-              <div className="text-2xl font-bold" style={{ color: 'var(--chart-1)' }}>
-                {displayData.totalCompleted}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">In Progress</div>
-              <div className="text-2xl font-bold" style={{ color: 'var(--chart-4)' }}>
-                {displayData.totalInProgress}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">To Do</div>
-              <div className="text-2xl font-bold" style={{ color: 'var(--chart-5)' }}>
-                {displayData.totalTodo}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Blocked</div>
-              <div className="text-2xl font-bold" style={{ color: 'var(--destructive)' }}>
-                {displayData.totalBlocked}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Completion Rate</div>
-              <div className="text-2xl font-bold">
-                {round(displayData.overallCompletionRate * 100, 1)}%
-              </div>
-            </div>
+    <section className="space-y-5" aria-label="Task completions report">
+      <ReportMetrics
+        items={[
+          { label: 'Tasks in scope', value: displayData.totalTasks },
+          {
+            label: 'Completed',
+            value: displayData.totalCompleted,
+            note: `${round(displayData.overallCompletionRate * 100, 1)}% completion`,
+          },
+          { label: 'In progress', value: displayData.totalInProgress },
+          { label: 'To do', value: displayData.totalTodo },
+          { label: 'Blocked', value: displayData.totalBlocked, problem: true },
+        ]}
+      />
+      <div className="overflow-hidden rounded-2xl border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">Completion by creator</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Created tasks, compared on a shared scale
+            </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* User Cards Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {displayData.userStats.map((user) => (
-          <Card key={user.userId} className="relative">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-base">{user.userName}</CardTitle>
-              </div>
-              <CardDescription className="text-xs">
-                {user.totalTasks} task{user.totalTasks !== 1 ? 's' : ''} assigned
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Task Status Distribution */}
-              <div>
-                <div className="text-xs font-medium mb-2">Task Status</div>
-                <ChartContainer config={statusConfig} className="h-[120px] w-full">
-                  <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Pie
-                      data={[
-                        {
-                          name: 'completed',
-                          value: user.completedTasks,
-                          fill: statusConfig.completed.color,
-                        },
-                        {
-                          name: 'inProgress',
-                          value: user.inProgressTasks,
-                          fill: statusConfig.inProgress.color,
-                        },
-                        {
-                          name: 'todo',
-                          value: user.todoTasks,
-                          fill: statusConfig.todo.color,
-                        },
-                        {
-                          name: 'blocked',
-                          value: user.blockedTasks,
-                          fill: statusConfig.blocked.color,
-                        },
-                      ]}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={25}
-                      outerRadius={45}
-                    />
-                  </PieChart>
-                </ChartContainer>
-                <div className="grid grid-cols-4 gap-2 text-xs mt-2">
-                  <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--chart-1)' }}>
-                      {user.completedTasks}
-                    </div>
-                    <div className="text-muted-foreground">Done</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--chart-4)' }}>
-                      {user.inProgressTasks}
-                    </div>
-                    <div className="text-muted-foreground">In Progress</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--chart-5)' }}>
-                      {user.todoTasks}
-                    </div>
-                    <div className="text-muted-foreground">To Do</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-medium" style={{ color: 'var(--destructive)' }}>
-                      {user.blockedTasks}
-                    </div>
-                    <div className="text-muted-foreground">Blocked</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Completion Rate */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">Completion Rate</span>
-                  <span className="font-medium">{round(user.completionRate * 100, 1)}%</span>
-                </div>
-                <Progress value={user.completionRate * 100} />
-              </div>
-
-              {/* On-Time Performance */}
-              {user.completedTasks >= 0 && (
-                <div>
-                  <div className="text-xs font-medium mb-2">On-Time Performance</div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <div className="text-muted-foreground">On-Time</div>
-                      <div className="font-medium text-green-600">{user.onTimeCompletions}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Late</div>
-                      <div className="font-medium text-red-600">{user.lateCompletions}</div>
-                    </div>
-                  </div>
-                  <Progress value={user.onTimeRate * 100} className="mt-2" />
-                  <div className="text-xs text-center mt-1 text-muted-foreground">
-                    {round(user.onTimeRate * 100, 1)}% on-time
-                  </div>
-                </div>
-              )}
-
-              {/* Time Metrics */}
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t">
-                <div>
-                  <div className="text-xs text-muted-foreground">Average Task Cycle Duration</div>
-                  <div className="text-sm font-medium">{round(user.avgCompletionTime, 1)}h</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Total Logged Hours</div>
-                  <div className="text-sm font-medium">{round(user.totalLoggedTime, 1)}h</div>
-                </div>
-              </div>
-
-              {loading && (
-                <div className="absolute inset-0 animate-pulse bg-black/5 rounded-lg pointer-events-none" />
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {displayData.userStats.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No user statistics available for the selected filters
+          <StatusLegend />
         </div>
-      )}
-    </div>
+        <div className="hidden grid-cols-[180px_minmax(180px,1fr)_100px_110px_100px] gap-5 border-y bg-muted/30 px-6 py-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground lg:grid">
+          <span>Creator</span>
+          <span>Task distribution</span>
+          <span className="text-right">Completion</span>
+          <span className="text-right">Avg cycle</span>
+          <span className="text-right">Logged time</span>
+        </div>
+        <div className="divide-y">
+          {displayData.userStats.map((user) => (
+            <div key={user.userId} className="p-5 sm:px-6">
+              <div className="grid items-center gap-4 lg:grid-cols-[180px_minmax(180px,1fr)_100px_110px_100px] lg:gap-5">
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-positive-soft text-xs font-medium text-positive"
+                  >
+                    {user.userName
+                      .split(' ')
+                      .map((part) => part[0])
+                      .slice(0, 2)
+                      .join('')}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{user.userName}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {user.totalTasks} created tasks
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <StatusComparison
+                    maximum={maximum}
+                    counts={{
+                      completed: user.completedTasks,
+                      inProgress: user.inProgressTasks,
+                      todo: user.todoTasks,
+                      blocked: user.blockedTasks,
+                    }}
+                  />
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                    <span>{user.completedTasks} done</span>
+                    <span>{user.inProgressTasks} active</span>
+                    <span>{user.todoTasks} to do</span>
+                    <span className={user.blockedTasks ? 'text-problem' : ''}>
+                      {user.blockedTasks} blocked
+                    </span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-sm lg:block lg:text-right">
+                  <span className="text-xs text-muted-foreground lg:hidden">Completion</span>
+                  <span className="font-medium tabular-nums text-positive">
+                    {round(user.completionRate * 100, 1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm lg:block lg:text-right">
+                  <span className="text-xs text-muted-foreground lg:hidden">Average cycle</span>
+                  <span className="tabular-nums">
+                    {round(user.avgCompletionTime, 1)}{' '}
+                    <span className="text-xs text-muted-foreground">h</span>
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm lg:block lg:text-right">
+                  <span className="text-xs text-muted-foreground lg:hidden">Logged time</span>
+                  <span className="tabular-nums">
+                    {round(user.totalLoggedTime, 1)}{' '}
+                    <span className="text-xs text-muted-foreground">h</span>
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-muted-foreground lg:pl-[228px]">
+                <span>
+                  <span className="text-positive">{user.onTimeCompletions}</span> on time
+                </span>
+                <span>
+                  <span className={user.lateCompletions ? 'text-problem' : ''}>
+                    {user.lateCompletions}
+                  </span>{' '}
+                  late
+                </span>
+                <span>{round(user.onTimeRate * 100, 1)}% on-time rate</span>
+                <span>{round(user.avgLoggedTimePerTask, 1)} h logged / task</span>
+              </div>
+            </div>
+          ))}
+          {!displayData.userStats.length && (
+            <p className="p-10 text-center text-sm text-muted-foreground">
+              No created tasks match this scope.
+            </p>
+          )}
+        </div>
+        <p className="border-t px-6 py-4 text-[10px] leading-relaxed text-muted-foreground">
+          Cycle duration uses creation to latest update for completed tasks. On-time compares latest
+          update with deadline; completed tasks without a deadline remain in the rate’s denominator.
+        </p>
+      </div>
+    </section>
   );
 }

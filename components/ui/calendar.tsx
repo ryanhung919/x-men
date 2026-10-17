@@ -34,7 +34,7 @@ function Calendar({
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className
       )}
-      style={{ backgroundColor: 'hsl(var(--popover))' }}
+      style={{ backgroundColor: 'var(--popover)' }}
       captionLayout={captionLayout}
       formatters={{
         formatMonthDropdown: (date) =>

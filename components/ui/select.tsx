@@ -67,7 +67,7 @@ function SelectContent({
           className,
         )}
         position={position}
-        style={{ backgroundColor: 'hsl(var(--popover))' }}
+        style={{ backgroundColor: 'var(--popover)' }}
         {...props}
       >
         <SelectScrollUpButton />

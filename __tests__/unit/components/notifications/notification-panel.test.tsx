@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { NotificationPanel } from '@/components/notifications/notification-panel';
 import type { Notification } from '@/components/notifications/notification-item';
 
@@ -115,7 +115,7 @@ describe('NotificationPanel', () => {
   });
 
   describe('Loading State', () => {
-    it('should show loading spinner when isLoading is true', async () => {
+    it('should expose loading progress when isLoading is true', async () => {
       mockUseNotifications.mockReturnValue({
         ...defaultMockReturn,
         isLoading: true,
@@ -129,7 +129,7 @@ describe('NotificationPanel', () => {
 
       await waitFor(() => {
         // Sheet renders to portal, so use document.querySelector
-        const spinner = document.querySelector('.animate-spin');
+        const spinner = screen.getByLabelText('Loading notifications');
         expect(spinner).toBeInTheDocument();
       });
     });
@@ -149,7 +149,7 @@ describe('NotificationPanel', () => {
       fireEvent.click(bellButton);
 
       await waitFor(() => {
-        expect(screen.getByText('No notifications yet')).toBeInTheDocument();
+        expect(screen.getByText(/No notifications yet\./)).toBeInTheDocument();
       });
     });
   });
@@ -191,7 +191,7 @@ describe('NotificationPanel', () => {
       });
     });
 
-    it('should not show "Mark all read" button when unreadCount is 0', async () => {
+    it('should disable "Mark all read" when unreadCount is 0', async () => {
       mockUseNotifications.mockReturnValue({
         ...defaultMockReturn,
         unreadCount: 0,
@@ -203,7 +203,7 @@ describe('NotificationPanel', () => {
       fireEvent.click(bellButton);
 
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: /mark all read/i })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /mark all read/i })).toBeDisabled();
       });
     });
   });
@@ -221,11 +221,11 @@ describe('NotificationPanel', () => {
       fireEvent.click(bellButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Deleting all notifications...')).toBeInTheDocument();
+        expect(screen.getByText('Deleting notifications…')).toBeInTheDocument();
       });
     });
 
-    it('should not show action buttons when isDeleting is true', async () => {
+    it('should disable action buttons when isDeleting is true', async () => {
       mockUseNotifications.mockReturnValue({
         ...defaultMockReturn,
         isDeleting: true,
@@ -237,8 +237,8 @@ describe('NotificationPanel', () => {
       fireEvent.click(bellButton);
 
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: /mark all read/i })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: /delete all/i })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /mark all read/i })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /delete all/i })).toBeDisabled();
       });
     });
   });
@@ -264,23 +264,18 @@ describe('NotificationPanel', () => {
       expect(mockHandleMarkAllAsRead).toHaveBeenCalledTimes(1);
     });
 
-    it('should call handleDeleteAll when "Delete all" is clicked', async () => {
+    it('requires confirmation before clearing notifications', async () => {
       const mockHandleDeleteAll = vi.fn();
       mockUseNotifications.mockReturnValue({
         ...defaultMockReturn,
         handleDeleteAll: mockHandleDeleteAll,
       });
-
       render(<NotificationPanel />);
-
-      const bellButton = screen.getByRole('button');
-      fireEvent.click(bellButton);
-
-      await waitFor(async () => {
-        const deleteAllButton = screen.getByRole('button', { name: /delete all/i });
-        fireEvent.click(deleteAllButton);
-      });
-
+      fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete all' }));
+      expect(mockHandleDeleteAll).not.toHaveBeenCalled();
+      const dialog = await screen.findByRole('alertdialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Delete all' }));
       expect(mockHandleDeleteAll).toHaveBeenCalledTimes(1);
     });
 

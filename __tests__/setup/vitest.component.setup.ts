@@ -3,24 +3,26 @@ import { vi } from 'vitest';
 
 // Mock jsPDF for component tests
 vi.mock('jspdf', () => ({
-  jsPDF: vi.fn().mockImplementation(() => ({
-    internal: {
-      pageSize: {
-        getWidth: () => 595,
-        getHeight: () => 842,
+  jsPDF: vi.fn().mockImplementation(function () {
+    return {
+      internal: {
+        pageSize: {
+          getWidth: () => 595,
+          getHeight: () => 842,
+        },
       },
-    },
-    setFont: vi.fn().mockReturnThis(),
-    setFontSize: vi.fn().mockReturnThis(),
-    text: vi.fn().mockReturnThis(),
-    addPage: vi.fn().mockReturnThis(),
-    save: vi.fn(),
-    splitTextToSize: vi.fn((text: string) => [text]),
-    rect: vi.fn().mockReturnThis(),
-    triangle: vi.fn().mockReturnThis(),
-    setFillColor: vi.fn().mockReturnThis(),
-    setTextColor: vi.fn().mockReturnThis(),
-  })),
+      setFont: vi.fn().mockReturnThis(),
+      setFontSize: vi.fn().mockReturnThis(),
+      text: vi.fn().mockReturnThis(),
+      addPage: vi.fn().mockReturnThis(),
+      save: vi.fn(),
+      splitTextToSize: vi.fn((text: string) => [text]),
+      rect: vi.fn().mockReturnThis(),
+      triangle: vi.fn().mockReturnThis(),
+      setFillColor: vi.fn().mockReturnThis(),
+      setTextColor: vi.fn().mockReturnThis(),
+    };
+  }),
 }));
 
 // Mock XLSX for component tests

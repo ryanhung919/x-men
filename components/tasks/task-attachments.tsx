@@ -1,210 +1,250 @@
-"use client"
+'use client';
 
-import type React from "react"
-
-import { Button } from "@/components/ui/button"
-import { FileText, X } from "lucide-react"
-import { useRef, useState } from "react"
-import { FileUploadZone } from "./file-upload-zone"
-import { Card, CardContent } from "@/components/ui/card"
+import { Button } from '@/components/ui/button';
+import { FileText, X, Plus, ArrowUpRight } from 'lucide-react';
+import { useState } from 'react';
+import { FileUploadZone } from './file-upload-zone';
 
 interface TaskAttachmentsProps {
-  taskId: number
-  initialAttachments: { id: number; storage_path: string; public_url?: string }[]
-  onAttachmentsUpdate?: (newAttachments: any[]) => void
+  taskId: number;
+  initialAttachments: { id: number; storage_path: string; public_url?: string }[];
+  readOnly?: boolean;
+  onAttachmentsUpdate?: (newAttachments: any[]) => void;
 }
 
-export function TaskAttachments({ taskId, initialAttachments, onAttachmentsUpdate }: TaskAttachmentsProps) {
-  const [attachments, setAttachments] = useState(initialAttachments)
-  const [isUploading, setIsUploading] = useState(false)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [uploadingFiles, setUploadingFiles] = useState<File[]>([])
+export function TaskAttachments({
+  taskId,
+  initialAttachments,
+  onAttachmentsUpdate,
+  readOnly = false,
+}: TaskAttachmentsProps) {
+  const [attachments, setAttachments] = useState(initialAttachments);
+  const [showUpload, setShowUpload] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
 
   const handleFileSelect = (selectedFiles: File[]) => {
-    setUploadingFiles(selectedFiles)
-  }
+    setUploadingFiles(selectedFiles);
+  };
 
   const handleUpload = async () => {
-    if (uploadingFiles.length === 0) return
+    if (uploadingFiles.length === 0) return;
 
-    setIsUploading(true)
-    setError(null)
+    setIsUploading(true);
+    setError(null);
 
     try {
-      const formData = new FormData()
-      formData.append("action", "addAttachments")
+      const formData = new FormData();
+      formData.append('action', 'addAttachments');
 
       uploadingFiles.forEach((file, index) => {
-        formData.append(`file_${index}`, file)
-      })
+        formData.append(`file_${index}`, file);
+      });
 
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: formData,
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to upload attachments")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to upload attachments');
       }
 
-      const data = await res.json()
-      console.log("[v0] Upload response:", data)
+      const data = await res.json();
 
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Refetch the task to get the updated attachments with public_url
-      const refetchRes = await fetch(`/api/tasks/${taskId}`)
+      const refetchRes = await fetch(`/api/tasks/${taskId}`);
       if (refetchRes.ok) {
-        const taskData = await refetchRes.json()
-        console.log("[v0] Refetched task data:", taskData)
+        const taskData = await refetchRes.json();
+
         if (taskData.attachments) {
-          setAttachments(taskData.attachments)
-          onAttachmentsUpdate?.(taskData.attachments)
+          setAttachments(taskData.attachments);
+          onAttachmentsUpdate?.(taskData.attachments);
         }
       } else {
         // Fallback: use the response data if refetch fails
-        const newAttachments = [...attachments, ...data.attachments]
-        setAttachments(newAttachments)
-        onAttachmentsUpdate?.(newAttachments)
+        const newAttachments = [...attachments, ...data.attachments];
+        setAttachments(newAttachments);
+        onAttachmentsUpdate?.(newAttachments);
       }
 
-      setUploadingFiles([])
+      setUploadingFiles([]);
+      setShowUpload(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to upload attachments"
-      setError(errorMessage)
-      console.error("Failed to upload attachments:", err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload attachments';
+      setError(errorMessage);
+      console.error('Failed to upload attachments:', err);
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
   const handleAttachmentDelete = async (attachmentId: number) => {
-    setDeletingId(attachmentId)
-    setError(null)
+    setDeletingId(attachmentId);
+    setError(null);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "removeAttachment",
+          action: 'removeAttachment',
           attachment_id: attachmentId,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to remove attachment")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to remove attachment');
       }
 
-      const newAttachments = attachments.filter((a) => a.id !== attachmentId)
-      setAttachments(newAttachments)
-      onAttachmentsUpdate?.(newAttachments)
+      const newAttachments = attachments.filter((a) => a.id !== attachmentId);
+      setAttachments(newAttachments);
+      onAttachmentsUpdate?.(newAttachments);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to remove attachment"
-      setError(errorMessage)
-      console.error("Failed to remove attachment:", err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove attachment';
+      setError(errorMessage);
+      console.error('Failed to remove attachment:', err);
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
-  }
+  };
 
   const getFileName = (path: string) => {
-    return path.split("/").pop() || "Unknown file"
-  }
+    return path.split('/').pop() || 'Unknown file';
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Error Message */}
+    <div className="space-y-3">
       {error && (
-        <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-3 rounded-md border border-red-200 dark:border-red-800">
+        <div
+          role="alert"
+          className="rounded-lg border border-problem/20 bg-problem-soft p-3 text-sm text-problem"
+        >
           {error}
         </div>
       )}
-
-      {/* Existing Attachments Section */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] text-muted-foreground">
+          {attachments.length
+            ? `${attachments.length} uploaded file${attachments.length === 1 ? '' : 's'}`
+            : 'No files attached.'}
+        </p>
+        {!readOnly && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isUploading}
+            aria-expanded={showUpload}
+            aria-controls={`task-upload-${taskId}`}
+            onClick={() => setShowUpload((open) => !open)}
+          >
+            <Plus className="size-3.5" />
+            Add files
+          </Button>
+        )}
+      </div>
       {attachments.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold">Uploaded Files ({attachments.length})</h4>
-          </div>
-          <div className="space-y-2">
-            {attachments.map((att) => (
-              <div
+        <ul className="divide-y rounded-lg border">
+          {attachments.map((att) => {
+            const name = getFileName(att.storage_path);
+            const extension = name.includes('.') ? name.split('.').pop()?.toUpperCase() : 'FILE';
+            return (
+              <li
                 key={att.id}
-                className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted rounded-lg transition-colors"
+                className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/40"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-positive-soft text-positive"
+                >
+                  <FileText className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
                   {att.public_url ? (
                     <a
                       href={att.public_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline truncate font-medium"
+                      className="block break-all text-xs font-medium text-foreground hover:text-positive hover:underline"
                     >
-                      {getFileName(att.storage_path)}
+                      {name}
                     </a>
                   ) : (
-                    <span className="text-sm text-muted-foreground truncate">{getFileName(att.storage_path)}</span>
+                    <span className="block break-all text-xs font-medium">{name}</span>
                   )}
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    {extension}
+                    {!att.public_url && ' · Link unavailable'}
+                  </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleAttachmentDelete(att.id)}
-                  disabled={deletingId === att.id}
-                  className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950 ml-2 flex-shrink-0"
-                >
-                  {deletingId === att.id ? <span className="text-xs">Deleting...</span> : <X className="w-4 h-4" />}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
+                {att.public_url && (
+                  <a
+                    href={att.public_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open ${name}`}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-positive"
+                  >
+                    <ArrowUpRight className="size-3.5" />
+                  </a>
+                )}
+                {!readOnly && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => handleAttachmentDelete(att.id)}
+                    disabled={deletingId === att.id}
+                    aria-label={`Remove ${name}`}
+                    className="size-8 shrink-0 text-muted-foreground hover:bg-problem-soft hover:text-problem"
+                  >
+                    {deletingId === att.id ? (
+                      <span className="text-[10px]">…</span>
+                    ) : (
+                      <X className="size-3.5" />
+                    )}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
-
-      {/* Upload Zone Section */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold">Add New Files</h4>
-        <FileUploadZone 
-          files={uploadingFiles} 
-          onChange={handleFileSelect}
-          maxTotalSize={50 * 1024 * 1024}
-          maxFiles={10}
-        />
-      </div>
-
-      {/* Upload Button */}
-      {uploadingFiles.length > 0 && (
-        <div className="flex gap-2">
-          <Button 
-            onClick={handleUpload}
-            disabled={isUploading}
-            className="flex-1"
-          >
-            {isUploading ? "Uploading..." : `Upload ${uploadingFiles.length} File(s)`}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setUploadingFiles([])}
-            disabled={isUploading}
-          >
-            Cancel
-          </Button>
+      {!readOnly && showUpload && (
+        <div id={`task-upload-${taskId}`} className="space-y-3 rounded-lg border bg-muted/20 p-3">
+          <FileUploadZone
+            files={uploadingFiles}
+            onChange={handleFileSelect}
+            maxTotalSize={50 * 1024 * 1024}
+            maxFiles={10}
+          />
+          {uploadingFiles.length > 0 && (
+            <div className="flex gap-2">
+              <Button onClick={handleUpload} disabled={isUploading} size="sm">
+                {isUploading ? 'Uploading...' : `Upload ${uploadingFiles.length} File(s)`}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setUploadingFiles([]);
+                  setShowUpload(false);
+                }}
+                disabled={isUploading}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Empty State */}
-      {attachments.length === 0 && uploadingFiles.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-8">
-          No attachments yet. Upload files to get started.
-        </p>
       )}
     </div>
-  )
+  );
 }

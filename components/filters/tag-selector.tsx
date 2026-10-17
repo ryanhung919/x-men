@@ -44,7 +44,7 @@ export function TagSelector({ tags, selectedTags, onChange, loading = false }: T
         <SelectContent
           className="bg-popover text-popover-foreground border border-border shadow-md"
           style={{
-            backgroundColor: 'hsl(var(--popover))',
+            backgroundColor: 'var(--popover)',
             backdropFilter: 'none',
             WebkitBackdropFilter: 'none',
           }}

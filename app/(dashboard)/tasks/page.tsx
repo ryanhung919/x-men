@@ -1,6 +1,6 @@
+import { getRolesForUserClient } from '@/lib/db/roles';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import TasksList from '@/components/tasks/task-list';
 import { getUserTasksService } from '@/lib/services/tasks';
 import TasksPageHeader from '@/components/tasks/tasks-page-header';
 import TasksViewWrapper from '@/components/tasks/tasks-view-wrapper';
@@ -16,11 +16,14 @@ export default async function TasksPage() {
   }
 
   // Fetch and format tasks via service layer (single call)
-  const tasks = await getUserTasksService(user.id);
+  const [tasks, roles] = await Promise.all([
+    getUserTasksService(user.id),
+    getRolesForUserClient(supabase, user.id),
+  ]);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <TasksPageHeader tasksCount={tasks.length} />
+    <div className="space-y-5">
+      <TasksPageHeader readOnly={roles.includes('demo_viewer')} tasksCount={tasks.length} />
       <TasksViewWrapper tasks={tasks} />
     </div>
   );

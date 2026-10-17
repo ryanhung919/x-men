@@ -77,11 +77,10 @@ describe('DayView User Interactions', () => {
     const task = createTask(1, 'Task 1', testDate);
     render(<DayView tasks={[task]} date={testDate} onTaskClick={mockOnTaskClick} />);
 
-    // Verify time navigation elements exist
-    expect(screen.getByText('12 AM')).toBeInTheDocument();
-    expect(screen.getByText('9 AM')).toBeInTheDocument();
-    expect(screen.getByText('12 PM')).toBeInTheDocument();
-    expect(screen.getByText('11 PM')).toBeInTheDocument();
+    // Calendar displays actual deadlines rather than invented working-hour allocations.
+    expect(screen.getByText('Monday')).toBeInTheDocument();
+    expect(screen.getByText(/1 task due/)).toBeInTheDocument();
+    expect(screen.queryByText('9 AM')).not.toBeInTheDocument();
 
     // Verify task is interactive
     expect(screen.getByLabelText(/Task: Task 1/)).toBeInTheDocument();

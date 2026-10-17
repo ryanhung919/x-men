@@ -16,6 +16,7 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const supabase = createClient();
 
@@ -27,6 +28,7 @@ export function useNotifications() {
       setUnreadCount(count);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setError('Could not load your notifications. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -37,7 +39,7 @@ export function useNotifications() {
 
     // Realtime subscription
     const channel: RealtimeChannel = supabase
-      .channel('notifications-changes')
+      .channel(`notifications-changes-${crypto.randomUUID()}`)
       .on(
         'postgres_changes',
         {
@@ -106,6 +108,7 @@ export function useNotifications() {
       // Realtime will confirm the update
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      setError('Could not mark this notification as read. Please try again.');
       // Revert on error
       fetchNotifications();
     }
@@ -121,6 +124,7 @@ export function useNotifications() {
       // Realtime will confirm the update
     } catch (error) {
       console.error('Error marking all as read:', error);
+      setError('Could not mark notifications as read. Please try again.');
       // Revert on error
       fetchNotifications();
     }
@@ -139,6 +143,7 @@ export function useNotifications() {
       // Realtime will confirm the update
     } catch (error) {
       console.error('Error deleting notification:', error);
+      setError('Could not delete this notification. Please try again.');
       // Revert on error
       fetchNotifications();
     }
@@ -166,6 +171,7 @@ export function useNotifications() {
       setUnreadCount(0);
     } catch (error) {
       console.error('Error deleting all notifications:', error);
+      setError('Could not delete all notifications. Please try again.');
       // Revert on error
       fetchNotifications();
     } finally {
@@ -175,6 +181,7 @@ export function useNotifications() {
 
   return {
     notifications,
+    error,
     unreadCount,
     isLoading,
     isDeleting,
@@ -182,6 +189,9 @@ export function useNotifications() {
     handleMarkAllAsRead,
     handleDelete,
     handleDeleteAll,
-    refetch: fetchNotifications,
+    refetch: () => {
+      setError(null);
+      return fetchNotifications();
+    },
   };
 }

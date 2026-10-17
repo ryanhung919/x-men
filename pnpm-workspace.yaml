@@ -1,0 +1,7 @@
+# Native toolchains require install scripts; core-js only prints an optional notice.
+allowBuilds:
+  '@tailwindcss/oxide': true
+  bcrypt: true
+  esbuild: true
+  sharp: true
+  core-js: false

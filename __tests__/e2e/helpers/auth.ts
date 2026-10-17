@@ -13,14 +13,14 @@ export async function login(page: Page, role: UserRole = 'staff'): Promise<void>
   await page.goto('/');
 
   // Wait for login page to load
-  await expect(page.getByText('Login', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
 
   // Fill in credentials
   await page.getByLabel(/email/i).fill(user.email);
   await page.getByLabel(/password/i).fill(user.password);
 
   // Click login button
-  await page.getByRole('button', { name: /login/i }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
   // Wait for redirect to tasks or schedule page
   await page.waitForURL(/\/tasks|\/schedule/);
@@ -36,72 +36,11 @@ export async function login(page: Page, role: UserRole = 'staff'): Promise<void>
 export async function logout(page: Page): Promise<void> {
   console.log('Logging out current user...');
 
-  // Try to wait a moment for any pending operations
-  await page.waitForTimeout(1000);
-
-  // Try desktop user profile button first
-  const userMenuButton = page.locator('button[data-slot="dropdown-menu-trigger"]')
-    .filter({ has: page.locator('svg.lucide-user-round') })
-    .first();
-
-  // Check if it's visible (desktop), if not, use mobile menu
-  let isDesktop = false;
-  try {
-    isDesktop = await userMenuButton.isVisible({ timeout: 3000 });
-  } catch {
-  }
-
-
-  if (isDesktop) {
-    try {
-      await userMenuButton.click({ timeout: 5000 });
-    } catch (error) {
-      // Try alternative selectors for user menu
-      const alternativeButton = page.locator('button')
-        .filter({ has: page.locator('svg.lucide-user-round, svg[data-lucide="user"]') })
-        .or(page.getByLabel(/user profile/i))
-        .or(page.getByLabel(/account/i))
-        .first();
-
-      await alternativeButton.click({ timeout: 5000 });
-    }
-
-    // Wait for menu to open
-    await page.waitForTimeout(500);
-
-    try {
-      await page.locator('div[role="menuitem"]')
-        .filter({ has: page.locator('svg.lucide-log-out') })
-        .filter({ hasText: 'Sign out' })
-        .first()
-        .click({ timeout: 5000 });
-    } catch (error) {
-      // Try alternative sign out selectors
-      const signOutButton = page.getByRole('button', { name: /sign out/i })
-        .or(page.getByRole('menuitem', { name: /sign out/i }))
-        .or(page.locator('button').filter({ hasText: 'Sign out' }))
-        .or(page.locator('button').filter({ has: page.locator('svg.lucide-log-out') }));
-
-      await signOutButton.first().click({ timeout: 5000 });
-    }
-  } else {
-    // Mobile: Try hamburger menu or other mobile menu button
-    try {
-      await page.getByRole('button', { name: /menu/i }).click();
-    } catch {
-      // Fallback: try to find any button that might be a menu trigger
-      await page.locator('button').filter({ has: page.locator('svg') }).first().click();
-    }
-    await page.getByRole('button', { name: /sign out/i }).click();
-  }
-
-  // Wait for redirect to login page
-  try {
-    await page.waitForURL('/', { timeout: 5000 });
-  } catch (error) {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-  }
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Account menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
 
   console.log('Successfully logged out');
 }

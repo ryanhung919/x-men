@@ -66,7 +66,7 @@ export function EditableDescription({
   };
 
   // Consistent padding wrapper for both modes
-  const containerClasses = 'p-3';
+  const containerClasses = 'py-1';
 
   if (isEditing) {
     return (
@@ -80,23 +80,18 @@ export function EditableDescription({
             className="min-h-[120px] resize-none text-base"
             disabled={isLoading}
           />
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-problem">{error}</p>}
           <div className="flex gap-2">
             <Button
               size="sm"
               onClick={handleSave}
               disabled={isLoading}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Check className="w-4 h-4 mr-1" />
               {isLoading ? 'Saving...' : 'Save'}
             </Button>
-            <Button
-              size="sm"
-              onClick={handleCancel}
-              disabled={isLoading}
-              variant="outline"
-            >
+            <Button size="sm" onClick={handleCancel} disabled={isLoading} variant="outline">
               <X className="w-4 h-4 mr-1" />
               Cancel
             </Button>
@@ -108,13 +103,22 @@ export function EditableDescription({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Edit description"
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setIsEditing(true);
+        }
+      }}
       onClick={() => setIsEditing(true)}
-      className={`${containerClasses} border border-transparent rounded-md hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-text transition-all`}
+      className={`${containerClasses} border border-transparent rounded-md hover:border-border hover:bg-muted/40 cursor-text transition-all`}
     >
       {description ? (
-        <p className="text-base whitespace-pre-wrap">{description}</p>
+        <p className="break-words text-sm leading-relaxed whitespace-pre-wrap">{description}</p>
       ) : (
-        <p className="text-base text-gray-400 italic">Add a description...</p>
+        <p className="text-xs text-muted-foreground">Add a description...</p>
       )}
     </div>
   );

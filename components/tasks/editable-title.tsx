@@ -11,11 +11,7 @@ interface EditableTitleProps {
   onTitleUpdate?: (newTitle: string) => void;
 }
 
-export function EditableTitle({
-  taskId,
-  initialTitle,
-  onTitleUpdate,
-}: EditableTitleProps) {
+export function EditableTitle({ taskId, initialTitle, onTitleUpdate }: EditableTitleProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(initialTitle);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,29 +83,24 @@ export function EditableTitle({
           onKeyDown={handleKeyDown}
           placeholder="Enter task title..."
           disabled={isLoading}
-          className="!text-2xl !font-bold h-auto py-2 px-3 selection:bg-blue-200 selection:text-inherit"
+          className="!text-2xl !font-bold h-auto py-2 px-3 selection:bg-positive-soft selection:text-inherit"
           style={{
             fontSize: '1.5rem',
             fontWeight: 'bold',
           }}
         />
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-problem">{error}</p>}
         <div className="flex gap-2">
           <Button
             size="sm"
             onClick={handleSave}
             disabled={isLoading}
-            className="bg-green-600 hover:bg-green-700"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Check className="w-4 h-4 mr-1" />
             {isLoading ? 'Saving...' : 'Save'}
           </Button>
-          <Button
-            size="sm"
-            onClick={handleCancel}
-            disabled={isLoading}
-            variant="outline"
-          >
+          <Button size="sm" onClick={handleCancel} disabled={isLoading} variant="outline">
             <X className="w-4 h-4 mr-1" />
             Cancel
           </Button>
@@ -119,11 +110,15 @@ export function EditableTitle({
   }
 
   return (
-    <h1
-      onClick={() => setIsEditing(true)}
-      className="text-2xl font-bold p-3 border border-transparent rounded-md hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-text transition-all"
-    >
-      {title}
+    <h1 className="text-2xl font-semibold leading-tight tracking-tight">
+      <button
+        type="button"
+        aria-label="Edit task title"
+        onClick={() => setIsEditing(true)}
+        className="w-full rounded-md text-left hover:text-positive"
+      >
+        {title}
+      </button>
     </h1>
   );
 }

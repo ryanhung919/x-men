@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
+      '@': path.resolve(import.meta.dirname, './'),
     },
   },
   test: {
@@ -33,7 +33,7 @@ export default defineConfig({
         '__tests__/',
         '.next/',
         'scripts/',
-        'middleware.ts',
+        'proxy.ts',
         '**/error.tsx',
         '**/loading.tsx',
         '**/layout.tsx',

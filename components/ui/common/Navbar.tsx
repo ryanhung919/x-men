@@ -1,10 +1,18 @@
 'use client';
 
 import { canViewReports } from '@/lib/demo-viewer';
-import { LogOut, User2, Settings, Menu, X } from 'lucide-react';
+import {
+  LogOut,
+  Menu,
+  ChevronDown,
+  Layers3,
+  ListTodo,
+  CalendarDays,
+  ChartNoAxesCombined,
+} from 'lucide-react';
 import { NotificationPanel } from '@/components/notifications/notification-panel';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,12 +27,22 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetDescription,
+} from '@/components/ui/sheet';
 
 export function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
   const [user, setUser] = useState<{ id: string; email: string | undefined } | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [accountError, setAccountError] = useState<string | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,9 +81,12 @@ export function Navbar() {
             try {
               const { data: uiRow, error: uiErr } = await supabase
                 .from('user_info')
-                .select('default_view')
+                .select('default_view, first_name, last_name')
                 .eq('id', user.id)
                 .maybeSingle();
+              if (!uiErr && uiRow) {
+                setDisplayName([uiRow.first_name, uiRow.last_name].filter(Boolean).join(' '));
+              }
               if (!uiErr && uiRow?.default_view) {
                 const dv = uiRow.default_view === 'calendar' ? 'schedule' : uiRow.default_view;
                 if (dv === 'tasks' || dv === 'schedule') setDefaultView(dv);
@@ -90,10 +111,12 @@ export function Navbar() {
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('Error signing out:', error.message);
+      setAccountError('Could not sign out. Please try again.');
       return;
     }
     setMobileMenuOpen(false);
-    router.push('/auth/login');
+    router.push('/');
+    router.refresh();
   };
 
   const isAdmin = roles.includes('admin');
@@ -101,6 +124,7 @@ export function Navbar() {
 
   const handleDefaultViewChange = async (value: string) => {
     if (value !== 'tasks' && value !== 'schedule') return;
+    setAccountError(null);
     const previous = defaultView;
     setDefaultView(value);
     try {
@@ -115,249 +139,207 @@ export function Navbar() {
         const msg = await res.json().catch(() => ({}));
         console.error('Failed to update default_view via API:', msg?.error || res.statusText);
         setDefaultView(previous);
+        setAccountError('Could not save your default view. Please try again.');
       }
     } catch (e) {
       console.error('Failed to update default_view via API:', e);
       setDefaultView(previous);
+      setAccountError('Could not save your default view. Please try again.');
     } finally {
       setSavingDefaultView(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <header className="flex h-16 shrink-0 items-center gap-4 border-b px-4 md:px-6 bg-background">
+  const isGuest = roles.includes('demo_viewer');
+  const identity = displayName || user?.email?.split('@')[0] || 'Your account';
+  const roleLabel = isGuest
+    ? 'Read-only demo'
+    : isAdmin
+      ? 'Administrator'
+      : roles.includes('manager')
+        ? 'Manager'
+        : 'Team member';
+  const initials = identity
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+  const destinations = [
+    { href: '/tasks', label: 'Tasks', icon: ListTodo },
+    { href: '/schedule', label: 'Schedule', icon: CalendarDays },
+    ...(showReports ? [{ href: '/report', label: 'Reports', icon: ChartNoAxesCombined }] : []),
+  ];
+  const current = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const navigation = (mobile = false) => (
+    <nav
+      aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}
+      className={mobile ? 'flex flex-col gap-1' : 'hidden h-full items-center gap-1 md:flex'}
+    >
+      {destinations.map(({ href, label, icon: Icon }) => (
         <Link
-          href="/tasks"
-          className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
+          key={href}
+          href={href}
+          aria-current={current(href) ? 'page' : undefined}
+          onClick={() => setMobileMenuOpen(false)}
+          className={`flex items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-150 ${mobile ? 'py-3' : 'py-2'} ${current(href) ? 'bg-positive-soft text-positive' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
         >
-          NODAL
+          <Icon className="size-4" aria-hidden="true" />
+          {label}
         </Link>
-        <div className="flex-1" />
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      </header>
-    );
-  }
-
-  if (!user) {
-    return (
-      <header className="flex h-16 shrink-0 items-center gap-4 border-b px-4 md:px-6 bg-background">
-        <Link
-          href="/"
-          className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
-        >
-          NODAL
-        </Link>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button
-            variant="ghost"
-            className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
-            onClick={() => router.push('/auth/login')}
-          >
-            Sign In
-          </Button>
-        </div>
-      </header>
-    );
-  }
+      ))}
+    </nav>
+  );
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b px-4 md:px-6 bg-background">
-      <Link
-        href="/tasks"
-        className="text-lg font-semibold transition-all duration-200 hover:text-primary hover:underline decoration-2 underline-offset-4"
-      >
-        NODAL
-      </Link>
-
-      {/* Desktop Navigation */}
-      <nav className="hidden md:flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          asChild
-          className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
+    <header className="sticky top-0 z-40 shrink-0 border-b bg-card/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-16 max-w-[1488px] items-center gap-7 px-4 sm:px-6 lg:px-8">
+        <Link
+          href={user ? `/${defaultView}` : '/'}
+          aria-label="NODAL home"
+          className="flex shrink-0 items-center gap-2.5 font-semibold tracking-[0.12em] text-sm"
         >
-          <Link href="/tasks">Tasks</Link>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          asChild
-          className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
-        >
-          <Link href="/schedule">Schedule</Link>
-        </Button>
-        {showReports && (
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
-          >
-            <Link href="/report">Report</Link>
-          </Button>
-        )}
-      </nav>
-
-      <div className="flex-1" />
-
-      {/* Desktop Actions */}
-      <div className="hidden md:flex items-center gap-2">
-        <NotificationPanel />
-        <ThemeToggle />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="flex items-center gap-2 transition-all duration-200 hover:bg-accent hover:text-accent-foreground hover:scale-105"
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform duration-200 hover:scale-110">
-                <User2 className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-medium">{user.email}</span>
-                <span className="text-xs text-muted-foreground">{isAdmin ? 'Admin' : 'User'}</span>
-              </div>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 bg-background border">
-            <DropdownMenuLabel>Account</DropdownMenuLabel>
-            <DropdownMenuItem asChild className="cursor-pointer">
-              <Link href="/profile">
-                <User2 className="mr-2 h-4 w-4" />
-                Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild className="cursor-pointer">
-              <Link href="/settings">
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Default view</DropdownMenuLabel>
-            <DropdownMenuRadioGroup value={defaultView} onValueChange={handleDefaultViewChange}>
-              <DropdownMenuRadioItem value="tasks">Tasks</DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="schedule">Schedule</DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleSignOut}
-              className="cursor-pointer text-destructive focus:text-destructive"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Mobile Actions */}
-      <div className="flex md:hidden items-center gap-2">
-        <NotificationPanel />
-        <ThemeToggle />
-        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Toggle menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-[280px] sm:w-[320px]">
-            <SheetHeader>
-              <SheetTitle>Menu</SheetTitle>
-            </SheetHeader>
-            <div className="flex flex-col gap-4 mt-6">
-              {/* User Info */}
-              <div className="flex items-center gap-3 pb-4 border-b">
-                <div className="flex ml-2 h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <User2 className="h-5 w-5" />
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-sm font-medium truncate">{user.email}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {isAdmin ? 'Admin' : 'User'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Navigation Links */}
-              <nav className="flex flex-col gap-2">
-                <Button
-                  variant="ghost"
-                  asChild
-                  className="justify-start"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Link href="/tasks">Tasks</Link>
-                </Button>
-                <Button
-                  variant="ghost"
-                  asChild
-                  className="justify-start"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Link href="/schedule">Schedule</Link>
-                </Button>
-                {showReports && (
+          <span className="flex size-8 items-center justify-center rounded-lg border border-positive/20 bg-positive-soft text-positive">
+            <Layers3 className="size-[18px]" aria-hidden="true" />
+          </span>
+          NODAL
+        </Link>
+        {user && navigation()}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {isLoading ? (
+            <span
+              className="h-8 w-28 animate-pulse rounded-lg bg-muted"
+              aria-label="Loading account"
+            />
+          ) : user ? (
+            <>
+              <NotificationPanel />
+              <ThemeToggle />
+              <div className="mx-2 hidden h-6 w-px bg-border md:block" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    asChild
-                    className="justify-start"
-                    onClick={() => setMobileMenuOpen(false)}
+                    className="hidden h-10 max-w-56 items-center gap-2.5 px-2 md:flex"
+                    aria-label="Account menu"
                   >
-                    <Link href="/report">Report</Link>
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted text-xs font-semibold">
+                      {initials}
+                    </span>
+                    <span className="min-w-0 text-left">
+                      <span className="block truncate text-xs font-medium">{identity}</span>
+                      <span className="block text-[11px] text-muted-foreground">{roleLabel}</span>
+                    </span>
+                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
                   </Button>
-                )}
-              </nav>
-
-              {/* Divider */}
-              <div className="border-t my-2" />
-
-              {/* Settings & Profile */}
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="ghost"
-                  asChild
-                  className="justify-start"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Link href="/profile">
-                    <User2 className="ml-2 mr-2 h-4 w-4" />
-                    Profile
-                  </Link>
-                </Button>
-                <Button
-                  variant="ghost"
-                  asChild
-                  className="justify-start"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Link href="/settings">
-                    <Settings className="ml-2 mr-2 h-4 w-4" />
-                    Settings
-                  </Link>
-                </Button>
-              </div>
-
-              {/* Divider */}
-              <div className="border-t my-2" />
-
-              {/* Sign Out */}
-              <Button
-                variant="ghost"
-                onClick={handleSignOut}
-                className="justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <LogOut className="ml-2 mr-2 h-4 w-4" />
-                Sign out
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel className="space-y-1">
+                    <span className="block truncate">{identity}</span>
+                    <span className="block truncate text-xs font-normal text-muted-foreground">
+                      {user.email}
+                    </span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Open by default
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={defaultView}
+                    onValueChange={handleDefaultViewChange}
+                  >
+                    <DropdownMenuRadioItem value="tasks" disabled={savingDefaultView}>
+                      Tasks
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="schedule" disabled={savingDefaultView}>
+                      Schedule
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 size-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                  {accountError && (
+                    <p role="alert" className="px-2 py-1 text-xs text-destructive">
+                      {accountError}
+                    </p>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden"
+                    aria-label="Open navigation"
+                  >
+                    <Menu className="size-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-[320px] max-w-full gap-0 p-0">
+                  <SheetHeader className="border-b p-6">
+                    <SheetTitle>NODAL</SheetTitle>
+                    <SheetDescription>Your workspace, in focus.</SheetDescription>
+                  </SheetHeader>
+                  <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-full border bg-muted text-sm font-semibold">
+                        {initials}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{identity}</p>
+                        <p className="text-xs text-muted-foreground">{roleLabel}</p>
+                      </div>
+                    </div>
+                    {navigation(true)}
+                    <div className="space-y-2 border-t pt-5">
+                      <p className="text-xs font-medium text-muted-foreground">Open by default</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['tasks', 'schedule'] as const).map((view) => (
+                          <Button
+                            key={view}
+                            size="sm"
+                            variant={defaultView === view ? 'secondary' : 'outline'}
+                            disabled={savingDefaultView}
+                            aria-pressed={defaultView === view}
+                            onClick={() => handleDefaultViewChange(view)}
+                          >
+                            {view === 'tasks' ? 'Tasks' : 'Schedule'}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    {accountError && (
+                      <p role="alert" className="text-xs text-destructive">
+                        {accountError}
+                      </p>
+                    )}
+                    <Button
+                      variant="ghost"
+                      className="mt-auto justify-start text-destructive hover:text-destructive"
+                      onClick={handleSignOut}
+                    >
+                      <LogOut className="mr-2 size-4" />
+                      Sign out
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </>
+          ) : (
+            <>
+              <ThemeToggle />
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/">Sign in</Link>
               </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

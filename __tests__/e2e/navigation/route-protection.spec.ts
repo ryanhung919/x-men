@@ -15,10 +15,10 @@ test.describe('Route Protection', () => {
 
     await page.goto('/tasks');
     await expect(page).toHaveURL('/');
-    await expect(page.getByText('Login', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /login/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
 
     await page.goto('/schedule');
     await expect(page).toHaveURL('/');

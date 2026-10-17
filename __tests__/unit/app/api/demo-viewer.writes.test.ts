@@ -11,17 +11,37 @@ const supabase: any = {
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn(async () => supabase) }));
 const { createTaskService } = vi.hoisted(() => ({ createTaskService: vi.fn() }));
 vi.mock('@/lib/services/tasks', () => ({
-  createTaskService, archiveTaskService: vi.fn(), updateTitle: vi.fn(),
-  updateDescription: vi.fn(), updateStatus: vi.fn(), updatePriority: vi.fn(), updateDeadline: vi.fn(),
-  updateNotes: vi.fn(), updateRecurrence: vi.fn(), addAssignee: vi.fn(), removeAssignee: vi.fn(),
-  addTag: vi.fn(), removeTag: vi.fn(), addTaskAttachments: vi.fn(), removeTaskAttachment: vi.fn(),
-  addComment: vi.fn(), updateComment: vi.fn(), deleteComment: vi.fn(), linkSubtaskToParent: vi.fn(),
+  createTaskService,
+  archiveTaskService: vi.fn(),
+  updateTitle: vi.fn(),
+  updateDescription: vi.fn(),
+  updateStatus: vi.fn(),
+  updatePriority: vi.fn(),
+  updateDeadline: vi.fn(),
+  updateNotes: vi.fn(),
+  updateRecurrence: vi.fn(),
+  addAssignee: vi.fn(),
+  removeAssignee: vi.fn(),
+  addTag: vi.fn(),
+  removeTag: vi.fn(),
+  addTaskAttachments: vi.fn(),
+  removeTaskAttachment: vi.fn(),
+  addComment: vi.fn(),
+  updateComment: vi.fn(),
+  deleteComment: vi.fn(),
+  linkSubtaskToParent: vi.fn(),
 }));
-vi.mock('@/lib/db/tasks', () => ({ getAllUsers: vi.fn(), getAllProjects: vi.fn(), getScheduleTasks: vi.fn() }));
+vi.mock('@/lib/db/tasks', () => ({
+  getAllUsers: vi.fn(),
+  getAllProjects: vi.fn(),
+  getScheduleTasks: vi.fn(),
+}));
 
 const resetEq = () => {
   supabase.eq.mockReset();
-  supabase.eq.mockReturnValueOnce(supabase).mockResolvedValue({ data: [{ role: 'demo_viewer' }], error: null });
+  supabase.eq
+    .mockReturnValueOnce(supabase)
+    .mockResolvedValue({ data: [{ role: 'demo_viewer' }], error: null });
 };
 
 describe('demo viewer cannot use write endpoints', () => {
@@ -30,8 +50,13 @@ describe('demo viewer cannot use write endpoints', () => {
   it('POST /api/tasks', async () => {
     const { POST } = await import('@/app/api/tasks/route');
     const fd = new FormData();
-    fd.append('taskData', JSON.stringify({ project_id: 1, title: 't', priority_bucket: 5, assignee_ids: ['guest'] }));
-    const res = await POST(new NextRequest('http://localhost/api/tasks', { method: 'POST', body: fd }));
+    fd.append(
+      'taskData',
+      JSON.stringify({ project_id: 1, title: 't', priority_bucket: 5, assignee_ids: ['guest'] })
+    );
+    const res = await POST(
+      new NextRequest('http://localhost/api/tasks', { method: 'POST', body: fd })
+    );
     expect(res.status).toBe(403);
     expect(createTaskService).not.toHaveBeenCalled();
   });
@@ -56,7 +81,7 @@ describe('demo viewer cannot use write endpoints', () => {
         method: 'PATCH',
         body: JSON.stringify({ is_archived: true }),
       }),
-      { params: { id: '1' } }
+      { params: Promise.resolve({ id: '1' }) }
     );
     expect(res.status).toBe(403);
   });

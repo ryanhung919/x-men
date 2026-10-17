@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "unicorn", "react", "nextjs", "jsx-a11y"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn"
+  },
+  "ignorePatterns": [
+    "node_modules/**",
+    ".next/**",
+    ".vercel/**",
+    "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
+    "demo-recording/**",
+    "dist/**",
+    "build/**",
+    "out/**",
+    "supabase/.temp/**",
+    "next-env.d.ts"
+  ]
+}

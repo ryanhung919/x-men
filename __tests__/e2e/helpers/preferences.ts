@@ -65,16 +65,8 @@ export class PreferenceHelpers {
     await this.page.keyboard.press('Escape');
     await this.page.waitForTimeout(300);
 
-    const userDropdown = this.page.locator('button').filter({
-      has: this.page.locator('div', { hasText: /@/ })
-    }).first();
-
-    if (await userDropdown.isVisible()) {
-      await userDropdown.click();
-      await this.page.waitForTimeout(500);
-    } else {
-      console.log('User dropdown button not found');
-    }
+    const menu = this.page.getByRole('button', { name: 'Account menu', exact: true });
+    if (await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
   }
 
   /**
@@ -123,7 +115,7 @@ export class PreferenceHelpers {
    */
   async verifyOnUnauthorizedPage(): Promise<void> {
     await expect(this.page).toHaveURL(/\/unauthorized/);
-    await expect(this.page.getByText(/unauthorized|access denied/i)).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: "This view isn't available", exact: true })).toBeVisible();
   }
 
   /**

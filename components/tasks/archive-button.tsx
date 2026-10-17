@@ -20,13 +20,15 @@ import { toast } from 'sonner';
 interface ArchiveButtonProps {
   taskId: number;
   subtaskCount: number;
+  onArchived?: () => void;
 }
 
-export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
+export function ArchiveButton({ taskId, subtaskCount, onArchived }: ArchiveButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleArchive = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const response = await fetch(`/api/tasks/${taskId}/archive`, {
@@ -48,7 +50,8 @@ export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
       });
 
       // Redirect to tasks page after successful archive
-      router.push('/tasks');
+      if (onArchived) onArchived();
+      else router.push('/tasks');
       router.refresh();
     } catch (error) {
       toast.error('Error', {
@@ -65,7 +68,11 @@ export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" disabled={isLoading}>
+        <Button
+          variant="outline"
+          className="text-problem hover:bg-problem-soft hover:text-problem"
+          disabled={isLoading}
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -81,7 +88,7 @@ export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogTitle>Archive this task?</AlertDialogTitle>
           <AlertDialogDescription>
             This will archive this task{subtaskText}. Archived tasks will no longer appear in the
             active task list.
@@ -94,7 +101,11 @@ export function ArchiveButton({ taskId, subtaskCount }: ArchiveButtonProps) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleArchive} disabled={isLoading}>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={handleArchive}
+            disabled={isLoading}
+          >
             {isLoading ? 'Archiving...' : 'Archive'}
           </AlertDialogAction>
         </AlertDialogFooter>

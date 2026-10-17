@@ -13,28 +13,18 @@ import {
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { type Task, calculateNextDueDate } from '@/lib/types/tasks';
-import {
-  Calendar,
-  Paperclip,
-  CheckSquare,
-  AlertCircle,
-  ArrowUpDown,
-  X,
-  Repeat,
-} from 'lucide-react';
-import { StatusSelector } from '@/components/filters/status-selector';
-import { ProjectSelector, Project } from '@/components/filters/project-selector';
-import { TagSelector } from '@/components/filters/tag-selector';
-import {
-  ColumnVisibilitySelector,
-  type ColumnId,
-} from '@/components/filters/column-visibility-selector';
-import { useRouter } from 'next/navigation';
-
+import { type Task } from '@/lib/types/tasks';
+import { Paperclip, CheckSquare, ArrowUpDown, Repeat } from 'lucide-react';
+import { type ColumnId } from '@/components/filters/column-visibility-selector';
+import { useTaskInspector } from './task-inspector-context';
+import Link from 'next/link';
+import { TaskStatus, OverdueIndicator } from './task-status';
 
 type TasksListProps = {
   tasks: Task[];
+  visibleColumns?: ColumnId[];
+  emptyMessage?: string;
+  onClear?: () => void;
 };
 
 type SortConfig = {
@@ -42,60 +32,15 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
-export default function TasksList({ tasks }: TasksListProps) {
-  const router = useRouter();
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [filters, setFilters] = useState({
-    projects: [] as number[],
-    statuses: [] as string[],
-    tags: [] as string[],
-  });
+export default function TasksList({
+  tasks,
+  visibleColumns = ['status', 'priority', 'dueDate', 'assignees', 'project'],
+  emptyMessage = 'No tasks match your scope.',
+  onClear,
+}: TasksListProps) {
+  const { openTask } = useTaskInspector();
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>([
-    'status',
-    'priority',
-    'dueDate',
-    'assignees',
-    'project',
-    'recurring',
-    'creator',
-    'subtasks',
-    'attachments',
-    'tags',
-  ]);
-
-  // Unique values for filters
-  const statuses = ['To Do', 'In Progress', 'Completed', 'Blocked'] as const;
-  const projects: Project[] = Array.from(
-    new Set(
-      tasks
-        .map((task) => task.project?.id)
-        .filter((id): id is number => id !== null && id !== undefined)
-    )
-  ).map((id) => {
-    const task = tasks.find((t) => t.project?.id === id)!;
-    return {
-      id: id,
-      name: task.project!.name,
-      is_archived: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-  });
-  const allTags = Array.from(new Set(tasks.flatMap((task) => task.tags)));
-
-  // Filter tasks
-  const filteredTasks = tasks
-    .filter((task) =>
-      showCompleted ? true : ['To Do', 'In Progress', 'Blocked'].includes(task.status)
-    )
-    .filter(
-      (task) =>
-        (filters.projects.length === 0 ||
-          (task.project?.id && filters.projects.includes(task.project.id))) &&
-        (filters.statuses.length === 0 || filters.statuses.includes(task.status)) &&
-        (filters.tags.length === 0 || filters.tags.some((tag) => task.tags.includes(tag)))
-    );
+  const filteredTasks = tasks;
 
   // Sort tasks
   const sortedTasks = sortConfig
@@ -132,8 +77,8 @@ export default function TasksList({ tasks }: TasksListProps) {
       })
     : filteredTasks;
 
-  // Handle recurring tasks
-  const tasksWithNextDue = sortedTasks.map(calculateNextDueDate);
+  // Dates have already been normalized once by the shared view scope.
+  const tasksWithNextDue = sortedTasks;
 
   // Toggle sort
   const handleSort = (key: keyof Task | 'project.name') => {
@@ -143,81 +88,71 @@ export default function TasksList({ tasks }: TasksListProps) {
     }));
   };
 
-  // Clear filters
-  const clearFilters = () => {
-    setFilters({ projects: [], statuses: [], tags: [] });
-  };
-
-  // Get status badge variant
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'Completed':
-        return 'default';
-      case 'In Progress':
-        return 'secondary';
-      case 'Blocked':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
-
-  // Get priority badge variant
-  const getPriorityVariant = (priority: number) => {
-    if (priority >= 8) return 'destructive';
-    if (priority >= 4) return 'secondary';
-    return 'outline';
-  };
-
   return (
-    <div className="space-y-4">
-      {/* Filter Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-background p-4 rounded-lg border">
-        <Button
-          variant={showCompleted ? 'default' : 'outline'}
-          onClick={() => setShowCompleted(!showCompleted)}
-          className="flex items-center gap-2"
-        >
-          <CheckSquare className="h-4 w-4" />
-          {showCompleted ? 'Hide Completed' : 'Show Completed'}
-        </Button>
-        <div className="flex flex-wrap items-center gap-2">
-          <ColumnVisibilitySelector
-            visibleColumns={visibleColumns}
-            onChange={setVisibleColumns}
-          />
-          <StatusSelector
-            statuses={statuses}
-            selectedStatuses={filters.statuses}
-            onChange={(statuses) => setFilters({ ...filters, statuses })}
-          />
-          <ProjectSelector
-            projects={projects}
-            selectedProjects={filters.projects}
-            onChange={(projects) => setFilters({ ...filters, projects })}
-          />
-          <TagSelector
-            tags={allTags}
-            selectedTags={filters.tags}
-            onChange={(tags) => setFilters({ ...filters, tags })}
-          />
-          {(filters.projects.length > 0 ||
-            filters.statuses.length > 0 ||
-            filters.tags.length > 0) && (
-            <Button variant="ghost" onClick={clearFilters} className="flex items-center gap-2">
-              <X className="h-4 w-4" />
-              Clear Filters
-            </Button>
-          )}
-        </div>
+    <div>
+      <div className="divide-y overflow-hidden rounded-xl border bg-card md:hidden">
+        {tasksWithNextDue.length ? (
+          tasksWithNextDue.map((task) => (
+            <Link
+              key={task.id}
+              href={`/tasks/${task.id}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                  event.preventDefault();
+                  openTask(task.id);
+                }
+              }}
+              className="block p-4 hover:bg-muted/50"
+            >
+              <div className="font-medium leading-relaxed">{task.title}</div>
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span className="font-mono">NDL-{task.id}</span>
+                {task.recurrence_interval > 0 && <Repeat className="size-3" />}
+                {visibleColumns.includes('project') && <span>{task.project?.name}</span>}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                {visibleColumns.includes('status') && <TaskStatus status={task.status} />}
+                {visibleColumns.includes('priority') && (
+                  <span className="text-xs text-muted-foreground">Priority {task.priority}</span>
+                )}
+                {visibleColumns.includes('dueDate') && task.deadline && (
+                  <span
+                    className={`text-xs ${task.isOverdue ? 'text-problem' : 'text-muted-foreground'}`}
+                  >
+                    {task.isOverdue ? 'Overdue · ' : ''}
+                    {format(new Date(task.deadline), 'MMM d')}
+                  </span>
+                )}
+              </div>
+              {visibleColumns.includes('assignees') && (
+                <div className="mt-3 text-[11px] text-muted-foreground">
+                  {task.assignees.length
+                    ? task.assignees
+                        .map((a) => `${a.user_info.first_name} ${a.user_info.last_name}`)
+                        .join(', ')
+                    : 'Unassigned'}
+                </div>
+              )}
+            </Link>
+          ))
+        ) : (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            {emptyMessage}
+            {onClear && (
+              <Button className="mt-3" variant="outline" onClick={onClear}>
+                Clear task scope
+              </Button>
+            )}
+          </div>
+        )}
       </div>
-
       {/* Task Table */}
-      <div className="border rounded-lg overflow-x-auto">
-        <Table>
-          <TableHeader>
+      <div className="hidden overflow-hidden rounded-xl border bg-card md:block">
+        <Table className="min-w-[850px] [&_td]:px-4 [&_td]:py-4 [&_th]:px-4 [&_th]:text-xs [&_th]:text-muted-foreground [&_th_button]:h-9 [&_th_button]:px-0 [&_th_button_svg]:size-3 [&_th_button_svg]:opacity-40">
+          <TableHeader className="bg-muted/35">
             <TableRow>
-              <TableHead className="w-[300px]">
+              <TableHead className="w-[36%]">
                 <Button
                   variant="ghost"
                   onClick={() => handleSort('title')}
@@ -303,40 +238,95 @@ export default function TasksList({ tasks }: TasksListProps) {
                   colSpan={visibleColumns.length + 1}
                   className="text-center py-8 text-muted-foreground"
                 >
-                  No tasks match the current filters.
+                  <div className="py-8">
+                    <p className="font-medium text-foreground">{emptyMessage}</p>
+                    <p className="mt-1 text-xs">Try another search or adjust the filters above.</p>
+                    {onClear && (
+                      <Button variant="outline" size="sm" className="mt-4" onClick={onClear}>
+                        Clear task scope
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               tasksWithNextDue.map((task) => (
                 <TableRow
                   key={task.id}
-                  onClick={() => router.push(`/tasks/${task.id}`)}
-                  className={`cursor-pointer hover:bg-muted/50 transition-colors ${task.isOverdue ? 'bg-destructive/10 hover:bg-destructive/20' : ''}`}
+                  onClick={() => openTask(task.id)}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
                 >
-                  <TableCell
-                    className={`font-medium ${task.isOverdue ? 'text-destructive' : ''}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {task.isOverdue && <AlertCircle className="h-4 w-4 text-destructive" />}
+                  <TableCell className="min-w-[240px] max-w-[420px] whitespace-normal">
+                    <Link
+                      href={`/tasks/${task.id}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                          event.preventDefault();
+                          openTask(task.id);
+                        }
+                      }}
+
+                      className="block font-medium leading-snug hover:text-positive"
+                      title={task.title}
+                    >
                       {task.title}
+                    </Link>
+                    <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
+                      <span className="font-mono">NDL-{task.id}</span>
+                      {task.recurrence_interval > 0 && (
+                        <span title={`Repeats every ${task.recurrence_interval} days`}>
+                          <Repeat className="size-3" />
+                        </span>
+                      )}
+                      {task.subtasks.length > 0 && (
+                        <span className="inline-flex items-center gap-1" title="Subtasks">
+                          <CheckSquare className="size-3" />
+                          {task.subtasks.length}
+                        </span>
+                      )}
+                      {task.attachments.length > 0 && (
+                        <span className="inline-flex items-center gap-1" title="Attachments">
+                          <Paperclip className="size-3" />
+                          {task.attachments.length}
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                   {visibleColumns.includes('status') && (
                     <TableCell>
-                      <Badge variant={getStatusVariant(task.status)}>{task.status}</Badge>
+                      <TaskStatus status={task.status} />
                     </TableCell>
                   )}
                   {visibleColumns.includes('priority') && (
                     <TableCell>
-                      <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
+                      <span
+                        className="inline-flex items-center gap-2 text-xs tabular-nums text-muted-foreground"
+                        title={`Priority ${task.priority} out of 10`}
+                      >
+                        <span className="flex h-3 items-end gap-0.5" aria-hidden="true">
+                          {[1, 2, 3].map((level) => (
+                            <span
+                              key={level}
+                              className={`w-0.5 rounded-sm ${task.priority >= level * 3 ? 'bg-foreground/70' : 'bg-border'}`}
+                              style={{ height: level * 4 }}
+                            />
+                          ))}
+                        </span>
+                        {task.priority}
+                      </span>
                     </TableCell>
                   )}
                   {visibleColumns.includes('dueDate') && (
-                    <TableCell className={task.isOverdue ? 'text-destructive' : ''}>
+                    <TableCell className="text-xs">
                       {task.deadline ? (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          {format(new Date(task.deadline), 'MMM d, yyyy')}
+                        <div className="flex flex-col items-start gap-1">
+                          <span
+                            className={task.isOverdue ? 'text-problem' : 'text-muted-foreground'}
+                          >
+                            {format(new Date(task.deadline), 'MMM d, yyyy')}
+                          </span>
+                          {task.isOverdue && <OverdueIndicator />}
                         </div>
                       ) : (
                         'None'
@@ -345,14 +335,15 @@ export default function TasksList({ tasks }: TasksListProps) {
                   )}
                   {visibleColumns.includes('assignees') && (
                     <TableCell>
-                      <div className="flex gap-1">
+                      <div className="flex -space-x-1.5">
                         {task.assignees.length > 0 ? (
                           task.assignees.slice(0, 3).map((assignee) => {
                             const { first_name, last_name } = assignee.user_info;
                             return (
                               <Avatar
                                 key={assignee.assignee_id}
-                                className="h-6 w-6 border-2 border-background"
+                                title={`${first_name} ${last_name}`}
+                                className="h-7 w-7 border-2 border-card"
                               >
                                 <AvatarFallback className="text-xs bg-primary/10 text-primary">
                                   {`${first_name[0]}${last_name[0]}`.toUpperCase()}
@@ -364,7 +355,7 @@ export default function TasksList({ tasks }: TasksListProps) {
                           <span className="text-muted-foreground">None</span>
                         )}
                         {task.assignees.length > 3 && (
-                          <Avatar className="h-6 w-6 border-2 border-background">
+                          <Avatar className="h-7 w-7 border-2 border-card">
                             <AvatarFallback className="text-xs bg-muted">
                               +{task.assignees.length - 3}
                             </AvatarFallback>
@@ -374,7 +365,9 @@ export default function TasksList({ tasks }: TasksListProps) {
                     </TableCell>
                   )}
                   {visibleColumns.includes('project') && (
-                    <TableCell>{task.project?.name || 'None'}</TableCell>
+                    <TableCell className="max-w-[180px] whitespace-normal text-xs leading-relaxed text-muted-foreground">
+                      {task.project?.name || 'No project'}
+                    </TableCell>
                   )}
                   {visibleColumns.includes('recurring') && (
                     <TableCell className="text-center">
@@ -393,7 +386,7 @@ export default function TasksList({ tasks }: TasksListProps) {
                   {visibleColumns.includes('creator') && (
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6 border-2 border-background">
+                        <Avatar className="h-7 w-7 border-2 border-card">
                           <AvatarFallback className="text-xs bg-secondary/50 text-secondary-foreground">
                             {`${task.creator.user_info.first_name[0]}${task.creator.user_info.last_name[0]}`.toUpperCase()}
                           </AvatarFallback>

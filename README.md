@@ -15,12 +15,12 @@ Open https://x-men-rosy.vercel.app/ and log in with the guest account:
 
 The guest is a read-only demo account (staff plus the `demo_viewer` role). It can browse tasks, the calendar, the schedule and the reports (`/report`), but every write is rejected by the database (restrictive RLS policies) and by the API. The data is shared demo data and may be reset at any time.
 
-Access the our GitHub Repository [here](https://github.com/ryanhung919/x-men)
+Access the our GitHub Repository [here](https://github.com/ryanhung919/nodal)
 
 ## Prerequisites
 
-- Node.js 22+ (LTS recommended)
-- pnpm 10+ (repo is pinned to pnpm and uses a lockfile)
+- Node.js 24 LTS (`24.22.0` in `.node-version`; use your Node version manager)
+- pnpm 12.14.0 (exact `packageManager` pin; `corepack pnpm` or `npx pnpm@12.14.0`)
 - A Supabase project with the following environment variables configured locally:
 	- NEXT_PUBLIC_SUPABASE_URL
 	- NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -60,7 +60,7 @@ because `/seed` drops and recreates the schema of whatever database `POSTGRES_UR
 First, install dependencies:
 
 ```bash
-pnpm i
+pnpm install --frozen-lockfile
 ```
 
 Then run the development server:
@@ -87,6 +87,24 @@ pnpm db:seed
 ```
 
 ## Running Tests
+
+### Linting and formatting
+
+Use the project-pinned Oxlint and Oxfmt tools:
+
+```bash
+pnpm lint          # Next.js, React/hooks, TypeScript and accessibility lint rules
+pnpm lint:fix      # Apply supported automatic lint fixes
+pnpm format:check  # Check formatting without changing files
+pnpm format       # Format the repository
+pnpm typecheck    # TypeScript compiler checks (separate from linting)
+```
+
+Oxfmt uses the existing style: semicolons, single quotes, ES5 trailing commas,
+100-column print width, and two-space indentation. Configure it in `.oxfmtrc.json`;
+lint rules live in `.oxlintrc.json`. Generated output and lockfiles are excluded
+from formatting. Tool adoption does not automatically reformat existing source
+or resolve its existing lint findings; run checks before applying broad fixes.
 
 - Unit tests:
 

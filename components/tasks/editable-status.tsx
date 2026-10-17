@@ -1,7 +1,8 @@
 'use client';
+import { toast } from 'sonner';
 
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { TaskStatus } from './task-status';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -53,7 +54,7 @@ export function EditableStatus({ taskId, initialStatus, onStatusUpdate }: Editab
       setIsEditing(false);
     } catch (err) {
       console.error('Failed to update status:', err);
-      alert(err instanceof Error ? err.message : 'Failed to update status');
+      toast.error(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
       setIsLoading(false);
     }
@@ -62,12 +63,11 @@ export function EditableStatus({ taskId, initialStatus, onStatusUpdate }: Editab
   if (!isEditing) {
     return (
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-sm px-3 py-1">
-          {status}
-        </Badge>
+        <TaskStatus status={status} />
         <Button
           size="sm"
           variant="ghost"
+          aria-label="Edit status"
           onClick={() => setIsEditing(true)}
           className="h-8 w-8 p-0"
           disabled={isLoading}

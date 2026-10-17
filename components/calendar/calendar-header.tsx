@@ -1,6 +1,16 @@
 'use client';
 
-import { format, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths } from 'date-fns';
+import {
+  format,
+  addDays,
+  addWeeks,
+  addMonths,
+  subDays,
+  subWeeks,
+  subMonths,
+  startOfWeek,
+  endOfWeek,
+} from 'date-fns';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { downloadICalFile } from '@/lib/utils/ical';
@@ -58,7 +68,7 @@ export default function CalendarHeader({
   };
 
   const handleExportICal = () => {
-    downloadICalFile(tasks, `x-men-tasks-${format(new Date(), 'yyyy-MM-dd')}.ics`);
+    downloadICalFile(tasks, `nodal-tasks-${format(new Date(), 'yyyy-MM-dd')}.ics`);
   };
 
   const getDateDisplay = () => {
@@ -66,88 +76,67 @@ export default function CalendarHeader({
       case 'day':
         return format(currentDate, 'MMMM d, yyyy');
       case 'week':
-        return format(currentDate, 'MMMM yyyy');
+        return `${format(startOfWeek(currentDate), 'MMM d')} – ${format(endOfWeek(currentDate), 'MMM d, yyyy')}`;
       case 'month':
         return format(currentDate, 'MMMM yyyy');
     }
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-2 sm:p-4 gap-2 sm:gap-0 border-b bg-background">
-      {/* Navigation */}
-      <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handlePrevious}
-          aria-label="Previous"
-          className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-        >
-          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleNext}
-          aria-label="Next"
-          className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-        >
-          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleToday}
-          className="text-xs sm:text-sm"
-        >
-          Today
-        </Button>
-        <h2 className="text-base sm:text-xl font-semibold ml-2 sm:ml-4 text-foreground truncate flex-1 sm:flex-initial">{getDateDisplay()}</h2>
-      </div>
-
-      {/* View toggle */}
-      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExportICal}
-          className="text-xs sm:text-sm gap-1 h-8 sm:h-9"
-          aria-label="Export to iCal"
-        >
-          <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Export</span>
-        </Button>
-        
-        <div className="flex rounded-md border overflow-hidden">
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-4 sm:px-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="min-w-40 text-base font-semibold tracking-tight">{getDateDisplay()}</h2>
+        <div className="flex items-center gap-1">
           <Button
-            variant={view === 'day' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => onViewChange('day')}
-            className="rounded-none border-r text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
-            aria-label="Day view"
+            variant="ghost"
+            size="icon"
+            onClick={handlePrevious}
+            aria-label="Previous"
+            className="size-7"
           >
-            D
+            <ChevronLeft className="size-4" />
           </Button>
           <Button
-            variant={view === 'week' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => onViewChange('week')}
-            className="rounded-none border-r text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
-            aria-label="Week view"
+            variant="ghost"
+            size="icon"
+            onClick={handleNext}
+            aria-label="Next"
+            className="size-7"
           >
-            W
+            <ChevronRight className="size-4" />
           </Button>
-          <Button
-            variant={view === 'month' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => onViewChange('month')}
-            className="rounded-none text-xs sm:text-sm px-2 sm:px-3 h-8 sm:h-9"
-            aria-label="Month view"
-          >
-            M
+          <Button variant="outline" size="sm" onClick={handleToday} className="ml-1 h-8 text-xs">
+            Today
           </Button>
         </div>
       </div>
-    </div>
+      <div className="flex items-center gap-3">
+        <div role="group" aria-label="Calendar view" className="flex rounded-lg bg-muted/60 p-1">
+          {(['day', 'week', 'month'] as const).map((mode) => (
+            <Button
+              key={mode}
+              variant="ghost"
+              size="sm"
+              onClick={() => onViewChange(mode)}
+              aria-label={`${mode[0].toUpperCase() + mode.slice(1)} view`}
+              aria-pressed={view === mode}
+              className={`h-7 px-3 text-xs ${view === mode ? 'bg-card text-positive shadow-sm hover:bg-card' : 'text-muted-foreground'}`}
+            >
+              {mode[0].toUpperCase() + mode.slice(1)}
+            </Button>
+          ))}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleExportICal}
+          className="size-8 text-muted-foreground"
+          aria-label="Export to iCal"
+          title="Export to iCal"
+        >
+          <Download className="size-4" />
+        </Button>
+      </div>
+    </header>
   );
 }

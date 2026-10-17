@@ -1,115 +1,119 @@
-"use client"
+'use client';
 
-import type React from "react"
+import type React from 'react';
 
-import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { X, Plus } from "lucide-react"
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { X, Plus } from 'lucide-react';
 
 interface EditableTagsProps {
-  taskId: number
-  initialTags: string[]
-  onTagsUpdate?: (newTags: string[]) => void
+  taskId: number;
+  initialTags: string[];
+  onTagsUpdate?: (newTags: string[]) => void;
 }
 
 export function EditableTags({ taskId, initialTags, onTagsUpdate }: EditableTagsProps) {
-  const [tags, setTags] = useState(initialTags)
-  const [inputValue, setInputValue] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [showAddInput, setShowAddInput] = useState(false)
+  const [tags, setTags] = useState(initialTags);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAddInput, setShowAddInput] = useState(false);
 
   const handleAddTag = async () => {
-    const tagInput = inputValue.trim()
+    const tagInput = inputValue.trim();
 
     if (!tagInput || tags.includes(tagInput)) {
-      setInputValue("")
-      return
+      setInputValue('');
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "addTag",
+          action: 'addTag',
           tag_name: tagInput,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to add tag")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to add tag');
       }
 
-      const newTags = [...tags, tagInput]
-      setTags(newTags)
-      setInputValue("")
-      setShowAddInput(false)
-      onTagsUpdate?.(newTags)
+      const newTags = [...tags, tagInput];
+      setTags(newTags);
+      setInputValue('');
+      setShowAddInput(false);
+      onTagsUpdate?.(newTags);
     } catch (err) {
-      console.error("Failed to add tag:", err)
+      console.error('Failed to add tag:', err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleRemoveTag = async (tagToRemove: string) => {
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: "removeTag",
+          action: 'removeTag',
           tag_name: tagToRemove,
         }),
-      })
+      });
 
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || "Failed to remove tag")
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to remove tag');
       }
 
-      const newTags = tags.filter((tag) => tag !== tagToRemove)
-      setTags(newTags)
-      onTagsUpdate?.(newTags)
+      const newTags = tags.filter((tag) => tag !== tagToRemove);
+      setTags(newTags);
+      onTagsUpdate?.(newTags);
     } catch (err) {
-      console.error("Failed to remove tag:", err)
+      console.error('Failed to remove tag:', err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      handleAddTag()
-    } else if (e.key === "Escape") {
-      setShowAddInput(false)
-      setInputValue("")
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
+    } else if (e.key === 'Escape') {
+      setShowAddInput(false);
+      setInputValue('');
     }
-  }
+  };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
         {tags.length > 0 ? (
           tags.map((tag) => (
-            <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-3 py-1">
+            <Badge
+              key={tag}
+              variant="secondary"
+              className="flex max-w-full items-center gap-1 break-words whitespace-normal px-2 py-1 text-[11px]"
+            >
               {tag}
               <button
                 onClick={() => handleRemoveTag(tag)}
                 disabled={isLoading}
-                className="ml-1 hover:text-red-600 disabled:opacity-50"
+                className="ml-1 hover:text-problem disabled:opacity-50"
                 aria-label={`Remove tag ${tag}`}
               >
                 <X className="w-3 h-3" />
@@ -142,14 +146,19 @@ export function EditableTags({ taskId, initialTags, onTagsUpdate }: EditableTags
             className="w-full max-w-md"
             autoFocus
           />
-          <Button size="sm" onClick={handleAddTag} disabled={!inputValue.trim() || isLoading} variant="outline">
+          <Button
+            size="sm"
+            onClick={handleAddTag}
+            disabled={!inputValue.trim() || isLoading}
+            variant="outline"
+          >
             Add
           </Button>
           <Button
             size="sm"
             onClick={() => {
-              setShowAddInput(false)
-              setInputValue("")
+              setShowAddInput(false);
+              setInputValue('');
             }}
             variant="ghost"
           >
@@ -158,5 +167,5 @@ export function EditableTags({ taskId, initialTags, onTagsUpdate }: EditableTags
         </div>
       )}
     </div>
-  )
+  );
 }
