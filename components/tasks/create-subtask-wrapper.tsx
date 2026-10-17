@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreateTaskDialog } from './create-task-dialog';
@@ -39,7 +40,7 @@ export function CreateSubtaskButton({
       if (!res.ok) {
         const errorData = await res.json();
         console.error('Failed to link subtask to parent:', errorData.error);
-        alert(`Subtask created but failed to link to parent: ${errorData.error}`);
+        toast.error('Task created, but could not link to parent', { description: errorData.error });
         return;
       }
 
@@ -49,7 +50,7 @@ export function CreateSubtaskButton({
       onCreated?.();
     } catch (err) {
       console.error('Failed to link subtask to parent:', err);
-      alert('Subtask created but failed to link to parent');
+      toast.error('Task created, but could not link to parent');
     } finally {
       setIsLinking(false);
     }
@@ -60,6 +61,7 @@ export function CreateSubtaskButton({
       initialProjectId={parentProjectId}
       initialProjectName={parentProjectName}
       isSubtask={true}
+      disabled={isLinking}
       onTaskCreated={handleSubtaskCreated}
     />
   );
