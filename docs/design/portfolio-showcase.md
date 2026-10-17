@@ -1,32 +1,59 @@
 # Portfolio showcase delivery
 
-One browsing-only, silent product tour; recorded from the existing populated local Supabase demo with an authenticated presenter. No login, captions, marketing overlay, submitted edits, creation, deletion or exports. Capture detected no unexpected mutation or download. Existing tasks, dates, permissions and report calculations are preserved.
+Updated 2026-10-17: a brisk, silent 54.53-second tour following the requested interaction sequence. Captured from the populated local demo as an authenticated presenter. No login, captions, exports, submitted task edits, creation or deletion. Opening a notification may mark it read, as requested. No unexpected API mutation or download was detected.
 
 ## Media
 
-Final assets are installed at `/Users/user/Projects/Base/public/media/nodal-demo.mp4`, `nodal-demo.webm`, and `nodal-demo-poster.jpg`. Local copies are in ignored `demo-recording/delivery/`; raw capture and scene marks are in `demo-recording/take2/`.
+Installed in `/Users/user/Projects/Base/public/media/`, with local copies in ignored `demo-recording/delivery/`:
 
-Both encodings show the same 1440×900 sequence at 30 fps. MP4 H.264/yuv420p/faststart: 59.933333 s, 3,446,134 bytes. WebM VP9/yuv420p: 59.933 s, 2,882,606 bytes. FFprobe reports exactly one video stream per file, with no audio/subtitle streams. Poster is the MP4 frame at 3 s; portfolio metadata now matches. Source span 60.268 s was trimmed before login-free opening and normalized by 0.99555 to 60 s (encoding lands 59.933 s).
+| Asset | Resolution | Size |
+| --- | --- | --- |
+| `nodal-demo.mp4` | 2880×1800 | 6,233,959 bytes |
+| `nodal-demo.webm` | 2880×1800 | 8,495,544 bytes |
+| `nodal-demo-mobile.mp4` | 1440×900 | 2,556,883 bytes |
+| `nodal-demo-mobile.webm` | 1440×900 | 3,290,438 bytes |
+| `nodal-demo-poster.jpg` | 2880×1800 | 289,962 bytes |
+
+All four videos are 30 fps, contain one video stream and no audio/subtitles. MP4 uses H.264, yuv420p, BT.709 limited range and faststart. WebM uses VP9. The poster now uses the dark Reports frame at 41.4 seconds; portfolio metadata matches.
+
+The layout is 1440×900 logical pixels at native deviceScaleFactor 2, captured as 2880×1800 JPEG quality-100 screencast frames. This is a fresh Retina render, not an upscale of the previous recording. Timestamped source frames, scene marks and the FFmpeg concat manifest are in ignored `demo-recording/retina-selected/`; exports and ffprobe verification are in `demo-recording/retina-release/`. Previous delivery files are retained in `demo-recording/previous-delivery/`.
 
 ## Coverage
 
-| Approximate final time | Scene |
+Approximate times; frame normalization adds less than one second across the clip.
+
+| Time | Scene |
 | --- | --- |
-| 0.0–6.0s | reportsLight |
-| 6.0–10.0s | reportsThemeSwitch |
-| 10.0–15.9s | reportComparisons |
-| 15.9–22.9s | tasks |
-| 22.9–31.9s | inspector |
-| 31.9–35.8s | creation |
-| 35.8–43.1s | calendar |
-| 43.1–50.0s | schedule |
-| 50.0–53.0s | notifications |
-| 53.0–60.0s | closing |
+| 0–6s | Tasks: type Portal, Blocked, Due this week, Clear |
+| 6–11s | Filters: All statuses → To Do; All projects → first project; select a tag; Clear |
+| 11–14s | Columns: enable Recurring and Subtasks |
+| 14–20s | Portal task inspector: properties, subtasks, attachment and discussion |
+| 20–22s | Create task: expand optional controls, cancel |
+| 22–28s | Tasks calendar: Month → populated Day → Week |
+| 28–36s | Schedule: date picker → Next 7 Days → Daniel Tan; inspect a timeline task |
+| 36–46s | Reports: hover PDF and Excel; switch light to dark; Logged Time, Task Completions, Team Summary |
+| 46–50s | Notifications: open inbox, open an item, Done, close |
+| 50–55s | Return to Logged Time and light theme |
 
-Reports opens light, exposes scope/export affordances, switches through the real theme menu to dark, and shows all three report types. Tasks shows search, columns and filters. Customer portal v2 launch inspector exposes properties, subtasks, uploaded file and discussion with controlled scrolling. Creation opens optional controls and cancels; Calendar shows month/day/week using existing deadlines; Schedule is scoped to Customer Portal Revamp and opens/cancels a deadline editor. Notifications opens without reading an item. Closing returns to light Reports for continuity. Some capabilities are represented by their visible controls, rather than submitted operations, as approved.
+## Portfolio behavior and verification
 
-## Portfolio verification
+The listing player selects the 1440×900 mobile export at widths up to 767px, and the Retina export above that. Both it and the 3D workbook prefer MP4, the smaller delivery format, with WebM fallback. The workbook receives the same mobile variants. Existing playback policy and the 52% black overlay are preserved.
 
-Preserved the existing 52% black scrim and player. Playwright CLI verified muted autoplay on visibility, WebM playback, MP4 fallback playback, loop wrap (59.7→0.7s), and paused poster at 0 s with reduced motion. Desktop 1440×900 and mobile 390×844 screenshots reviewed; mobile intentionally uses the existing cover crop. Light and dark dashboard frames remain visible behind the layer. No deployment.
+Playwright CLI verified the actual portfolio listing in local Chromium:
 
-Screenshots: `/tmp/nodal-portfolio-final-light.png`, `-dark.png`, `-poster.png`, `-mobile.png`. Contact sheet: `/tmp/nodal-final-contact-sheet.jpg`. Portfolio TypeScript/Vite production build passed; existing unrelated VERSO chunk-size advisory remains. Codec testing was in Chromium; cross-engine Safari/Firefox playback was not exercised.
+- Desktop selects 2880×1800 MP4: 300 decoded frames over 10 seconds, zero dropped frames.
+- Mobile-sized viewport selects 1440×900 MP4: 150 decoded frames over 5 seconds, zero dropped frames.
+- No video resource requests before scrolling the mobile player into view.
+- Scrolling offscreen pauses playback.
+- Reduced motion keeps the poster, paused at time zero, with readyState 0.
+- Desktop and mobile screenshots reviewed at `/tmp/nodal-retina-portfolio-desktop.png` and `/tmp/nodal-retina-portfolio-mobile.png`.
+
+Portfolio typecheck, targeted existing media-mapping/source tests (6 tests), and production build pass. NODAL typecheck passes. Playback measurements cover local Chromium, not physical mobile hardware or Safari. No deployment or commits were made.
+
+## Dark-first variant — 2026-10-18
+
+`DEMO_START_DARK=true` repeats the same feature sequence, opening Tasks in dark mode and switching to light when Schedule opens. Reports and notifications then remain light. The export ends after the completed notification interaction, omitting the redundant closing return; a small pacing adjustment keeps it approximately one minute.
+
+The separate asset family is `nodal-demo-dark.mp4`, `nodal-demo-dark.webm`, `nodal-demo-dark-mobile.mp4`, `nodal-demo-dark-mobile.webm` and `nodal-demo-dark-poster.jpg`, saved alongside the originals in the portfolio's `public/media/` and local `demo-recording/delivery/`. The default portfolio recording is unchanged. Desktop remains native 2880×1800 at 30 fps; mobile is 1440×900. The poster matches 0.4 seconds. Raw frames and theme-switch marks are in ignored `demo-recording/dark-selected/`.
+
+The Retina MP4 is 58.966667 seconds and 5,986,959 bytes, H.264/yuv420p with faststart and no audio. Browser playback was verified in Chromium, with CLI screenshots at `/tmp/nodal-demo-dark-opening.png` and `/tmp/nodal-demo-dark-schedule-light.png`; the encoded Schedule frame at 36 seconds is light. No production data reset, deployment or replacement of the original clip.

@@ -3,10 +3,10 @@
  * Browsing-only portfolio capture. Authenticate separately with Playwright CLI,
  * save a private storage state, then run:
  * DEMO_STORAGE_STATE=/tmp/nodal-presenter.json pnpm exec tsx scripts/record-demo.ts [outDir]
- * Optional: DEMO_BASE_URL, DEMO_TASK_TITLE, DEMO_PROJECT, DEMO_CALENDAR_MONTH (YYYY-MM).
- * No credentials, login footage, submitted forms, downloads or notification mutations.
- * Output: raw/*.webm and timeline.json. Trim marks.start..marks.end with FFmpeg;
- * source targets ~60 seconds, with actual load latency recorded honestly in marks.
+ * Optional: DEMO_BASE_URL, DEMO_TASK_TITLE, DEMO_START_DARK=true.
+ * No credentials, login footage, submitted task edits or downloads. Opening a notification may mark it read.
+ * Output: native 2880×1800 JPEG frames and timestamped timeline.json for FFmpeg;
+ * source targets a brisk ~60 seconds, with actual load latency recorded honestly in marks.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,13 +14,16 @@ import { chromium, type Locator, type Page } from '@playwright/test';
 
 const BASE = process.env.DEMO_BASE_URL ?? 'http://localhost:3000';
 const STORAGE = process.env.DEMO_STORAGE_STATE;
+const START_DARK = process.env.DEMO_START_DARK === 'true';
 const TASK = process.env.DEMO_TASK_TITLE ?? 'Customer portal v2 launch';
-const PROJECT = process.env.DEMO_PROJECT ?? 'Customer Portal Revamp';
 const OUT = path.resolve(process.argv[2] ?? 'demo-recording');
-const SIZE = { width: 1440, height: 900 };
+const SIZE = { width: 2880, height: 1800 };
+const LAYOUT = { width: 1440, height: 900 };
 
 if (!STORAGE || !fs.existsSync(STORAGE)) {
-  throw new Error('DEMO_STORAGE_STATE must point to an existing private authenticated storage-state file.');
+  throw new Error(
+    'DEMO_STORAGE_STATE must point to an existing private authenticated storage-state file.'
+  );
 }
 
 /** Draws a cursor that follows mouse events (headless browsers have none). */
@@ -62,13 +65,13 @@ const CURSOR_SCRIPT = `
 })();
 `;
 
-let cursor = { x: SIZE.width / 2, y: SIZE.height / 2 };
+let cursor = { x: LAYOUT.width / 2, y: LAYOUT.height / 2 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 async function glide(page: Page, x: number, y: number, ms?: number) {
   const dist = Math.hypot(x - cursor.x, y - cursor.y);
-  const duration = ms ?? Math.min(450, Math.max(180, dist * 0.5));
+  const duration = ms ?? Math.min(260, Math.max(140, dist * 0.13));
   const steps = Math.max(12, Math.round(duration / 16));
   const from = { ...cursor };
   for (let i = 1; i <= steps; i++) {
@@ -89,11 +92,11 @@ async function moveTo(page: Page, target: Locator, opts: { dx?: number; dy?: num
   await glide(page, x, y);
 }
 
-async function click(page: Page, target: Locator, pauseBefore = 80) {
+async function click(page: Page, target: Locator, pauseBefore = 35) {
   await moveTo(page, target);
   await sleep(pauseBefore);
   await page.mouse.down();
-  await sleep(70);
+  await sleep(35);
   await page.mouse.up();
 }
 
@@ -127,179 +130,280 @@ async function loadedReport(page: Page, label: string) {
 async function theme(page: Page, value: 'Light' | 'Dark') {
   await click(page, page.getByRole('button', { name: 'Toggle theme' }));
   await click(page, page.getByRole('menuitem', { name: value, exact: true }));
-  await page.waitForFunction((dark) => document.documentElement.classList.contains('dark') === dark, value === 'Dark');
+  await page.waitForFunction(
+    (dark) => document.documentElement.classList.contains('dark') === dark,
+    value === 'Dark'
+  );
 }
 
 async function main() {
-  fs.mkdirSync(path.join(OUT, 'raw'), { recursive: true });
+  fs.mkdirSync(path.join(OUT, 'frames'), { recursive: true });
   const browser = await chromium.launch();
-  const options = { viewport: SIZE, deviceScaleFactor: 1, timezoneId: 'Asia/Singapore', storageState: STORAGE! };
-  // Validate auth and normalize preferences in an UNRECORDED context first.
-  const preflight = await browser.newContext(options);
-  const check = await preflight.newPage();
-  await check.goto(`${BASE}/report`);
-  await check.waitForURL(/\/report(?:[?#].*)?$/, { timeout: 30000 });
-  await loadedReport(check, 'Logged time overview');
-  await theme(check, 'Light');
-  await check.evaluate(() => localStorage.setItem('tasks-calendar-view', 'month'));
-  const authenticatedState = await preflight.storageState();
-  await preflight.close();
-
   const context = await browser.newContext({
-    ...options,
-    storageState: authenticatedState,
-    recordVideo: { dir: path.join(OUT, 'raw'), size: SIZE },
+    viewport: LAYOUT,
+    deviceScaleFactor: 2,
+    timezoneId: 'Asia/Singapore',
+    storageState: STORAGE!,
+    reducedMotion: 'no-preference',
   });
+  context.setDefaultTimeout(12000);
+  // Render the 1440×900 composition at native Retina pixel density.
+  await context.addInitScript(() => {
+    const install = () => {
+      const style = document.createElement('style');
+      style.textContent = 'nextjs-portal{display:none!important}';
+      document.head.appendChild(style);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+    else install();
+  });
+  await context.addInitScript(CURSOR_SCRIPT);
   let unexpectedMutation = '';
   await context.route('**/api/**', async (route) => {
-    const request = route.request();
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
-      unexpectedMutation = `${request.method()} ${new URL(request.url()).pathname}`;
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(route.request().method())) {
+      unexpectedMutation = `${route.request().method()} ${new URL(route.request().url()).pathname}`;
       await route.abort();
     } else await route.continue();
   });
-  await context.addInitScript(CURSOR_SCRIPT);
   const page = await context.newPage();
-  page.on('download', () => { unexpectedMutation = 'Unexpected download'; });
-  const t0 = Date.now();
+  page.on('download', () => {
+    unexpectedMutation = 'Unexpected download';
+  });
   const marks: Record<string, number> = {};
-  const mark = (name: string) => { marks[name] = (Date.now() - t0) / 1000; };
-  let sceneStart = 0;
-  const scene = (name: string) => { mark(name); sceneStart = Date.now(); };
-  const dwell = async (seconds: number) => { await sleep(Math.max(0, seconds * 1000 - (Date.now() - sceneStart))); };
-
+  let t0 = 0;
+  const mark = (name: string) => {
+    marks[name] = (Date.now() - t0) / 1000;
+    console.log(name, marks[name].toFixed(2));
+  };
+  const frames: { file: string; time: number }[] = [];
+  const cdp = await context.newCDPSession(page);
+  let capturing = false;
+  cdp.on('Page.screencastFrame', (event) => {
+    void cdp.send('Page.screencastFrameAck', { sessionId: event.sessionId }).catch(() => {});
+    if (!capturing) return;
+    const time = (event.metadata.timestamp ?? Date.now() / 1000) - t0 / 1000;
+    if (frames.length && time - frames[frames.length - 1].time < 1 / 32) return;
+    const file = `frames/${String(frames.length).padStart(6, '0')}.jpg`;
+    fs.writeFileSync(path.join(OUT, file), Buffer.from(event.data, 'base64'));
+    frames.push({ file, time });
+  });
+  const pause = (ms = 550) => sleep(ms);
+  const combo = (text: string) => page.getByRole('combobox').filter({ hasText: text });
+  const escape = () => page.keyboard.press('Escape');
+  const choose = async (trigger: Locator, option: Locator) => {
+    await click(page, trigger);
+    await pause(160);
+    await click(page, option);
+    await pause(160);
+    await escape();
+  };
   try {
+    // Warm routes outside the take; the final recording retains all actual interaction/load timing.
     await page.goto(`${BASE}/report`);
     await loadedReport(page, 'Logged time overview');
-    await glide(page, 1190, 785, 200);
+    await theme(page, START_DARK ? 'Dark' : 'Light');
+    await page.goto(`${BASE}/schedule`);
+    await page.getByRole('region', { name: 'Staff task timeline' }).waitFor();
+    await page.goto(`${BASE}/tasks`);
+    await page.getByRole('textbox', { name: 'Search tasks' }).waitFor();
+    await page.getByRole('button', { name: 'Account menu' }).waitFor();
+    await page.evaluate(() => localStorage.setItem('tasks-calendar-view', 'month'));
+    await pause(700);
+    await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: LAYOUT.width,
+      height: LAYOUT.height,
+      deviceScaleFactor: 2,
+      mobile: false,
+      screenWidth: SIZE.width,
+      screenHeight: SIZE.height,
+      viewport: { x: 0, y: 0, width: LAYOUT.width, height: LAYOUT.height, scale: 1 },
+    });
+    if (await page.evaluate(() => devicePixelRatio !== 2 || innerWidth !== 1440))
+      throw new Error('Retina viewport was not applied');
+    t0 = Date.now();
+    capturing = true;
+    await cdp.send('Page.startScreencast', {
+      format: 'jpeg',
+      quality: 100,
+      maxWidth: SIZE.width,
+      maxHeight: SIZE.height,
+      everyNthFrame: 1,
+    });
     mark('start');
-    scene('reportsLight');
-    await sleep(1300);
-    await click(page, page.getByRole('combobox').filter({ hasText: 'All projects' }));
-    await sleep(450);
-    await page.keyboard.press('Escape');
-    await moveTo(page, page.getByRole('button', { name: /Export PDF/ }));
-    await dwell(6);
+    await pause(750);
 
-    scene('reportsThemeSwitch');
-    await theme(page, 'Dark');
-    await glide(page, 1190, 785);
-    await dwell(4);
-    scene('reportComparisons');
-    await click(page, page.getByRole('tab', { name: 'Task Completions', exact: true }));
-    await loadedReport(page, 'Task completions report');
-    await sleep(1200);
-    await click(page, page.getByRole('tab', { name: 'Team Summary', exact: true }));
-    await loadedReport(page, 'Team summary report');
-    await dwell(6);
-
-    scene('tasks');
-    await click(page, page.getByRole('link', { name: 'Tasks', exact: true }));
+    mark('tasksSearchAndPresets');
     const search = page.getByRole('textbox', { name: 'Search tasks' });
-    await search.waitFor();
     await click(page, search);
-    await search.pressSequentially(TASK.split(' ').slice(0, 2).join(' '), { delay: 35 });
-    await sleep(450);
-    await search.fill('');
-    await click(page, page.getByRole('combobox').filter({ hasText: 'Columns' }));
-    await sleep(450);
-    await page.keyboard.press('Escape');
-    await click(page, page.getByRole('button', { name: 'Filters', exact: true }));
-    await sleep(350);
-    await click(page, page.getByRole('button', { name: 'Filters', exact: true }));
-    await dwell(7);
+    await search.pressSequentially('Portal', { delay: 85 });
+    await pause(650);
+    await click(page, page.getByRole('button', { name: 'Blocked', exact: true }));
+    await pause(650);
+    await click(page, page.getByRole('button', { name: 'Due this week', exact: true }));
+    await pause(650);
+    await click(page, page.getByRole('button', { name: 'Clear', exact: true }));
+    await pause(450);
 
-    scene('inspector');
+    mark('tasksAdvancedFilters');
+    await click(page, page.getByRole('button', { name: 'Filters', exact: true }));
+    await choose(
+      combo('All statuses'),
+      page.getByRole('listbox').getByText('To Do', { exact: true })
+    );
+    await click(page, combo('All projects'));
+    await pause(180);
+    const firstProject = page.getByRole('listbox').locator('span.flex-1').first();
+    const projectName = await firstProject.innerText();
+    await click(page, firstProject);
+    await pause(220);
+    await escape();
+    await click(page, combo('All tags'));
+    await pause(180);
+    await click(page, page.getByRole('listbox').locator('span.flex-1').first());
+    await pause(220);
+    await escape();
+    await pause(450);
+    await click(page, page.getByRole('button', { name: 'Clear', exact: true }));
+    await click(page, page.getByRole('button', { name: 'Filters', exact: true }));
+
+    mark('taskColumns');
+    await click(page, combo('Columns'));
+    for (const name of ['Recurring', 'Subtasks']) {
+      const checkbox = page.getByRole('checkbox', { name, exact: true });
+      if ((await checkbox.getAttribute('aria-checked')) !== 'true') await click(page, checkbox);
+      await pause(300);
+    }
+    await escape();
+    await pause(600);
+
+    mark('taskInspector');
+    await click(page, search);
+    await search.pressSequentially('Customer portal', { delay: 35 });
+    await pause(220);
     await click(page, page.getByRole('link', { name: TASK, exact: true }).first());
     const inspector = page.getByRole('dialog', { name: 'Task details', exact: true });
-    await inspector.getByText(TASK, { exact: true }).first().waitFor();
-    await sleep(800);
+    await inspector.waitFor();
+    await pause(600);
     await moveTo(page, inspector.getByText('Discussion', { exact: true }));
-    await scroll(page, 430, 750);
-    await sleep(800);
-    await scroll(page, -650, 650);
+    await scroll(page, 420, 420);
+    await pause(650);
     await click(page, inspector.getByRole('button', { name: 'Close', exact: true }));
-    await dwell(9);
 
-    scene('creation');
+    await search.fill('');
+    mark('creation');
     await click(page, page.getByRole('button', { name: 'Create Task', exact: true }));
     const creation = page.getByRole('dialog', { name: 'Create task', exact: true });
-    await creation.waitFor();
-    const more = creation.getByRole('button', { name: /More options/ });
-    if (await more.isVisible()) await click(page, more);
-    await sleep(700);
-    await page.keyboard.press('Escape');
-    await dwell(4);
+    await click(page, creation.locator('summary').filter({ hasText: 'More options' }));
+    await pause(650);
+    await escape();
 
-    scene('calendar');
+    mark('taskCalendar');
     await click(page, page.getByRole('button', { name: 'Switch to calendar view' }));
     await page.getByRole('region', { name: 'Month calendar', exact: true }).waitFor();
-    const calendarMonth = process.env.DEMO_CALENDAR_MONTH;
-    if (calendarMonth) {
-      if (!/^\d{4}-\d{2}$/.test(calendarMonth)) throw new Error('DEMO_CALENDAR_MONTH must be YYYY-MM');
-      const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Singapore' }));
-      const [year, month] = calendarMonth.split('-').map(Number);
-      const offset = (year - now.getFullYear()) * 12 + month - 1 - now.getMonth();
-      if (Math.abs(offset) > 24 || month < 1 || month > 12) throw new Error('Calendar month must be valid and within 24 months');
-      for (let i = 0; i < Math.abs(offset); i++) await click(page, page.getByRole('button', { name: offset < 0 ? 'Previous' : 'Next', exact: true }));
-    }
-    await glide(page, 1210, 740);
-    await scroll(page, 220, 500);
-    await sleep(650);
-    // Use a real populated day if present, so Day/Week share meaningful dates.
-    const dayButtons = page.locator('section[aria-label="Month calendar"] button[aria-label*=" tasks"]:not([aria-label$=", 0 tasks"])');
-    if (await dayButtons.count()) await click(page, dayButtons.first());
-    else await click(page, page.getByRole('button', { name: 'Day view', exact: true }));
+    await pause(700);
+    const populatedDays = page.locator(
+      'section[aria-label="Month calendar"] button[aria-label*=" tasks"]:not([aria-label$=", 0 tasks"])'
+    );
+    await click(page, populatedDays.first());
     await page.getByRole('region', { name: 'Day calendar', exact: true }).waitFor();
-    await sleep(650);
+    await pause(650);
     await click(page, page.getByRole('button', { name: 'Week view', exact: true }));
-    await page.getByRole('region', { name: 'Week calendar', exact: true }).waitFor();
-    await dwell(7);
+    await pause(650);
 
-    scene('schedule');
+    mark('schedule');
     await click(page, page.getByRole('link', { name: 'Schedule', exact: true }));
     await page.getByRole('region', { name: 'Staff task timeline' }).waitFor();
-    await click(page, page.getByRole('combobox').filter({ hasText: 'All projects' }));
-    await click(page, page.getByText(PROJECT, { exact: true }).last());
-    await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: /^Inspect / }).first().waitFor();
-    await moveTo(page, page.getByRole('button', { name: /^Inspect / }).first());
-    const deadline = page.getByRole('button', { name: /^Adjust deadline for / }).first();
-    if (await deadline.isVisible()) {
-      await click(page, deadline);
-      await page.getByLabel('Deadline date', { exact: true }).waitFor();
-      await sleep(500);
-      await page.keyboard.press('Escape');
+    if (START_DARK) {
+      mark('scheduleThemeSwitch');
+      await theme(page, 'Light');
+      await pause(500);
     }
-    await dwell(7);
+    await click(page, page.getByRole('button', { name: /^\d{2}\/\d{2}\/\d{4}/ }));
+    await pause(250);
+    await click(page, page.getByRole('button', { name: 'Next 7 Days', exact: true }));
+    await click(page, page.getByRole('heading', { name: 'Schedule', exact: true }));
+    await pause(800);
+    await click(page, combo('Select staff to filter'));
+    await pause(250);
+    const staff = page.getByRole('listbox').getByText('Daniel Tan', { exact: true });
+    const staffName = await staff.innerText();
+    await click(page, staff);
+    await escape();
+    await pause(800);
+    const inspect = page.getByRole('button', { name: /^Inspect / }).first();
+    if (await inspect.isVisible()) {
+      await click(page, inspect);
+      await pause(650);
+      await click(
+        page,
+        page
+          .getByRole('dialog', { name: 'Task details' })
+          .getByRole('button', { name: 'Close', exact: true })
+      );
+    }
+    console.log('Chosen scope:', projectName, staffName);
 
-    scene('notifications');
-    await click(page, page.getByRole('button', { name: 'Notifications', exact: true }).first());
-    const inbox = page.getByRole('dialog', { name: 'Notifications', exact: true });
-    await inbox.waitFor();
-    await sleep(700);
-    await click(page, inbox.getByRole('button', { name: 'Close', exact: true }));
-    await dwell(3);
-
-    scene('closing');
+    mark('reportsLight');
     await click(page, page.getByRole('link', { name: 'Reports', exact: true }));
     await loadedReport(page, 'Logged time overview');
+    await pause(800);
+    await moveTo(page, page.getByRole('button', { name: /Export PDF/ }));
+    await pause(650);
+    await moveTo(page, page.getByRole('button', { name: /Export Excel/ }));
+    await pause(650);
+    if (!START_DARK) {
+      mark('reportsThemeSwitch');
+      await theme(page, 'Dark');
+      await pause(750);
+    }
+    await click(page, page.getByRole('tab', { name: 'Task Completions', exact: true }));
+    await loadedReport(page, 'Task completions report');
+    await pause(950);
+    await click(page, page.getByRole('tab', { name: 'Team Summary', exact: true }));
+    await loadedReport(page, 'Team summary report');
+    await pause(950);
+
+    mark('notifications');
+    await click(page, page.getByRole('button', { name: 'Notifications', exact: true }).first());
+    const inbox = page.getByRole('dialog', { name: 'Notifications', exact: true });
+    await inbox
+      .getByRole('button', { name: /^(Unread|Read):/ })
+      .first()
+      .waitFor();
+    await pause(550);
+    await click(page, inbox.getByRole('button', { name: /^(Unread|Read):/ }).first());
+    await pause(900);
+    await click(page, page.getByRole('button', { name: 'Done', exact: true }));
+    await pause(200);
+    await click(page, inbox.getByRole('button', { name: 'Close', exact: true }));
+
+    mark('closing');
+    await click(page, page.getByRole('tab', { name: 'Logged Time', exact: true }));
+    await loadedReport(page, 'Logged time overview');
+    await pause(750);
     await theme(page, 'Light');
     await glide(page, 1190, 785);
-    await dwell(7);
+    await pause(900);
     mark('end');
     if (unexpectedMutation) throw new Error(`Capture rejected: ${unexpectedMutation}`);
   } finally {
-    const video = page.video();
+    capturing = false;
+    await cdp.send('Page.stopScreencast').catch(() => {});
+    const result = {
+      viewport: SIZE,
+      layout: { width: 1440, height: 900 },
+      capture: 'native deviceScaleFactor 2, JPEG quality 100 screencast',
+      marks,
+      frames,
+      unexpectedMutation: unexpectedMutation || null,
+    };
+    fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify(result, null, 2));
+    console.log('Frames', frames.length, 'Duration', marks.end ?? 'incomplete');
     await context.close();
     await browser.close();
-    const videoPath = video ? await video.path() : null;
-    const result = { video: videoPath, viewport: SIZE, timezone: 'Asia/Singapore', marks, unexpectedMutation: unexpectedMutation || null };
-    fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify(result, null, 2));
-    console.log(JSON.stringify(result, null, 2));
   }
 }
-
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : 'Capture failed');
   process.exitCode = 1;
