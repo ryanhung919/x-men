@@ -171,7 +171,10 @@ export function TaskComments({
   return (
     <div className="space-y-4">
       {error && (
-        <div className="p-3 bg-red-100 text-red-800 rounded-md text-sm border border-red-200">
+        <div
+          role="alert"
+          className="rounded-lg border border-problem/20 bg-problem-soft p-3 text-sm text-problem"
+        >
           {error}
         </div>
       )}
@@ -189,10 +192,7 @@ export function TaskComments({
       )}
 
       {!readOnly && showCommentInput && (
-        <form
-          onSubmit={handleAddComment}
-          className="space-y-2 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg"
-        >
+        <form onSubmit={handleAddComment} className="space-y-3 rounded-xl border bg-muted/20 p-4">
           <Textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
@@ -202,8 +202,8 @@ export function TaskComments({
             disabled={isSubmitting}
             autoFocus
           />
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">{newComment.length}/5000</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">{newComment.length}/5000</span>
             <div className="flex gap-2">
               <Button
                 type="submit"
@@ -230,29 +230,39 @@ export function TaskComments({
       )}
 
       {/* Comments List */}
-      <div className="space-y-3">
+      <div className="space-y-0">
         {comments.length === 0 ? (
-          <p className="text-sm text-gray-500">No comments yet. Be the first to comment!</p>
+          <p className="text-xs text-muted-foreground">No discussion yet.</p>
         ) : (
           comments.map((comment) => (
             <div
               key={comment.id}
-              className="border rounded-lg p-4 bg-white dark:bg-gray-800 space-y-2"
+              className="relative space-y-2 border-b border-border/60 py-4 pl-11 last:border-0 last:pb-0"
             >
+              <span
+                aria-hidden="true"
+                className="absolute left-0 top-4 flex size-8 items-center justify-center rounded-full border bg-muted/50 text-[10px] font-medium text-muted-foreground"
+              >
+                {`${comment.user_info?.first_name?.[0] || ''}${comment.user_info?.last_name?.[0] || ''}` ||
+                  '?'}
+              </span>
               {/* Header */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">
+                  <span className="text-xs font-medium">
                     {comment.user_id === currentUserId
                       ? 'You'
-                      : `${comment.user_info?.first_name} ${comment.user_info?.last_name}`}
+                      : `${comment.user_info?.first_name || ''} ${comment.user_info?.last_name || ''}`.trim() ||
+                        'Unknown user'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">
+                  <span className="text-[11px] text-muted-foreground">
                     {format(new Date(comment.created_at), 'MMM d, yyyy HH:mm')}
                   </span>
-                  {comment.updated_at && <span className="text-xs text-gray-400">(edited)</span>}
+                  {comment.updated_at && (
+                    <span className="text-[10px] text-muted-foreground">(edited)</span>
+                  )}
                 </div>
               </div>
 
@@ -271,7 +281,7 @@ export function TaskComments({
                       size="sm"
                       onClick={() => handleSaveEdit(comment.id)}
                       disabled={isSavingEdit || editContent.trim().length === 0}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       <Check className="w-4 h-4 mr-1" />
                       Save
@@ -288,7 +298,9 @@ export function TaskComments({
                   </div>
                 </div>
               ) : (
-                <p className="text-sm whitespace-pre-wrap break-words">{comment.content}</p>
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/85">
+                  {comment.content}
+                </p>
               )}
 
               {/* Actions */}
@@ -299,7 +311,7 @@ export function TaskComments({
                       size="sm"
                       variant="ghost"
                       onClick={() => handleEditStart(comment)}
-                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:bg-positive-soft hover:text-positive"
                       disabled={isSavingEdit || deletingId === comment.id}
                     >
                       <Edit2 className="w-4 h-4 mr-1" />
@@ -311,7 +323,7 @@ export function TaskComments({
                       size="sm"
                       variant="ghost"
                       onClick={() => handleDeleteComment(comment.id)}
-                      className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-950"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:bg-problem-soft hover:text-problem"
                       disabled={deletingId === comment.id}
                     >
                       {deletingId === comment.id ? (
