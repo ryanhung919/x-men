@@ -6,9 +6,10 @@ import { ListTodo } from 'lucide-react';
 
 interface TasksPageHeaderProps {
   tasksCount: number;
+  readOnly?: boolean;
 }
 
-export default function TasksPageHeader({ tasksCount }: TasksPageHeaderProps) {
+export default function TasksPageHeader({ tasksCount, readOnly }: TasksPageHeaderProps) {
   const router = useRouter();
 
   const handleTaskCreated = () => {
@@ -33,7 +34,7 @@ export default function TasksPageHeader({ tasksCount }: TasksPageHeaderProps) {
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <CreateTaskDialog onTaskCreated={handleTaskCreated} />
+        <CreateTaskDialog readOnly={readOnly} onTaskCreated={handleTaskCreated} />
       </div>
     </div>
   );

@@ -127,7 +127,6 @@ export function FileUploadZone({
             ? 'border-primary bg-primary/5'
             : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-accent/50'
         )}
-        onClick={handleBrowseClick}
       >
         <input
           ref={fileInputRef}
@@ -138,7 +137,16 @@ export function FileUploadZone({
           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv"
         />
         <UploadIcon className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm font-medium">Drag files here or click to browse</p>
+        <p className="text-sm font-medium">Drop files here</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleBrowseClick}
+          className="mt-3"
+        >
+          Browse files
+        </Button>
         <p className="text-xs text-muted-foreground mt-1">
           Supports images, PDFs, docs, spreadsheets
         </p>

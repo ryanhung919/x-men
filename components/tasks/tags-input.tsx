@@ -4,7 +4,6 @@ import { useState, KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { XIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface TagsInputProps {
   tags: string[];
@@ -74,13 +73,14 @@ export function TagsInput({ tags, onChange, maxTags = 10, maxTagLength = 30 }: T
 
     if (matches) {
       // Check if the last character is a space or if there are multiple hashtags
-      const hasSpaceAfterHashtag = value.endsWith(' ') || value.match(/#\w+\s/) || value.match(/#\w+#/);
+      const hasSpaceAfterHashtag =
+        value.endsWith(' ') || value.match(/#\w+\s/) || value.match(/#\w+#/);
 
       if (hasSpaceAfterHashtag) {
         // Add all complete hashtags (those followed by space or another hashtag)
         const completeTags = value.match(/#(\w+)(?=\s|#|$)/g);
         if (completeTags) {
-          completeTags.forEach(tag => {
+          completeTags.forEach((tag) => {
             addTag(tag);
           });
 
@@ -104,10 +104,15 @@ export function TagsInput({ tags, onChange, maxTags = 10, maxTagLength = 30 }: T
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {tags.map((tag, index) => (
-            <Badge key={index} variant="secondary" className="flex items-center gap-1 pl-3 pr-1 py-1">
+            <Badge
+              key={index}
+              variant="secondary"
+              className="flex items-center gap-1 pl-3 pr-1 py-1"
+            >
               #{tag}
               <button
                 type="button"
+                aria-label={`Remove tag ${tag}`}
                 onClick={() => removeTag(index)}
                 className="ml-1 rounded-full hover:bg-muted p-0.5"
               >
@@ -138,7 +143,7 @@ export function TagsInput({ tags, onChange, maxTags = 10, maxTagLength = 30 }: T
             {tags.length} / {maxTags}
           </span>
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-problem">{error}</p>}
       </div>
     </div>
   );

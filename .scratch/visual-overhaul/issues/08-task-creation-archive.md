@@ -33,3 +33,13 @@ Prioritize presentable design and the portfolio recording; implement only necess
 - Test externally observable outcomes. Reuse the browser-level seam, existing Playwright suites, and globally installed Playwright CLI. Verify isolated database targeting before running tests that seed or mutate data.
 - Preserve unrelated user changes. No hosted reseed, deployment, broad machine-wide upgrades, or unrelated portfolio changes.
 
+
+## Resolution: implemented
+
+2026-10-17 delivered under owner's revised visual/demo scope. Creation now uses a680px focused dialog with scrollable body/pinned actions, prominent title/context and grouped required project/deadline/assignment/status/priority. Primary Create Task is blue; subtask action secondary. Native More options reveals recurrence/tags/files while keeping selected values, file limits50MBtotal/max10 and actual required-field validation unchanged. Creation priority remains original1–9 offer; existing API1–10 untouched. Repeat interval copy correctly says every1/7/30days. Project inheritance remains locked for subtasks.
+
+Keyboard-accessible project/user choices and connected labels, clear file Browse button, removable-item names, problem token validation/file errors. Prevent duplicate creation and dismissal during pending request; failures preserve input and focus footer error. Existing06subtask/inspector refresh callbacks retained; linking failure honestly reports that task was created but linkage failed rather than silent reload/alert. Guests receive existing demo_viewer capability from server role helper and see read-only explanation without mounting a submission form. No permission/data/schema changes.
+
+Archive stays manager-only through existing parent/API, with quiet red outline trigger and true red final confirmation including current subtask implications. Pending/error/success and06context callback preserved.
+
+Validation: typecheck, production build/start, targeted creation/selector/upload/archive lint pass;15 existing archive unit tests pass. CLI screenshots inspected:1440x900 creation light/dark, optionalEvery30days,390x844 scrollbody/sticky actions (footer reachable true; overflow false), inherited subtask project (visible1), canceled archive confirmation (visible1), guest explanation (visible1; editableforms0). Artifacts `/tmp/nodal08-{create-light,create-dark,options-dark,create-mobile,subtask,archive,guest}.png`. No submit, archive, uploads, seeds, or preference writes. Mutation/failure-path matrix deferred under revised scope.

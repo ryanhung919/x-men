@@ -28,6 +28,7 @@ export function ArchiveButton({ taskId, subtaskCount, onArchived }: ArchiveButto
   const router = useRouter();
 
   const handleArchive = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const response = await fetch(`/api/tasks/${taskId}/archive`, {
@@ -67,7 +68,11 @@ export function ArchiveButton({ taskId, subtaskCount, onArchived }: ArchiveButto
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" disabled={isLoading}>
+        <Button
+          variant="outline"
+          className="text-problem hover:bg-problem-soft hover:text-problem"
+          disabled={isLoading}
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -83,7 +88,7 @@ export function ArchiveButton({ taskId, subtaskCount, onArchived }: ArchiveButto
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogTitle>Archive this task?</AlertDialogTitle>
           <AlertDialogDescription>
             This will archive this task{subtaskText}. Archived tasks will no longer appear in the
             active task list.
@@ -96,7 +101,11 @@ export function ArchiveButton({ taskId, subtaskCount, onArchived }: ArchiveButto
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleArchive} disabled={isLoading}>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={handleArchive}
+            disabled={isLoading}
+          >
             {isLoading ? 'Archiving...' : 'Archive'}
           </AlertDialogAction>
         </AlertDialogFooter>
