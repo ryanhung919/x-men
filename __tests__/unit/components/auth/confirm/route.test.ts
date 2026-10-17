@@ -143,7 +143,7 @@ describe('app/auth/confirm/route', () => {
       const url = 'http://localhost:3000/auth/confirm?token_hash=abc123&type=recovery';
       const request = new NextRequest(url);
 
-      await expect(GET(request)).rejects.toThrow('REDIRECT: /');
+      await expect(GET(request)).rejects.toThrow('REDIRECT: /auth/update-password');
       expect(mockSupabase.auth.verifyOtp).toHaveBeenCalledWith({
         type: 'recovery',
         token_hash: 'abc123',
